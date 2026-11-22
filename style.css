@@ -1,4 +1,4 @@
-/* Zombie Defense Command v0.23.0 - tactical command-center theme (offline, zero layout shift) */
+/* Zombie Defense Command v0.23.1 - tactical command-center theme (offline, zero layout shift) */
 :root {
   --bg: #07090d;
   --panel: #0e131b;
@@ -1288,7 +1288,7 @@ body.is-mobile-touch .camera-controls {
   }
 }
 
-/* ---------- 4-Player Co-Op Multiplayer Modals & HUD Locks (v0.23.0) ---------- */
+/* ---------- 4-Player Co-Op Multiplayer Modals & HUD Locks (v0.23.1) ---------- */
 .mp-card {
   width: min(560px, 96vw);
   border-top-color: var(--color-cyan);
@@ -1534,6 +1534,29 @@ body.is-mobile-touch .camera-controls {
   background: linear-gradient(180deg, #00c48c, #078761);
   border-color: var(--color-cyan);
   box-shadow: 0 0 14px rgba(0, 224, 138, 0.55);
+}
+.mp-host-start-btn {
+  background: linear-gradient(180deg, #00b4d8, #0077b6);
+  border-color: var(--color-cyan);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  transition: all 0.18s ease;
+}
+.mp-host-start-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+  box-shadow: none;
+}
+.mp-host-start-btn.is-active:not(:disabled) {
+  background: linear-gradient(180deg, #00e08a, #009e5c);
+  border-color: #64ffda;
+  box-shadow: 0 0 16px rgba(0, 224, 138, 0.65);
+  animation: pulse-host-btn 1.4s infinite alternate;
+}
+@keyframes pulse-host-btn {
+  0% { box-shadow: 0 0 10px rgba(0, 224, 138, 0.4); }
+  100% { box-shadow: 0 0 20px rgba(0, 224, 138, 0.85); }
 }
 .mp-disconnect-card {
   border-top-color: var(--color-orange);

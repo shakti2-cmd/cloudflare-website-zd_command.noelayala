@@ -1,5 +1,5 @@
 /**
- * Zombie Defense Command - 4-Player Co-Op Multiplayer Manager (v0.23.0)
+ * Zombie Defense Command - 4-Player Co-Op Multiplayer Manager (v0.23.1)
  * $0 Zero-Config WebRTC P2P Mesh (PeerJS) + Public Live Room Directory (ntfy.sh & BroadcastChannel)
  * Pure Vanilla JavaScript - 100% Static Client Deployment (Cloudflare Free Tier Safe)
  */
@@ -452,11 +452,10 @@
       }
 
       if (msg.type === 'ready_toggle') {
-        const p = this.players.find((pl) => pl.id === conn.peer);
+        const p = this.players.find((pl) => pl.id === conn.peer || (msg && pl.id === msg.playerId));
         if (!p || this.inMatch) return;
         p.ready = !p.ready;
         this.broadcastLobbyUpdate();
-        this.checkAllReadyAndLaunch();
         return;
       }
 
@@ -475,7 +474,6 @@
         if (!this.inMatch) {
           this.broadcastLobbyUpdate();
           this.publishRoom('waiting');
-          this.checkAllReadyAndLaunch();
         } else {
           this.cb.onLobbyUpdated(this.getLobbyState());
         }
@@ -500,10 +498,16 @@
       this.cb.onLobbyUpdated(lobby);
     }
 
-    checkAllReadyAndLaunch() {
-      if (this.role !== 'host' || this.inMatch) return;
-      if (this.players.length < 1) return;
-      if (!this.players.every((p) => p.ready)) return;
+    hostStartMatch() {
+      if (this.role !== 'host' || this.inMatch) return false;
+      if (this.players.length < 2) {
+        this.cb.onError('At least 2 players are required to start a Multiplayer match.');
+        return false;
+      }
+      if (!this.players.every((p) => p.ready)) {
+        this.cb.onError('All connected players must be Ready before starting.');
+        return false;
+      }
 
       this.inMatch = true;
       this.publishRoom('playing');
@@ -516,6 +520,7 @@
       };
       this.broadcastRaw({ type: 'match_start', config });
       this.cb.onMatchStart(config);
+      return true;
     }
 
     // --- GUEST FLOW ---
@@ -696,10 +701,9 @@
         if (!me) return;
         me.ready = !me.ready;
         this.broadcastLobbyUpdate();
-        this.checkAllReadyAndLaunch();
       } else if (this.role === 'guest' && this.hostConn && this.hostConn.open) {
         try {
-          this.hostConn.send({ type: 'ready_toggle' });
+          this.hostConn.send({ type: 'ready_toggle', playerId: this.localId });
         } catch (_) {}
       }
     }

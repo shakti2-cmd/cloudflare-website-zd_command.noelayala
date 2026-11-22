@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.23.0 (4-Player Co-Op Multiplayer, Live Room Browser, Waiting Room, Individual Wallets & Host Disconnect Modal)
+ * Version: v0.23.1 (Waiting Room Launch Flow Fix, Host Start Game Button & Guest Ready Sync)
  */
 
 (function () {
@@ -1238,6 +1238,7 @@
       this.mpLobbyReadyHint = $('mpLobbyReadyHint');
       this.btnMpLeaveRoom = $('btnMpLeaveRoom');
       this.btnMpToggleReady = $('btnMpToggleReady');
+      this.btnMpHostStart = $('btnMpHostStart');
       this.mpHostDisconnectedModal = $('mpHostDisconnectedModal');
       this.mpDisconnectReason = $('mpDisconnectReason');
       this.btnMpDisconnectMenu = $('btnMpDisconnectMenu');
@@ -1497,6 +1498,12 @@
       on(this.btnMpToggleReady, 'click', () => {
         if (this.mp) this.mp.toggleReady();
         this.sound.playClick();
+      });
+      on(this.btnMpHostStart, 'click', () => {
+        if (this.mp) {
+          const started = this.mp.hostStartMatch();
+          if (started) this.sound.playClick();
+        }
       });
       on(this.btnMpLeaveRoom, 'click', () => {
         if (this.mp) this.mp.leaveRoom();
@@ -2575,12 +2582,34 @@
       const me = (lobby.players || []).find((p) => p.id === lobby.localId);
       const isMeReady = !!(me && me.ready);
       const readyCount = (lobby.players || []).filter((p) => p.ready).length;
+      const totalPlayers = (lobby.players || []).length;
+      const allReady = totalPlayers >= 2 && readyCount === totalPlayers;
+
       if (this.btnMpToggleReady) {
         this.btnMpToggleReady.classList.toggle('is-ready', isMeReady);
-        this.btnMpToggleReady.innerHTML = isMeReady ? '&#10003; Ready (Click to Unready)' : '&#9654; Start / Ready';
+        this.btnMpToggleReady.innerHTML = isMeReady ? '&#10003; Ready' : 'Ready';
       }
+
+      if (this.btnMpHostStart) {
+        if (lobby.isHost) {
+          showEl(this.btnMpHostStart, 'inline-flex');
+          this.btnMpHostStart.disabled = !allReady;
+          this.btnMpHostStart.classList.toggle('is-active', allReady);
+        } else {
+          hideEl(this.btnMpHostStart);
+        }
+      }
+
       if (this.mpLobbyReadyHint) {
-        this.mpLobbyReadyHint.textContent = `${readyCount}/${lobby.players.length} Ready — All connected players must press Start / Ready to deploy.`;
+        if (totalPlayers < 2) {
+          this.mpLobbyReadyHint.textContent = 'Waiting for another player to join... Share Room Info above!';
+        } else if (!allReady) {
+          this.mpLobbyReadyHint.textContent = `${readyCount}/${totalPlayers} Ready — All players must press Ready first.`;
+        } else if (lobby.isHost) {
+          this.mpLobbyReadyHint.textContent = `All ${totalPlayers} players Ready! Press Start Game to deploy.`;
+        } else {
+          this.mpLobbyReadyHint.textContent = `All ${totalPlayers} players Ready! Waiting for Host to press Start Game...`;
+        }
       }
     }
 
