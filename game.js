@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.25.0 (Mobile Tab/Clearance Fix, Settings Modal, Device Screen Rotation Lock & 60 FPS Multiplayer Interpolation)
+ * Version: v0.26.0 (WebRTC Backpressure, 60 FPS Guest Projectiles/Visuals, Synced Web Audio & Optimistic Placement)
  */
 
 (function () {
@@ -329,6 +329,12 @@
     constructor() {
       this.ctx = null;
       this.muted = false;
+      this.onCue = null;
+      this._replaying = false;
+    }
+
+    emitCue(k, a = null) {
+      if (this.onCue && !this._replaying) this.onCue(k, a);
     }
 
     unlock() {
@@ -368,21 +374,74 @@
     }
 
     playClick() { this.tone(680, 920, 0.055, 'triangle', 0.06); }
-    playLaser(f1 = 560, f2 = 220, d = 0.07) { this.tone(f1, f2, d, 'sawtooth', 0.045); }
-    playCryoPulse() { this.tone(880, 320, 0.22, 'sine', 0.06); }
-    playSniperRail() { this.tone(1100, 140, 0.16, 'square', 0.065); }
-    playHit() { this.tone(190, 95, 0.06, 'square', 0.05); }
-    playBarricadeBreak() { this.tone(130, 42, 0.25, 'sawtooth', 0.09); }
-    playInfection() { this.tone(310, 220, 0.24, 'sawtooth', 0.07); }
+    playLaser(f1 = 560, f2 = 220, d = 0.07) {
+      this.tone(f1, f2, d, 'sawtooth', 0.045);
+      this.emitCue('laser', [f1, f2, d]);
+    }
+    playCryoPulse() {
+      this.tone(880, 320, 0.22, 'sine', 0.06);
+      this.emitCue('cryo');
+    }
+    playSniperRail() {
+      this.tone(1100, 140, 0.16, 'square', 0.065);
+      this.emitCue('sniper');
+    }
+    playHit() {
+      this.tone(190, 95, 0.06, 'square', 0.05);
+      this.emitCue('hit');
+    }
+    playBarricadeBreak() {
+      this.tone(130, 42, 0.25, 'sawtooth', 0.09);
+      this.emitCue('break');
+    }
+    playInfection() {
+      this.tone(310, 220, 0.24, 'sawtooth', 0.07);
+      this.emitCue('infection');
+    }
+    playWaveWarning() {
+      this.tone(420, 620, 0.22, 'sawtooth', 0.08);
+      this.emitCue('wave');
+    }
 
     playRescue() {
       this.tone(523.25, 523.25, 0.09, 'triangle', 0.08);
       setTimeout(() => this.tone(659.25, 659.25, 0.09, 'triangle', 0.08), 70);
       setTimeout(() => this.tone(783.99, 1046.5, 0.16, 'triangle', 0.09), 140);
+      this.emitCue('rescue');
     }
 
     playUpgrade() {
       this.tone(440, 880, 0.18, 'triangle', 0.09);
+      this.emitCue('upgrade');
+    }
+
+    playRemoteCue(cue) {
+      if (!cue || !cue.k) return;
+      this._replaying = true;
+      try {
+        if (cue.k === 'laser') {
+          const a = Array.isArray(cue.a) ? cue.a : [];
+          this.playLaser(a[0], a[1], a[2]);
+        } else if (cue.k === 'cryo') {
+          this.playCryoPulse();
+        } else if (cue.k === 'sniper') {
+          this.playSniperRail();
+        } else if (cue.k === 'hit') {
+          this.playHit();
+        } else if (cue.k === 'break') {
+          this.playBarricadeBreak();
+        } else if (cue.k === 'infection') {
+          this.playInfection();
+        } else if (cue.k === 'wave') {
+          this.playWaveWarning();
+        } else if (cue.k === 'rescue') {
+          this.playRescue();
+        } else if (cue.k === 'upgrade') {
+          this.playUpgrade();
+        }
+      } finally {
+        this._replaying = false;
+      }
     }
   }
 
@@ -989,6 +1048,16 @@
       this.mpPendingJoinRoom = null;
       this.mpSyncAccum = 0;
       this.mpPauseActive = false;
+      this.lastAppliedMpSeq = 0;
+      this.lastMpMigrationGen = 0;
+      this.nextProjId = 1;
+      this.mpSeenProjIds = new Set();
+      this.mpSfxQueue = [];
+      this.mpSfxSeq = 0;
+      this.lastPlayedMpSfxId = 0;
+      if (this.sound) {
+        this.sound.onCue = (kind, args) => this.recordMpSfx(kind, args);
+      }
       this.mp = typeof window.MultiplayerManager !== 'undefined'
         ? new window.MultiplayerManager({
             onRoomsUpdated: (rooms) => this.renderMpRoomList(rooms),
@@ -1294,6 +1363,13 @@
           e.target.closest('button').blur();
         }
       });
+
+      const unlockAudio = () => {
+        if (this.sound) this.sound.unlock();
+      };
+      window.addEventListener('pointerdown', unlockAudio, { passive: true });
+      window.addEventListener('touchstart', unlockAudio, { passive: true });
+      window.addEventListener('keydown', unlockAudio, { passive: true });
 
       // Startup screen difficulty cards
       document.querySelectorAll('[data-diff]').forEach((card) => {
@@ -3202,10 +3278,24 @@
       return bestOwner;
     }
 
+    recordMpSfx(kind, args) {
+      if (!this.isMultiplayer || !this.isMpHost || !this.inPlay) return;
+      this.mpSfxQueue.push({ id: ++this.mpSfxSeq, k: kind, a: args || null });
+      if (this.mpSfxQueue.length > 24) {
+        this.mpSfxQueue.splice(0, this.mpSfxQueue.length - 24);
+      }
+    }
+
     initMultiplayerMatch(config) {
       this.clearTutorial();
       this.isMultiplayer = true;
       this.isMpHost = !!(this.mp && this.mp.role === 'host');
+      this.lastAppliedMpSeq = 0;
+      this.lastMpMigrationGen = 0;
+      if (this.mpSeenProjIds) this.mpSeenProjIds.clear();
+      this.mpSfxQueue = [];
+      this.mpSfxSeq = 0;
+      this.lastPlayedMpSfxId = 0;
       this.localPlayerId = (this.mp && this.mp.localId) || (config.players && config.players[0] && config.players[0].id) || 'local';
       this.mpPlayers = (config.players || []).map((p) => ({ ...p }));
       this.difficulty = DIFFICULTY_PRESETS[config.difficulty] ? config.difficulty : 'normal';
@@ -3611,24 +3701,56 @@
           angle: z.angle || 0, slowTimer: z.slowTimer || 0, bruteBreach: !!z.bruteBreach
         })),
         projectiles: this.projectiles.map((p) => ({
-          x: Math.round(p.x * 10) / 10,
-          y: Math.round(p.y * 10) / 10,
-          vx: Math.round((p.vx || 0) * 10) / 10,
-          vy: Math.round((p.vy || 0) * 10) / 10,
-          color: p.color,
-          radius: p.radius || 3,
-          life: p.life || 0.4
-        }))
+          id: p.id || 0,
+          type: p.type || 'bullet',
+          x1: p.x1 !== undefined ? Math.round(p.x1 * 10) / 10 : undefined,
+          y1: p.y1 !== undefined ? Math.round(p.y1 * 10) / 10 : undefined,
+          x2: p.x2 !== undefined ? Math.round(p.x2 * 10) / 10 : undefined,
+          y2: p.y2 !== undefined ? Math.round(p.y2 * 10) / 10 : undefined,
+          x: p.x !== undefined ? Math.round(p.x * 10) / 10 : undefined,
+          y: p.y !== undefined ? Math.round(p.y * 10) / 10 : undefined,
+          vx: p.vx !== undefined ? Math.round(p.vx * 10) / 10 : undefined,
+          vy: p.vy !== undefined ? Math.round(p.vy * 10) / 10 : undefined,
+          radius: p.radius !== undefined ? Math.round(p.radius * 10) / 10 : undefined,
+          maxRadius: p.maxRadius !== undefined ? Math.round(p.maxRadius * 10) / 10 : undefined,
+          color: p.color || '#FFD23F',
+          life: Math.round((p.life || 0.11) * 1000) / 1000,
+          maxLife: Math.round((p.maxLife || 0.11) * 1000) / 1000
+        })),
+        sfx: this.mpSfxQueue.slice()
       };
     }
 
     applyMpState(snap) {
       if (!this.isMultiplayer || this.isMpHost || !snap) return;
 
+      const snapGen = Number(snap.migrationGen) || 0;
+      if (snapGen > (this.lastMpMigrationGen || 0)) {
+        this.lastMpMigrationGen = snapGen;
+        this.lastAppliedMpSeq = 0;
+      }
+      if (typeof snap.seq === 'number') {
+        if (snap.seq <= this.lastAppliedMpSeq) return;
+        this.lastAppliedMpSeq = snap.seq;
+      }
+
       const prevSelKey = this.selectedStructure ? `${this.selectedStructure.col},${this.selectedStructure.row}` : null;
       const prevSolId = this.selectedSoldier ? this.selectedSoldier.id : null;
       const prevEngId = this.selectedEngineer ? this.selectedEngineer.id : null;
       const prevCivId = this.selectedCivilian ? this.selectedCivilian.id : null;
+
+      const pendingSz = [];
+      for (const sz of this.safeZones.values()) {
+        if (sz.pendingConfirmUntil && sz.ownerId === this.localPlayerId) {
+          pendingSz.push(sz);
+        }
+      }
+      const pendingSt = [];
+      for (const st of this.structures.values()) {
+        if (st.pendingConfirmUntil && st.ownerId === this.localPlayerId) {
+          pendingSt.push(st);
+        }
+      }
 
       this.wave = snap.wave || 0;
       const prevState = this.waveState;
@@ -3676,6 +3798,59 @@
           trainQueue: new Array(st.qLen || 0).fill(0).map(() => ({ cost: 50, started: true })),
           activeTrainers: new Array(st.activeT || 0).fill(0).map(() => ({ timer: st.trainTimer || 0 }))
         });
+      }
+
+      if (pendingSz.length > 0 || pendingSt.length > 0) {
+        const now = performance.now();
+        let pendingHoldCost = 0;
+        let conflictNotified = false;
+        for (const pSz of pendingSz) {
+          const key = `${pSz.col},${pSz.row}`;
+          const hostSz = this.safeZones.get(key);
+          if (hostSz && hostSz.ownerId === this.localPlayerId) {
+            continue;
+          }
+          if (hostSz && hostSz.ownerId !== this.localPlayerId) {
+            if (!conflictNotified) {
+              this.showStatus('Tile claimed by another commander — Scrap synced.');
+              conflictNotified = true;
+            }
+            continue;
+          }
+          if (pSz.pendingConfirmUntil > now) {
+            this.safeZones.set(key, pSz);
+            if (this.grid[pSz.row]) this.grid[pSz.row][pSz.col] = 2;
+            pendingHoldCost += (pSz.pendingCost || 0);
+          }
+        }
+        for (const pSt of pendingSt) {
+          const key = `${pSt.col},${pSt.row}`;
+          const hostSt = this.structures.get(key);
+          if (hostSt && hostSt.ownerId === this.localPlayerId && hostSt.type === pSt.type) {
+            continue;
+          }
+          if (hostSt && hostSt.ownerId !== this.localPlayerId) {
+            if (!conflictNotified) {
+              this.showStatus('Tile claimed by another commander — Scrap synced.');
+              conflictNotified = true;
+            }
+            continue;
+          }
+          if (pSt.pendingConfirmUntil > now) {
+            this.structures.set(key, pSt);
+            if (this.grid[pSt.row]) {
+              if (pSt.type === 'wall' && !this.safeZones.has(key)) this.grid[pSt.row][pSt.col] = 4;
+              else if (pSt.type === 'gate' && this.grid[pSt.row][pSt.col] === 4) {
+                this.grid[pSt.row][pSt.col] = this.safeZones.has(key) ? 2 : 0;
+              }
+            }
+            pendingHoldCost += (pSt.pendingCost || 0);
+          }
+        }
+        if (pendingHoldCost > 0 && this.localPlayerId && this.playerWallets[this.localPlayerId] !== undefined) {
+          this.playerWallets[this.localPlayerId] = Math.max(0, (Number(this.playerWallets[this.localPlayerId]) || 0) - pendingHoldCost);
+          this.scrap = this.playerWallets[this.localPlayerId];
+        }
       }
 
       this.spawns.clear();
@@ -3866,7 +4041,39 @@
         });
       }
 
-      this.projectiles = snap.projectiles || [];
+      for (const sp of snap.projectiles || []) {
+        if (sp.id && this.mpSeenProjIds.has(sp.id)) continue;
+        if (sp.id) {
+          this.mpSeenProjIds.add(sp.id);
+          if (this.mpSeenProjIds.size > 300) {
+            const firstKey = this.mpSeenProjIds.values().next().value;
+            this.mpSeenProjIds.delete(firstKey);
+          }
+        }
+        const minLife = sp.type === 'bullet' ? 0.09 : (sp.type === 'railBeam' ? 0.16 : 0.2);
+        this.projectiles.push({
+          ...sp,
+          life: Math.max(sp.life || minLife, minLife),
+          maxLife: Math.max(sp.maxLife || minLife, minLife)
+        });
+        if (sp.x2 !== undefined && sp.y2 !== undefined) {
+          const count = sp.type === 'railBeam' ? 8 : 3;
+          const speed = sp.type === 'railBeam' ? 65 : 35;
+          this.addParticles(sp.x2, sp.y2, sp.color || '#FFD23F', count, speed);
+        }
+      }
+
+      if (Array.isArray(snap.sfx) && snap.sfx.length > 0 && this.sound) {
+        const playedKinds = new Set();
+        for (let i = 0; i < snap.sfx.length; i++) {
+          const cue = snap.sfx[i];
+          if (!cue || typeof cue.id !== 'number' || cue.id <= this.lastPlayedMpSfxId) continue;
+          this.lastPlayedMpSfxId = cue.id;
+          if (playedKinds.has(cue.k)) continue;
+          playedKinds.add(cue.k);
+          this.sound.playRemoteCue(cue);
+        }
+      }
 
       if (prevSelKey) {
         const match = this.structures.get(prevSelKey) || this.safeZones.get(prevSelKey) || null;
@@ -5837,16 +6044,12 @@
         return;
       }
 
-      if (this.isMultiplayer && !this.isMpHost) {
-        if (this.mp) this.mp.sendAction({ kind: 'sz_drag', sc: startCol, sr: startRow, cc: curCol, cr: curRow });
-        if (this.isMobileTouch) {
-          this.selectedBuildType = null;
-          this.updateBuildPanelUI();
-        }
-        return;
-      }
-
       if (!this.spendPlayerScrap(effActor, plan.totalCost)) return;
+      const isOptimistic = this.isMultiplayer && !this.isMpHost;
+      if (isOptimistic && this.mp) {
+        this.mp.sendAction({ kind: 'sz_drag', sc: startCol, sr: startRow, cc: curCol, cr: curRow });
+      }
+      const pendingUntil = isOptimistic ? (performance.now() + 2500) : 0;
       const lv = STRUCTURE_SPECS.safezone.levels[0];
       const pMeta = this.getPlayerMeta(effActor);
       let lastX = 0;
@@ -5873,7 +6076,8 @@
           ownerId: effActor || null,
           ownerSlot: pMeta ? pMeta.slot : 0,
           ownerColor: pMeta ? pMeta.color : null,
-          ownerName: pMeta ? pMeta.callsign : null
+          ownerName: pMeta ? pMeta.callsign : null,
+          ...(pendingUntil ? { pendingConfirmUntil: pendingUntil, pendingCost: unitCost } : {})
         });
         this.grid[r][c] = 2;
         this.addParticles(p.x, p.y, (pMeta && pMeta.color) || '#00E08A', 5, 36);
@@ -5958,16 +6162,12 @@
         return;
       }
 
-      if (this.isMultiplayer && !this.isMpHost) {
-        if (this.mp) this.mp.sendAction({ kind: 'line_drag', sc: startCol, sr: startRow, cc: curCol, cr: curRow, bType: type });
-        if (this.isMobileTouch) {
-          this.selectedBuildType = null;
-          this.updateBuildPanelUI();
-        }
-        return;
-      }
-
       if (!this.spendPlayerScrap(effActor, plan.totalCost)) return;
+      const isOptimistic = this.isMultiplayer && !this.isMpHost;
+      if (isOptimistic && this.mp) {
+        this.mp.sendAction({ kind: 'line_drag', sc: startCol, sr: startRow, cc: curCol, cr: curRow, bType: type });
+      }
+      const pendingUntil = isOptimistic ? (performance.now() + 2500) : 0;
       const lv = spec.levels[0];
       const pMeta = this.getPlayerMeta(effActor);
       let lastX = 0;
@@ -6001,7 +6201,8 @@
           ownerId: effActor || null,
           ownerSlot: pMeta ? pMeta.slot : 0,
           ownerColor: pMeta ? pMeta.color : null,
-          ownerName: pMeta ? pMeta.callsign : null
+          ownerName: pMeta ? pMeta.callsign : null,
+          ...(pendingUntil ? { pendingConfirmUntil: pendingUntil, pendingCost: spec.baseCost } : {})
         });
         if (type === 'wall' && !this.safeZones.has(key)) {
           this.grid[r][c] = 4;
@@ -6128,16 +6329,12 @@
         return;
       }
 
-      if (this.isMultiplayer && !this.isMpHost) {
-        if (this.mp) this.mp.sendAction({ kind: 'build', type, col, row });
-        if (this.isMobileTouch) {
-          this.selectedBuildType = null;
-          this.updateBuildPanelUI();
-        }
-        return;
-      }
-
       if (!this.spendPlayerScrap(effActor, spec.baseCost)) return;
+      const isOptimistic = this.isMultiplayer && !this.isMpHost;
+      if (isOptimistic && this.mp) {
+        this.mp.sendAction({ kind: 'build', type, col, row });
+      }
+      const pendingUntil = isOptimistic ? (performance.now() + 2500) : 0;
       const lv = spec.levels[0];
       const pMeta = this.getPlayerMeta(effActor);
 
@@ -6159,7 +6356,8 @@
           ownerId: effActor || null,
           ownerSlot: pMeta ? pMeta.slot : 0,
           ownerColor: pMeta ? pMeta.color : null,
-          ownerName: pMeta ? pMeta.callsign : null
+          ownerName: pMeta ? pMeta.callsign : null,
+          ...(pendingUntil ? { pendingConfirmUntil: pendingUntil, pendingCost: spec.baseCost } : {})
         };
         this.safeZones.set(key, szBlock);
         this.grid[row][col] = 2;
@@ -6194,7 +6392,8 @@
           ownerId: effActor || null,
           ownerSlot: pMeta ? pMeta.slot : 0,
           ownerColor: pMeta ? pMeta.color : null,
-          ownerName: pMeta ? pMeta.callsign : null
+          ownerName: pMeta ? pMeta.callsign : null,
+          ...(pendingUntil ? { pendingConfirmUntil: pendingUntil, pendingCost: spec.baseCost } : {})
         };
         if (type === 'barracks' || type === 'engineering') {
           struct.capacity = lv.capacity || 4;
@@ -8517,7 +8716,10 @@
       try {
         if (dt > 0) this.update(dt);
         else if (this.isMultiplayer && !this.isMpHost && this.inPlay && !this.isPaused) {
-          this.interpolateMpEntities(Math.min(rawDt, 0.1));
+          const interpDt = Math.min(rawDt, 0.1);
+          this.interpolateMpEntities(interpDt);
+          this.updateProjectiles(interpDt);
+          this.updateVisuals(interpDt);
         }
       } catch (err) {
         if (window.console) console.error('Simulation error:', err);
@@ -8587,12 +8789,6 @@
             e.y += (e.targetY - e.y) * factor;
           }
         }
-      }
-      for (let p = 0; p < this.projectiles.length; p++) {
-        const proj = this.projectiles[p];
-        proj.x += (proj.vx || 0) * dt;
-        proj.y += (proj.vy || 0) * dt;
-        if (proj.life) proj.life -= dt;
       }
     }
 
@@ -9106,6 +9302,7 @@
             sol.angle = Math.atan2(fireTarget.y - sol.y, fireTarget.x - sol.x);
             this.sound.playLaser(720, 340, 0.05);
             this.projectiles.push({
+              id: this.nextProjId++,
               type: 'bullet',
               x1: sol.x,
               y1: sol.y,
@@ -9129,6 +9326,7 @@
               sol.angle = Math.atan2(breach.y - sol.y, breach.x - sol.x);
               this.sound.playLaser(720, 340, 0.05);
               this.projectiles.push({
+                id: this.nextProjId++,
                 type: 'bullet',
                 x1: sol.x,
                 y1: sol.y,
@@ -9874,6 +10072,7 @@
                 struct.angle = Math.atan2(fireTarget.y - struct.y, fireTarget.x - struct.x);
                 this.sound.playLaser(720, 340, 0.05);
                 this.projectiles.push({
+                  id: this.nextProjId++,
                   type: 'bullet',
                   x1: struct.x,
                   y1: struct.y,
@@ -10088,6 +10287,7 @@
       this.sound.playLaser(560, 220, 0.07);
       t.angle = Math.atan2(target.y - t.y, target.x - t.x);
       this.projectiles.push({
+        id: this.nextProjId++,
         type: 'bullet',
         x1: t.x,
         y1: t.y,
@@ -10107,6 +10307,7 @@
     fireCryo(t, lv) {
       this.sound.playCryoPulse();
       this.projectiles.push({
+        id: this.nextProjId++,
         type: 'cryoWave',
         x: t.x,
         y: t.y,
@@ -10133,6 +10334,7 @@
       this.sound.playSniperRail();
       t.angle = Math.atan2(target.y - t.y, target.x - t.x);
       this.projectiles.push({
+        id: this.nextProjId++,
         type: 'railBeam',
         x1: t.x,
         y1: t.y,

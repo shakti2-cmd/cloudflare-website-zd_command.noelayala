@@ -1,5 +1,5 @@
 /**
- * Zombie Defense Command - 4-Player Co-Op Multiplayer Manager (v0.25.0)
+ * Zombie Defense Command - 4-Player Co-Op Multiplayer Manager (v0.26.0)
  * $0 Zero-Config WebRTC P2P Mesh (PeerJS) + Public Live Room Directory (ntfy.sh & BroadcastChannel)
  * Pure Vanilla JavaScript - 100% Static Client Deployment (Cloudflare Free Tier Safe)
  */
@@ -65,6 +65,7 @@
       this.pauseState = null;
       this.pendingReconnectConn = null;
       this.lastSnapshot = null;
+      this.stateSeq = 0;
 
       // Live directory state
       this.rooms = new Map(); // roomId -> { roomId, roomName, hostName, difficulty, hasPassword, playerCount, maxPlayers, status, ts, seenAt }
@@ -465,6 +466,7 @@
       this.pauseState = null;
       this.pendingReconnectConn = null;
       this.lastSnapshot = null;
+      this.stateSeq = 0;
       this.roomName = cleanRoom;
       this.roomPassword = String(password || '').trim().slice(0, 20);
       this.hasPassword = !!this.roomPassword;
@@ -732,9 +734,18 @@
       }
     }
 
-    broadcastRaw(obj) {
+    broadcastRaw(obj, options = null) {
+      const maxBuf = options && options.maxBufferedBytes > 0 ? options.maxBufferedBytes : 0;
       for (const [peerId, conn] of this.conns.entries()) {
         if (conn && conn.open) {
+          if (maxBuf > 0) {
+            try {
+              const dc = conn.dataChannel || conn._dc;
+              if (dc && typeof dc.bufferedAmount === 'number' && dc.bufferedAmount > maxBuf) {
+                continue;
+              }
+            } catch (_) {}
+          }
           try {
             conn.send(obj);
           } catch (_) {}
@@ -1551,11 +1562,13 @@
     broadcastState(snap) {
       if (this.role !== 'host' || !this.inMatch) return;
       if (snap && typeof snap === 'object') {
+        this.stateSeq = Math.max(this.stateSeq || 0, (this.lastSnapshot && this.lastSnapshot.seq) || 0) + 1;
+        snap.seq = this.stateSeq;
         snap.nextHostId = this.pickNextHostId();
         snap.migrationGen = this.migrationGen || 0;
         this.lastSnapshot = snap;
       }
-      this.broadcastRaw({ type: 'state', snap });
+      this.broadcastRaw({ type: 'state', snap }, { maxBufferedBytes: 32768 });
     }
 
     sendAction(action) {
