@@ -1,4 +1,4 @@
-/* Zombie Defense Command v0.24.0 - tactical command-center theme (offline, zero layout shift) */
+/* Zombie Defense Command v0.25.0 - tactical command-center theme (offline, zero layout shift) */
 :root {
   --bg: #07090d;
   --panel: #0e131b;
@@ -876,6 +876,10 @@ body.is-mobile-touch #mobileTabBar {
   height: 60px;
 }
 
+body.is-mobile-touch.is-multiplayer #mobileTabBar {
+  grid-template-columns: repeat(5, 1fr);
+}
+
 .mobile-tab-btn.tab-next-wave {
   background: linear-gradient(180deg, #0c8a63, #086548);
   border-color: var(--color-green);
@@ -1153,7 +1157,7 @@ body.is-mobile-touch #commandDeck {
   max-height: none;
   overflow: visible;
   z-index: 25;
-  padding: 4px calc(6px + env(safe-area-inset-right, 0px)) calc(4px + env(safe-area-inset-bottom, 0px)) calc(6px + env(safe-area-inset-left, 0px));
+  padding: 4px calc(6px + env(safe-area-inset-right, 0px)) max(14px, env(safe-area-inset-bottom, 14px)) calc(6px + env(safe-area-inset-left, 0px));
   gap: 0;
 }
 body.is-mobile-touch #buildPanel {
@@ -1298,7 +1302,7 @@ body.is-mobile-touch .camera-controls {
   }
 }
 
-/* ---------- 4-Player Co-Op Multiplayer Modals & HUD Locks (v0.24.0) ---------- */
+/* ---------- 4-Player Co-Op Multiplayer Modals & HUD Locks (v0.25.0) ---------- */
 .mp-card {
   width: min(560px, 96vw);
   border-top-color: var(--color-cyan);
@@ -1717,7 +1721,7 @@ body.is-multiplayer #btnMobileReset {
     height: auto;
     min-height: 0;
     max-height: none;
-    padding: 2px calc(6px + env(safe-area-inset-right, 0px)) calc(2px + env(safe-area-inset-bottom, 0px)) calc(6px + env(safe-area-inset-left, 0px));
+    padding: 2px calc(6px + env(safe-area-inset-right, 0px)) max(10px, env(safe-area-inset-bottom, 10px)) calc(6px + env(safe-area-inset-left, 0px));
   }
   body.is-mobile-touch #inspectorSlot {
     flex: none;
@@ -1811,5 +1815,120 @@ body.is-multiplayer #btnMobileReset {
   .train-select {
     height: 30px;
     font-size: 10px;
+  }
+}
+
+/* ---------- System Settings Modal & Screen Rotation Locks (v0.25.0) ---------- */
+.settings-card {
+  width: min(520px, 94vw);
+  border-top: 3px solid var(--color-cyan);
+  text-align: left;
+  max-height: 90dvh;
+  overflow-y: auto;
+}
+.settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 14px 0 16px 0;
+}
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.settings-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--color-cyan);
+}
+.settings-hint {
+  font-family: var(--font);
+  font-size: 10.5px;
+  color: var(--dim);
+}
+.settings-rot-row,
+.settings-btn-row,
+.settings-callsign-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.rot-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 8px 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--panel-2);
+  color: var(--dim);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  text-align: center;
+}
+.rot-btn:hover {
+  border-color: var(--color-cyan);
+  color: var(--text);
+}
+.rot-btn.active {
+  background: rgba(0, 229, 255, 0.15);
+  border-color: var(--color-cyan);
+  color: #fff;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+}
+.settings-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: #0a0f18;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 8px 10px;
+}
+.settings-input:focus {
+  outline: none;
+  border-color: var(--color-cyan);
+  box-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
+}
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* CSS orientation fallback when screen.orientation is unsupported */
+@media (orientation: portrait) {
+  body.is-mobile-touch.force-landscape #gameContainer {
+    position: fixed;
+    top: 0;
+    left: 100vw;
+    width: 100vh;
+    height: 100vw;
+    transform: rotate(90deg);
+    transform-origin: top left;
+  }
+}
+@media (orientation: landscape) {
+  body.is-mobile-touch.force-portrait #gameContainer {
+    position: fixed;
+    top: 100vh;
+    left: 0;
+    width: 100vh;
+    height: 100vw;
+    transform: rotate(-90deg);
+    transform-origin: top left;
   }
 }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Zombie Defense Command - Tactical Grid Survival (v0.24.0)</title>
+  <title>Zombie Defense Command - Tactical Grid Survival (v0.25.0)</title>
 
   <!-- PWA & Mobile Web App Meta -->
   <meta name="theme-color" content="#07090d">
@@ -30,7 +30,7 @@
     <header id="topHud">
       <div class="hud-brand">
         <span class="hud-logo">&#9763;</span>
-        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.24.0</small></span>
+        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.25.0</small></span>
       </div>
 
       <div class="hud-stats">
@@ -85,6 +85,7 @@
     <!-- Floating Mobile Settings Menu (Outside #topHud to avoid overflow clipping) -->
     <div id="mobileSettingsMenu" class="mobile-settings-menu hidden" role="menu" aria-label="Mobile Settings">
       <div class="mobile-settings-header">TACTICAL SETTINGS</div>
+      <button id="btnMobileOpenSettings" class="mobile-settings-item" role="menuitem">&#9881; Settings</button>
       <button id="btnMobileZombies" class="mobile-settings-item" role="menuitem">&#9763; Zombie Bestiary</button>
       <button id="btnMobileReset" class="mobile-settings-item" role="menuitem">&#8635; Restart Sector</button>
       <button id="btnMobileAudio" class="mobile-settings-item" role="menuitem">&#128266; Audio: On</button>
@@ -132,7 +133,7 @@
         <div class="modal-card start-card">
           <div class="start-icon">&#9763;</div>
           <h1 class="start-title">ZOMBIE DEFENSE COMMAND</h1>
-          <div class="start-version-badge">v0.24.0</div>
+          <div class="start-version-badge">v0.25.0</div>
           <p class="start-subtitle">Expand green Safe Zones within 3 tiles of Red Spawn Breaches and deploy Commandos to destroy them (towers defend against zombies only).</p>
 
           <div id="startMainSection">
@@ -173,6 +174,7 @@
             <div class="modal-actions" id="mainModalActions">
               <button id="btnStartMission" class="modal-btn primary-btn">&#9654; Start Mission</button>
               <button id="btnStartMultiplayer" class="modal-btn secondary-btn mp-start-btn">&#127760; Multiplayer</button>
+              <button id="btnStartSettings" class="modal-btn secondary-btn">&#9881; Settings</button>
               <button id="btnStartTutorial" class="modal-btn secondary-btn tutorial-start-btn">&#9733; Tutorial</button>
               <button id="btnStartZombies" class="modal-btn secondary-btn zombies-modal-btn">&#9760; Zombies</button>
               <button id="btnHowToPlay" class="modal-btn secondary-btn">How to Play</button>
@@ -206,7 +208,53 @@
             <option value="tutorial">Tutorial: Basic Training</option>
           </select>
 
-          <div class="start-hint">v0.24.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; M mute</div>
+          <div class="start-hint">v0.25.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; M mute</div>
+        </div>
+      </div>
+
+      <!-- Settings Modal (v0.25.0) -->
+      <div id="settingsModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+        <div class="modal-card settings-card">
+          <button id="btnCloseSettings" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
+          <h2 id="settingsTitle" class="help-title">&#9881; SYSTEM SETTINGS</h2>
+          <div class="settings-content">
+            <div class="settings-group">
+              <label class="settings-label">Screen Rotation</label>
+              <div class="settings-rot-row" id="settingsRotRow">
+                <button type="button" class="rot-btn active" data-rot="auto">&#8646; Auto</button>
+                <button type="button" class="rot-btn" data-rot="portrait">&#128241; Lock Portrait</button>
+                <button type="button" class="rot-btn" data-rot="landscape">&#128242; Lock Landscape</button>
+              </div>
+              <div class="settings-hint">Lock orientation for mobile touch / handheld play.</div>
+            </div>
+
+            <div class="settings-group">
+              <label class="settings-label" for="settingsPlayerCallsign">Commander Callsign</label>
+              <div class="settings-callsign-row">
+                <input type="text" id="settingsPlayerCallsign" class="settings-input" maxlength="16" placeholder="Commander" autocomplete="off" autocorrect="off" autocapitalize="words" />
+                <button id="btnSettingsSaveCallsign" class="modal-btn secondary-btn settings-save-btn" type="button">Save</button>
+              </div>
+              <div class="settings-hint">Used for 4-Player Co-Op multiplayer and leaderboards.</div>
+            </div>
+
+            <div class="settings-group">
+              <label class="settings-label">Audio FX</label>
+              <div class="settings-row">
+                <button id="btnSettingsAudio" class="modal-btn secondary-btn" type="button">&#128266; Sound: On</button>
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <label class="settings-label">Field Guides</label>
+              <div class="settings-btn-row">
+                <button id="btnSettingsHowToPlay" class="modal-btn secondary-btn" type="button">&#128214; Tactical Manual</button>
+                <button id="btnSettingsBestiary" class="modal-btn secondary-btn" type="button">&#9760; Zombie Bestiary</button>
+              </div>
+            </div>
+          </div>
+          <div class="modal-actions settings-actions">
+            <button id="btnSettingsBack" type="button" class="modal-btn primary-btn">Done</button>
+          </div>
         </div>
       </div>
 
@@ -214,7 +262,7 @@
       <div id="howToPlayModal" class="modal-overlay hidden">
         <div class="modal-card help-card">
           <button id="btnCloseHowToPlay" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.24.0)</h2>
+          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.25.0)</h2>
           <div class="help-grid">
             <section>
               <h3>Single 3&times;3 Start &amp; Line-Drag Barricades</h3>
@@ -251,7 +299,7 @@
       <div id="zombieGuideModal" class="modal-overlay hidden">
         <div class="modal-card help-card zombie-guide-card">
           <button id="btnCloseZombieGuide" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.24.0)</h2>
+          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.25.0)</h2>
           <div id="bestiaryHardIndicator" class="bestiary-hard-indicator hidden">&#9888; HARD MODE ACTIVE: 3.0&times; ZOMBIE HP APPLIED</div>
           <p class="bestiary-note"><b class="c-orange">25% Random Brute-Breach Trait:</b> Any spawned Walker, Runner, Tank, or Wrecker has a 25% chance (100% on Demolisher) to smash straight toward Safe Zones, dealing a <b>fixed unscaled 12 damage</b> (<b>16 damage</b> for Demolishers) per strike against structures &amp; Safe Zones.</p>
           <div class="zombie-intel-list">
@@ -317,7 +365,7 @@
         </div>
       </div>
 
-      <!-- 4-Player Co-Op Multiplayer Modals (v0.24.0) -->
+      <!-- 4-Player Co-Op Multiplayer Modals (v0.25.0) -->
       <div id="mpRoleModal" class="modal-overlay hidden">
         <div class="modal-card mp-card">
           <h2 class="help-title mp-modal-title">&#127760; 4-PLAYER CO-OP MULTIPLAYER</h2>
@@ -446,7 +494,7 @@
         </div>
       </div>
 
-      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.24.0) -->
+      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.25.0) -->
       <div id="mpPauseModal" class="modal-overlay hidden">
         <div class="modal-card mp-card mp-pause-card">
           <h2 id="mpPauseTitle" class="help-title mp-modal-title">&#9208; MATCH PAUSED</h2>
@@ -615,7 +663,7 @@
         </div>
 
         <div id="deckHint">
-          <span class="hint-text">v0.24.0 &bull; Towers target zombies only &bull; Expand $10 Safe Zones &le;3 tiles of a Breach so Commandos destroy it! &bull; Engineers +20/+40/+70 HP/s</span>
+          <span class="hint-text">v0.25.0 &bull; Towers target zombies only &bull; Expand $10 Safe Zones &le;3 tiles of a Breach so Commandos destroy it! &bull; Engineers +20/+40/+70 HP/s</span>
         </div>
       </div>
     </footer>

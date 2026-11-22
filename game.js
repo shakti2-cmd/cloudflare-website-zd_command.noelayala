@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.24.0 (Mobile Jitter/Orientation Lock Fix, Multiplayer Disconnect Pause, Host Migration, Reconnect Flow & Player Color Rings)
+ * Version: v0.25.0 (Mobile Tab/Clearance Fix, Settings Modal, Device Screen Rotation Lock & 60 FPS Multiplayer Interpolation)
  */
 
 (function () {
@@ -1008,6 +1008,10 @@
 
       this.bindDOM();
       this.bindEvents();
+      const savedRot = (function() {
+        try { return localStorage.getItem('zdc_screen_rotation') || 'auto'; } catch (_) { return 'auto'; }
+      })();
+      this.applyScreenRotationSetting(savedRot);
       this.updateMobileMode(true);
       this.renderBestiaryPortraits();
 
@@ -1210,6 +1214,19 @@
       this.btnCampaignBack = $('btnCampaignBack');
       this.btnStartCampaignSector = $('btnStartCampaignSector');
 
+      // Settings Modal UI Elements (v0.25.0)
+      this.btnStartSettings = $('btnStartSettings');
+      this.btnMobileOpenSettings = $('btnMobileOpenSettings');
+      this.settingsModal = $('settingsModal');
+      this.btnCloseSettings = $('btnCloseSettings');
+      this.btnSettingsBack = $('btnSettingsBack');
+      this.settingsRotRow = $('settingsRotRow');
+      this.settingsPlayerCallsign = $('settingsPlayerCallsign');
+      this.btnSettingsSaveCallsign = $('btnSettingsSaveCallsign');
+      this.btnSettingsAudio = $('btnSettingsAudio');
+      this.btnSettingsHowToPlay = $('btnSettingsHowToPlay');
+      this.btnSettingsBestiary = $('btnSettingsBestiary');
+
       // Multiplayer UI Elements (v0.23.0)
       this.btnStartMultiplayer = $('btnStartMultiplayer');
       this.mpRoleModal = $('mpRoleModal');
@@ -1343,6 +1360,7 @@
 
       on(this.btnStartMission, 'click', () => this.deployFromStartScreen());
       on(this.btnStartMultiplayer, 'click', () => this.openMultiplayerModal('role'));
+      on(this.btnStartSettings, 'click', () => this.openSettingsModal());
       on(this.btnStartTutorial, 'click', () => this.startTutorial());
       on(this.btnSkipTutorial, 'click', () => this.returnToStartMenu());
       on(this.btnStartZombies, 'click', () => this.openZombieGuide());
@@ -1350,6 +1368,41 @@
       on(this.btnCloseHowToPlay, 'click', () => this.closeHowToPlay());
       on(this.btnDismissHelp, 'click', () => this.closeHowToPlay());
       on(this.btnHudHelp, 'click', () => this.openHowToPlay());
+
+      // Settings Modal bindings (v0.25.0)
+      on(this.btnCloseSettings, 'click', () => this.closeSettingsModal());
+      on(this.btnSettingsBack, 'click', () => this.closeSettingsModal());
+      on(this.btnSettingsAudio, 'click', () => this.toggleMute());
+      on(this.btnSettingsHowToPlay, 'click', () => this.openHowToPlay());
+      on(this.btnSettingsBestiary, 'click', () => this.openZombieGuide());
+
+      const saveSettingsCallsign = () => {
+        if (!this.settingsPlayerCallsign) return;
+        const raw = this.settingsPlayerCallsign.value;
+        const saved = this.mp ? this.mp.saveCallsign(raw) : (raw.trim().slice(0, 16) || 'Commander');
+        try { localStorage.setItem('zdc_callsign', saved); } catch (_) {}
+        this.settingsPlayerCallsign.value = saved;
+        if (this.mpPlayerCallsign) this.mpPlayerCallsign.value = saved;
+      };
+      on(this.settingsPlayerCallsign, 'input', saveSettingsCallsign);
+      on(this.settingsPlayerCallsign, 'blur', saveSettingsCallsign);
+      on(this.btnSettingsSaveCallsign, 'click', () => {
+        saveSettingsCallsign();
+        this.sound.playClick();
+        this.showStatus('Commander callsign saved.');
+      });
+
+      if (this.settingsRotRow) {
+        const rotBtns = this.settingsRotRow.querySelectorAll('.rot-btn');
+        rotBtns.forEach((btn) => {
+          on(btn, 'click', () => {
+            const rot = btn.dataset.rot || 'auto';
+            rotBtns.forEach((b) => b.classList.toggle('active', b === btn));
+            this.applyScreenRotationSetting(rot);
+            this.sound.playClick();
+          });
+        });
+      }
 
       // Zombie Intel modal bindings
       on(this.btnHudZombies, 'click', () => {
@@ -1664,6 +1717,12 @@
         }
       });
 
+      on(this.btnMobileOpenSettings, 'click', () => {
+        if (this.mobileSettingsMenu) this.mobileSettingsMenu.classList.add('hidden');
+        if (this.btnMobileSettings) this.btnMobileSettings.setAttribute('aria-expanded', 'false');
+        this.openSettingsModal();
+      });
+
       on(this.btnMobileZombies, 'click', () => {
         if (this.mobileSettingsMenu) this.mobileSettingsMenu.classList.add('hidden');
         if (this.btnMobileSettings) this.btnMobileSettings.setAttribute('aria-expanded', 'false');
@@ -1917,8 +1976,19 @@
             if (this.touchState.panning && this.canPanCamera()) {
               const rect = this.canvas.getBoundingClientRect();
               if (rect.width > 0 && rect.height > 0) {
-                const dx = (t0.clientX - this.touchState.lastX) * (this.canvas.width / rect.width);
-                const dy = (t0.clientY - this.touchState.lastY) * (this.canvas.height / rect.height);
+                const rawDeltaX = t0.clientX - this.touchState.lastX;
+                const rawDeltaY = t0.clientY - this.touchState.lastY;
+                let dx, dy;
+                if (document.body && document.body.classList.contains('force-landscape') && window.innerHeight > window.innerWidth) {
+                  dx = rawDeltaY * (this.canvas.width / rect.height);
+                  dy = -rawDeltaX * (this.canvas.height / rect.width);
+                } else if (document.body && document.body.classList.contains('force-portrait') && window.innerWidth > window.innerHeight) {
+                  dx = -rawDeltaY * (this.canvas.width / rect.height);
+                  dy = rawDeltaX * (this.canvas.height / rect.width);
+                } else {
+                  dx = rawDeltaX * (this.canvas.width / rect.width);
+                  dy = rawDeltaY * (this.canvas.height / rect.height);
+                }
                 this.camera.panX += dx;
                 this.camera.panY += dy;
                 this.clampCamera();
@@ -2031,7 +2101,9 @@
       window.addEventListener('keydown', (e) => {
         const key = e.key.toLowerCase();
         if (key === 'escape') {
-          if (this.zombieGuideOpen) {
+          if (this.settingsModal && !this.settingsModal.classList.contains('hidden')) {
+            this.closeSettingsModal();
+          } else if (this.zombieGuideOpen) {
             this.closeZombieGuide();
           } else if (this.helpOpen) {
             this.closeHowToPlay();
@@ -2137,8 +2209,23 @@
       if (!this.canvas) return null;
       const rect = this.canvas.getBoundingClientRect();
       if (!rect || rect.width <= 0 || rect.height <= 0) return null;
-      const canvasX = (clientX - rect.left) * (this.canvas.width / rect.width);
-      const canvasY = (clientY - rect.top) * (this.canvas.height / rect.height);
+      let canvasX, canvasY;
+      if (document.body && document.body.classList.contains('force-landscape') && window.innerHeight > window.innerWidth) {
+        // Rotated 90deg clockwise: screen Y is canvas X, screen (right - X) is canvas Y
+        const localX = clientY - rect.top;
+        const localY = rect.right - clientX;
+        canvasX = localX * (this.canvas.width / rect.height);
+        canvasY = localY * (this.canvas.height / rect.width);
+      } else if (document.body && document.body.classList.contains('force-portrait') && window.innerWidth > window.innerHeight) {
+        // Rotated -90deg counter-clockwise: screen (bottom - Y) is canvas X, screen X is canvas Y
+        const localX = rect.bottom - clientY;
+        const localY = clientX - rect.left;
+        canvasX = localX * (this.canvas.width / rect.height);
+        canvasY = localY * (this.canvas.height / rect.width);
+      } else {
+        canvasX = (clientX - rect.left) * (this.canvas.width / rect.width);
+        canvasY = (clientY - rect.top) * (this.canvas.height / rect.height);
+      }
       const s = this.getCameraScale();
       const worldX = (canvasX - this.camera.panX) / s;
       const worldY = (canvasY - this.camera.panY) / s;
@@ -2282,6 +2369,73 @@
     }
 
     // --- MENUS & MODALS ---
+    openSettingsModal() {
+      if (!this.settingsModal) return;
+      this.syncSettingsUI();
+      if (this.inPlay && !this.isPaused && !this.isMultiplayer) {
+        this.setPaused(true);
+        this.settingsPausedGame = true;
+      }
+      showEl(this.settingsModal, 'flex');
+      this.sound.playClick();
+    }
+
+    closeSettingsModal() {
+      if (!this.settingsModal) return;
+      hideEl(this.settingsModal);
+      if (this.settingsPausedGame && this.inPlay && !this.isMultiplayer) {
+        this.setPaused(false);
+      }
+      this.settingsPausedGame = false;
+      this.sound.playClick();
+    }
+
+    syncSettingsUI() {
+      const rot = (function() {
+        try { return localStorage.getItem('zdc_screen_rotation') || 'auto'; } catch (_) { return 'auto'; }
+      })();
+      if (this.settingsRotRow) {
+        const buttons = this.settingsRotRow.querySelectorAll('.rot-btn');
+        buttons.forEach((btn) => {
+          btn.classList.toggle('active', btn.dataset.rot === rot);
+        });
+      }
+      const cs = this.mp ? this.mp.getSavedCallsign() : ((function() {
+        try { return localStorage.getItem('zdc_callsign') || 'Commander'; } catch (_) { return 'Commander'; }
+      })());
+      if (this.settingsPlayerCallsign) this.settingsPlayerCallsign.value = cs;
+      if (this.mpPlayerCallsign) this.mpPlayerCallsign.value = cs;
+      if (this.btnSettingsAudio) {
+        this.btnSettingsAudio.innerHTML = this.sound.muted ? '&#128263; Sound: Muted' : '&#128266; Sound: On';
+      }
+    }
+
+    applyScreenRotationSetting(mode) {
+      this.screenRotationMode = mode || 'auto';
+      try {
+        localStorage.setItem('zdc_screen_rotation', this.screenRotationMode);
+      } catch (_) {}
+
+      if (window.screen && window.screen.orientation) {
+        try {
+          if (this.screenRotationMode === 'portrait' && typeof window.screen.orientation.lock === 'function') {
+            window.screen.orientation.lock('portrait').catch(() => {});
+          } else if (this.screenRotationMode === 'landscape' && typeof window.screen.orientation.lock === 'function') {
+            window.screen.orientation.lock('landscape').catch(() => {});
+          } else if (typeof window.screen.orientation.unlock === 'function') {
+            window.screen.orientation.unlock();
+          }
+        } catch (_) {}
+      }
+
+      if (document.body) {
+        document.body.classList.toggle('force-portrait', this.screenRotationMode === 'portrait');
+        document.body.classList.toggle('force-landscape', this.screenRotationMode === 'landscape');
+      }
+
+      this.updateMobileMode();
+    }
+
     openHowToPlay() {
       if (this.helpOpen) return;
       if (this.zombieGuideOpen) this.closeZombieGuide();
@@ -3422,30 +3576,49 @@
         structures: stArr,
         spawns: spArr,
         civilians: this.civilians.map((c) => ({
-          id: c.id, x: Math.round(c.x), y: Math.round(c.y),
-          isIncubating: !!c.isIncubating, incubationTimer: c.incubationTimer || 0
+          id: c.id,
+          x: Math.round(c.x * 10) / 10,
+          y: Math.round(c.y * 10) / 10,
+          vx: Math.round((c.vx || 0) * 10) / 10,
+          vy: Math.round((c.vy || 0) * 10) / 10,
+          isIncubating: !!c.isIncubating,
+          incubationTimer: c.incubationTimer || 0
         })),
         soldiers: this.soldiers.map((s) => ({
           id: s.id, level: s.level, isCommando: !!s.isCommando,
-          x: Math.round(s.x), y: Math.round(s.y), hp: s.hp, maxHp: s.maxHp,
+          x: Math.round(s.x * 10) / 10, y: Math.round(s.y * 10) / 10,
+          vx: Math.round((s.vx || 0) * 10) / 10, vy: Math.round((s.vy || 0) * 10) / 10,
+          hp: s.hp, maxHp: s.maxHp,
           range: s.range, dmg: s.dmg, rate: s.rate, kills: s.kills || 0,
           angle: s.angle || 0, name: s.name || '', color: s.color || '#38E8FF',
           homeHubId: s.homeHubId || null, ownerId: s.ownerId || null,
           ownerColor: s.ownerColor || null, ownerName: s.ownerName || null
         })),
         engineers: this.engineers.map((e) => ({
-          id: e.id, level: e.level, x: Math.round(e.x), y: Math.round(e.y),
+          id: e.id, level: e.level,
+          x: Math.round(e.x * 10) / 10, y: Math.round(e.y * 10) / 10,
+          vx: Math.round((e.vx || 0) * 10) / 10, vy: Math.round((e.vy || 0) * 10) / 10,
           hp: e.hp, maxHp: e.maxHp, speed: e.speed, repairRate: e.repairRate,
           repairedTotal: e.repairedTotal || 0, name: e.name || '', color: e.color || '#FFD23F',
           homeHubId: e.homeHubId || null, ownerId: e.ownerId || null,
           ownerColor: e.ownerColor || null, ownerName: e.ownerName || null
         })),
         zombies: this.zombies.map((z) => ({
-          id: z.id, type: z.type, x: Math.round(z.x), y: Math.round(z.y),
+          id: z.id, type: z.type,
+          x: Math.round(z.x * 10) / 10, y: Math.round(z.y * 10) / 10,
+          vx: Math.round((z.vx || 0) * 10) / 10, vy: Math.round((z.vy || 0) * 10) / 10,
           hp: z.hp, maxHp: z.maxHp, radius: z.radius, color: z.color,
           angle: z.angle || 0, slowTimer: z.slowTimer || 0, bruteBreach: !!z.bruteBreach
         })),
-        projectiles: this.projectiles.map((p) => ({ ...p }))
+        projectiles: this.projectiles.map((p) => ({
+          x: Math.round(p.x * 10) / 10,
+          y: Math.round(p.y * 10) / 10,
+          vx: Math.round((p.vx || 0) * 10) / 10,
+          vy: Math.round((p.vy || 0) * 10) / 10,
+          color: p.color,
+          radius: p.radius || 3,
+          life: p.life || 0.4
+        }))
       };
     }
 
@@ -3522,33 +3695,177 @@
         });
       }
 
-      this.civilians = (snap.civilians || []).map((c) => ({
-        ...c,
-        radius: 6,
-        speed: 60,
-        path: [],
-        dest: null
-      }));
-      this.soldiers = (snap.soldiers || []).map((s) => ({
-        ...s,
-        radius: 7,
-        speed: 70,
-        path: [],
-        dest: null
-      }));
-      this.engineers = (snap.engineers || []).map((e) => ({
-        ...e,
-        radius: 7,
-        unitType: 'engineer',
-        path: [],
-        dest: null
-      }));
-      this.zombies = (snap.zombies || []).map((z) => ({
-        ...z,
-        speed: 45,
-        baseSpeed: 45,
-        path: []
-      }));
+      // Reconcile civilians by id (smooth client interpolation)
+      const snapCivMap = new Map();
+      for (const sc of snap.civilians || []) snapCivMap.set(sc.id, sc);
+      for (let i = this.civilians.length - 1; i >= 0; i--) {
+        const c = this.civilians[i];
+        const sc = snapCivMap.get(c.id);
+        if (sc) {
+          c.targetX = sc.x;
+          c.targetY = sc.y;
+          c.vx = sc.vx || 0;
+          c.vy = sc.vy || 0;
+          c.isIncubating = !!sc.isIncubating;
+          c.incubationTimer = sc.incubationTimer || 0;
+          if (Math.hypot(c.x - sc.x, c.y - sc.y) > 80) {
+            c.x = sc.x;
+            c.y = sc.y;
+          }
+          snapCivMap.delete(c.id);
+        } else {
+          this.civilians.splice(i, 1);
+        }
+      }
+      for (const sc of snapCivMap.values()) {
+        this.civilians.push({
+          ...sc,
+          targetX: sc.x,
+          targetY: sc.y,
+          vx: sc.vx || 0,
+          vy: sc.vy || 0,
+          radius: 6,
+          speed: 60,
+          path: [],
+          dest: null
+        });
+      }
+
+      // Reconcile soldiers by id
+      const snapSolMap = new Map();
+      for (const ss of snap.soldiers || []) snapSolMap.set(ss.id, ss);
+      for (let i = this.soldiers.length - 1; i >= 0; i--) {
+        const s = this.soldiers[i];
+        const ss = snapSolMap.get(s.id);
+        if (ss) {
+          s.targetX = ss.x;
+          s.targetY = ss.y;
+          s.vx = ss.vx || 0;
+          s.vy = ss.vy || 0;
+          s.hp = ss.hp;
+          s.maxHp = ss.maxHp;
+          s.level = ss.level;
+          s.isCommando = !!ss.isCommando;
+          s.range = ss.range;
+          s.dmg = ss.dmg;
+          s.rate = ss.rate;
+          s.kills = ss.kills;
+          s.angle = ss.angle;
+          s.name = ss.name;
+          s.color = ss.color;
+          s.homeHubId = ss.homeHubId;
+          s.ownerId = ss.ownerId;
+          s.ownerColor = ss.ownerColor;
+          s.ownerName = ss.ownerName;
+          if (Math.hypot(s.x - ss.x, s.y - ss.y) > 80) {
+            s.x = ss.x;
+            s.y = ss.y;
+          }
+          snapSolMap.delete(s.id);
+        } else {
+          this.soldiers.splice(i, 1);
+        }
+      }
+      for (const ss of snapSolMap.values()) {
+        this.soldiers.push({
+          ...ss,
+          targetX: ss.x,
+          targetY: ss.y,
+          vx: ss.vx || 0,
+          vy: ss.vy || 0,
+          radius: 7,
+          speed: 70,
+          path: [],
+          dest: null
+        });
+      }
+
+      // Reconcile engineers by id
+      const snapEngMap = new Map();
+      for (const se of snap.engineers || []) snapEngMap.set(se.id, se);
+      for (let i = this.engineers.length - 1; i >= 0; i--) {
+        const e = this.engineers[i];
+        const se = snapEngMap.get(e.id);
+        if (se) {
+          e.targetX = se.x;
+          e.targetY = se.y;
+          e.vx = se.vx || 0;
+          e.vy = se.vy || 0;
+          e.hp = se.hp;
+          e.maxHp = se.maxHp;
+          e.level = se.level;
+          e.speed = se.speed;
+          e.repairRate = se.repairRate;
+          e.repairedTotal = se.repairedTotal;
+          e.name = se.name;
+          e.color = se.color;
+          e.homeHubId = se.homeHubId;
+          e.ownerId = se.ownerId;
+          e.ownerColor = se.ownerColor;
+          e.ownerName = se.ownerName;
+          if (Math.hypot(e.x - se.x, e.y - se.y) > 80) {
+            e.x = se.x;
+            e.y = se.y;
+          }
+          snapEngMap.delete(e.id);
+        } else {
+          this.engineers.splice(i, 1);
+        }
+      }
+      for (const se of snapEngMap.values()) {
+        this.engineers.push({
+          ...se,
+          targetX: se.x,
+          targetY: se.y,
+          vx: se.vx || 0,
+          vy: se.vy || 0,
+          radius: 7,
+          unitType: 'engineer',
+          path: [],
+          dest: null
+        });
+      }
+
+      // Reconcile zombies by id
+      const snapZomMap = new Map();
+      for (const sz of snap.zombies || []) snapZomMap.set(sz.id, sz);
+      for (let i = this.zombies.length - 1; i >= 0; i--) {
+        const z = this.zombies[i];
+        const sz = snapZomMap.get(z.id);
+        if (sz) {
+          z.targetX = sz.x;
+          z.targetY = sz.y;
+          z.vx = sz.vx || 0;
+          z.vy = sz.vy || 0;
+          z.hp = sz.hp;
+          z.maxHp = sz.maxHp;
+          z.radius = sz.radius;
+          z.color = sz.color;
+          z.angle = sz.angle;
+          z.slowTimer = sz.slowTimer;
+          z.bruteBreach = sz.bruteBreach;
+          if (Math.hypot(z.x - sz.x, z.y - sz.y) > 80) {
+            z.x = sz.x;
+            z.y = sz.y;
+          }
+          snapZomMap.delete(z.id);
+        } else {
+          this.zombies.splice(i, 1);
+        }
+      }
+      for (const sz of snapZomMap.values()) {
+        this.zombies.push({
+          ...sz,
+          targetX: sz.x,
+          targetY: sz.y,
+          vx: sz.vx || 0,
+          vy: sz.vy || 0,
+          speed: 45,
+          baseSpeed: 45,
+          path: []
+        });
+      }
+
       this.projectiles = snap.projectiles || [];
 
       if (prevSelKey) {
@@ -3588,6 +3905,9 @@
       }
       if (this.btnMobileAudio) {
         this.btnMobileAudio.innerHTML = this.sound.muted ? '&#128263; Audio: Muted' : '&#128266; Audio: On';
+      }
+      if (this.btnSettingsAudio) {
+        this.btnSettingsAudio.innerHTML = this.sound.muted ? '&#128263; Sound: Muted' : '&#128266; Sound: On';
       }
     }
 
@@ -8196,6 +8516,9 @@
 
       try {
         if (dt > 0) this.update(dt);
+        else if (this.isMultiplayer && !this.isMpHost && this.inPlay && !this.isPaused) {
+          this.interpolateMpEntities(Math.min(rawDt, 0.1));
+        }
       } catch (err) {
         if (window.console) console.error('Simulation error:', err);
       }
@@ -8247,6 +8570,30 @@
         if (window.console) console.error('Render error:', err);
       }
       requestAnimationFrame((ts) => this.loop(ts));
+    }
+
+    interpolateMpEntities(dt) {
+      if (dt <= 0) return;
+      const factor = 1 - Math.exp(-18 * dt);
+      const groups = [this.zombies, this.soldiers, this.engineers, this.civilians];
+      for (let g = 0; g < groups.length; g++) {
+        const list = groups[g];
+        for (let i = 0; i < list.length; i++) {
+          const e = list[i];
+          if (e.targetX !== undefined && e.targetY !== undefined) {
+            e.targetX += (e.vx || 0) * dt;
+            e.targetY += (e.vy || 0) * dt;
+            e.x += (e.targetX - e.x) * factor;
+            e.y += (e.targetY - e.y) * factor;
+          }
+        }
+      }
+      for (let p = 0; p < this.projectiles.length; p++) {
+        const proj = this.projectiles[p];
+        proj.x += (proj.vx || 0) * dt;
+        proj.y += (proj.vy || 0) * dt;
+        if (proj.life) proj.life -= dt;
+      }
     }
 
     update(dt) {
@@ -8325,12 +8672,41 @@
         this.updateTimerHud();
       }
 
+      if (this.isMultiplayer && this.isMpHost) {
+        const preEntities = [this.civilians, this.soldiers, this.engineers, this.zombies];
+        for (let g = 0; g < preEntities.length; g++) {
+          const list = preEntities[g];
+          for (let k = 0; k < list.length; k++) {
+            const e = list[k];
+            e._prevX = e.x;
+            e._prevY = e.y;
+          }
+        }
+      }
+
       this.updateCivilians(dt);
       this.updateSoldiers(dt);
       this.updateEngineers(dt);
       this.updateZombies(dt);
       this.updateStructures(dt);
       this.updateProjectiles(dt);
+
+      if (this.isMultiplayer && this.isMpHost && dt > 0) {
+        const postEntities = [this.civilians, this.soldiers, this.engineers, this.zombies];
+        for (let g = 0; g < postEntities.length; g++) {
+          const list = postEntities[g];
+          for (let k = 0; k < list.length; k++) {
+            const e = list[k];
+            if (e._prevX !== undefined) {
+              e.vx = (e.x - e._prevX) / dt;
+              e.vy = (e.y - e._prevY) / dt;
+            } else {
+              e.vx = 0;
+              e.vy = 0;
+            }
+          }
+        }
+      }
       this.updateVisuals(dt);
       if (this.isTutorialMode) this.updateTutorial();
       this.checkMissionEnd();

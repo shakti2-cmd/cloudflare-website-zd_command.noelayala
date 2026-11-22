@@ -1,5 +1,5 @@
 /**
- * Zombie Defense Command - 4-Player Co-Op Multiplayer Manager (v0.24.0)
+ * Zombie Defense Command - 4-Player Co-Op Multiplayer Manager (v0.25.0)
  * $0 Zero-Config WebRTC P2P Mesh (PeerJS) + Public Live Room Directory (ntfy.sh & BroadcastChannel)
  * Pure Vanilla JavaScript - 100% Static Client Deployment (Cloudflare Free Tier Safe)
  */
