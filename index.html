@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Zombie Defense Command - Tactical Grid Survival (v0.27.0)</title>
+  <title>Zombie Defense Command - Tactical Grid Survival (v0.28.0)</title>
 
   <!-- PWA & Mobile Web App Meta -->
   <meta name="theme-color" content="#07090d">
@@ -30,7 +30,7 @@
     <header id="topHud">
       <div class="hud-brand">
         <span class="hud-logo">&#9763;</span>
-        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.27.0</small></span>
+        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.28.0</small></span>
       </div>
 
       <div class="hud-stats">
@@ -133,7 +133,7 @@
         <div class="modal-card start-card">
           <div class="start-icon">&#9763;</div>
           <h1 class="start-title">ZOMBIE DEFENSE COMMAND</h1>
-          <div class="start-version-badge">v0.27.0</div>
+          <div class="start-version-badge">v0.28.0</div>
           <p class="start-subtitle">Expand green Safe Zones within 3 tiles of Red Spawn Breaches and deploy Commandos to destroy them (towers defend against zombies only).</p>
 
           <div id="startMainSection">
@@ -208,11 +208,11 @@
             <option value="tutorial">Tutorial: Basic Training</option>
           </select>
 
-          <div class="start-hint">v0.27.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; M mute</div>
+          <div class="start-hint">v0.28.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; M mute</div>
         </div>
       </div>
 
-      <!-- Settings Modal (v0.27.0) -->
+      <!-- Settings Modal (v0.28.0) -->
       <div id="settingsModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
         <div class="modal-card settings-card">
           <button id="btnCloseSettings" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
@@ -262,11 +262,11 @@
       <div id="howToPlayModal" class="modal-overlay hidden">
         <div class="modal-card help-card">
           <button id="btnCloseHowToPlay" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.27.0)</h2>
+          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.28.0)</h2>
           <div class="help-grid">
             <section>
               <h3>Single 3&times;3 Start &amp; Line-Drag Barricades</h3>
-              <p>Every map opens with a single <b>3&times;3 Safe Zone (+9% DMG)</b>. Expand <b>Safe Zones ($10, Key 7)</b> toward breaches; all other buildings &amp; towers build <b>only on Safe Zones</b>. <b>Barricades ($10, Key 1)</b> build up to <b>3 tiles</b> out via line-drag.</p>
+              <p>Every map opens with a single <b>3&times;3 Safe Zone (+9% DMG)</b>. Expand <b>Safe Zones ($10, Key 7)</b> toward breaches; all other buildings &amp; towers build <b>only on Safe Zones</b>. <b>Only Engineers</b> can step over Safe-Zone structures &mdash; all other units route around structures and enter/exit hubs from adjacent tiles.</p>
             </section>
             <section>
               <h3>Perimeter Commandos &amp; Breach Destruction</h3>
@@ -299,7 +299,7 @@
       <div id="zombieGuideModal" class="modal-overlay hidden">
         <div class="modal-card help-card zombie-guide-card">
           <button id="btnCloseZombieGuide" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.27.0)</h2>
+          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.28.0)</h2>
           <div id="bestiaryHardIndicator" class="bestiary-hard-indicator hidden">&#9888; HARD MODE ACTIVE: 3.0&times; ZOMBIE HP APPLIED</div>
           <p class="bestiary-note"><b class="c-orange">25% Random Brute-Breach Trait:</b> Any spawned Walker, Runner, Tank, or Wrecker has a 25% chance (100% on Demolisher) to smash straight toward Safe Zones, dealing a <b>fixed unscaled 12 damage</b> (<b>16 damage</b> for Demolishers) per strike against structures &amp; Safe Zones.</p>
           <div class="zombie-intel-list">
@@ -365,7 +365,7 @@
         </div>
       </div>
 
-      <!-- 4-Player Co-Op Multiplayer Modals (v0.27.0) -->
+      <!-- 4-Player Co-Op Multiplayer Modals (v0.28.0) -->
       <div id="mpRoleModal" class="modal-overlay hidden">
         <div class="modal-card mp-card">
           <h2 class="help-title mp-modal-title">&#127760; 4-PLAYER CO-OP MULTIPLAYER</h2>
@@ -494,7 +494,7 @@
         </div>
       </div>
 
-      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.27.0) -->
+      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.28.0) -->
       <div id="mpPauseModal" class="modal-overlay hidden">
         <div class="modal-card mp-card mp-pause-card">
           <h2 id="mpPauseTitle" class="help-title mp-modal-title">&#9208; MATCH PAUSED</h2>
@@ -597,7 +597,7 @@
             <button id="toolWall" class="tool-btn" data-tool="wall" title="Barricade $10 (Lv2 $90, Lv3 $180): Click or Line-Drag on Safe Zone OR within 3 tiles of a Safe Zone; ignored by Horde Scaling (1)">
               <span class="tool-key">1</span><span class="tool-icon">&#9646;</span><span class="tool-name">Barricade</span><span class="tool-cost">$10</span>
             </button>
-            <button id="toolGate" class="tool-btn" data-tool="gate" title="Security Gate $100: Safe Zone Only; friendly units &amp; Commandos pass freely while blocking zombies (2)">
+            <button id="toolGate" class="tool-btn" data-tool="gate" title="Security Gate $100: Heavy defensive chokepoint up to 3 tiles from Safe Zone; blocks zombies and non-engineer units (only Engineers traverse Safe-Zone structures) (2)">
               <span class="tool-key">2</span><span class="tool-icon">&#9638;</span><span class="tool-name">Gate</span><span class="tool-cost">$100</span>
             </button>
             <button id="toolBarracks" class="tool-btn" data-tool="barracks" title="Barracks $80: Safe Zone Only; trains Commandos (4-unit cap) &mdash; ONLY unit that destroys Red Spawn Breaches (1.25x dmg); intercepts &amp; kites within 3 tiles of Safe Zones (4)">
@@ -663,7 +663,7 @@
         </div>
 
         <div id="deckHint">
-          <span class="hint-text">v0.27.0 &bull; Towers target zombies only &bull; Expand $10 Safe Zones &le;3 tiles of a Breach so Commandos destroy it! &bull; Engineers +20/+40/+70 HP/s</span>
+          <span class="hint-text">v0.28.0 &bull; Towers target zombies only &bull; Expand $10 Safe Zones &le;3 tiles of a Breach so Commandos destroy it! &bull; Engineers +20/+40/+70 HP/s</span>
         </div>
       </div>
     </footer>

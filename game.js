@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.27.0 (Mobile Viewport Height & Orientation Lock Fix, 3x3 MP Safe Zones, Randomized Breaches, Equal Civilians & Balanced Wave Split)
+ * Version: v0.28.0 (MP Init Crash Fix, Breach & Relocation Sync, No-Step-Over Structures & MP Audit)
  */
 
 (function () {
@@ -3141,7 +3141,7 @@
       const names = abandonedList.map((d) => d.callsign).join(', ');
       this.showStatus(`${names} left the match — territory, units & $${totalScrapSplit} Scrap divided among active commanders.`);
       this.updateHUD();
-      if (this.mp) this.mp.broadcastState(this.serializeMpState());
+      if (this.mp) this.mp.broadcastState(this.serializeMpState(), true);
     }
 
     onMpPauseStateChanged(payload) {
@@ -3510,7 +3510,8 @@
               targetBarracks: null
             };
             if (targetSz) {
-              civ.path = this.findPath(cc, rr, targetSz.col, targetSz.row, true);
+              const rawPath = findPath(cc, rr, targetSz.col, targetSz.row, (c, r) => this.unitBlocked(c, r));
+              civ.path = rawPath ? rawPath.map(([pc, pr]) => tileCenter(pc, pr)) : [];
               civ.dest = { col: targetSz.col, row: targetSz.row };
             }
             this.civilians.push(civ);
@@ -3520,7 +3521,7 @@
         this.civTotal = this.civilians.length;
       } else {
         this.initialSpawnCount = Math.max(1, this.spawns.size);
-        this.civTotal = 8 + this.mpPlayers.length * 2;
+        this.civTotal = this.mpPlayers.length * 4;
       }
 
       this.recalcBaseIntegrity();
@@ -3546,7 +3547,7 @@
       }
 
       if (this.isMpHost && this.mp) {
-        this.mp.broadcastState(this.serializeMpState());
+        this.mp.broadcastState(this.serializeMpState(), true);
       }
     }
 
@@ -3650,7 +3651,7 @@
           this.triggerNextWaveEarly(senderId);
           break;
       }
-      if (this.mp) this.mp.broadcastState(this.serializeMpState());
+      if (this.mp) this.mp.broadcastState(this.serializeMpState(), true);
     }
 
     applyRemoteUnitCommand(actorId, action) {
@@ -3726,6 +3727,7 @@
       for (const sp of this.spawns.values()) {
         spArr.push({
           col: sp.col, row: sp.row, hp: sp.hp, maxHp: sp.maxHp,
+          flash: sp.flash || 0,
           isRegenerating: !!sp.isRegenerating
         });
       }
@@ -3734,6 +3736,7 @@
         waveState: this.waveState,
         nextWaveTimer: this.nextWaveTimer,
         threatMult: this.threatMult,
+        initialSpawnCount: this.initialSpawnCount || Math.max(1, this.spawns.size),
         score: this.score,
         savedCount: this.savedCount,
         infectedCount: this.infectedCount,
@@ -3918,6 +3921,12 @@
             continue;
           }
           if (pSt.pendingConfirmUntil > now) {
+            if (pSt.pendingMovedFromKey && pSt.pendingMovedFromKey !== key) {
+              const oldSt = this.structures.get(pSt.pendingMovedFromKey);
+              if (oldSt && (oldSt.id === pSt.id || oldSt.ownerId === this.localPlayerId)) {
+                this.structures.delete(pSt.pendingMovedFromKey);
+              }
+            }
             this.structures.set(key, pSt);
             if (this.grid[pSt.row]) {
               if (pSt.type === 'wall' && !this.safeZones.has(key)) this.grid[pSt.row][pSt.col] = 4;
@@ -3934,10 +3943,15 @@
         }
       }
 
-      this.spawns.clear();
+      if (snap.initialSpawnCount) {
+        this.initialSpawnCount = Number(snap.initialSpawnCount) || 1;
+      }
+      const seenSpKeys = new Set();
       for (const sp of snap.spawns || []) {
+        const key = `${sp.col},${sp.row}`;
+        seenSpKeys.add(key);
         const p = tileCenter(sp.col, sp.row);
-        this.spawns.set(`${sp.col},${sp.row}`, {
+        this.spawns.set(key, {
           type: 'spawn',
           col: sp.col,
           row: sp.row,
@@ -3945,10 +3959,19 @@
           y: p.y,
           hp: sp.hp,
           maxHp: sp.maxHp,
-          flash: 0,
+          flash: sp.flash || 0,
           timeSinceHit: 99,
           isRegenerating: !!sp.isRegenerating
         });
+        if (this.grid[sp.row]) this.grid[sp.row][sp.col] = 3;
+      }
+      for (const [key, oldSp] of this.spawns.entries()) {
+        if (!seenSpKeys.has(key)) {
+          this.spawns.delete(key);
+          if (this.grid[oldSp.row] && this.grid[oldSp.row][oldSp.col] === 3) {
+            this.grid[oldSp.row][oldSp.col] = 0;
+          }
+        }
       }
 
       // Reconcile civilians by id (smooth client interpolation)
@@ -6562,16 +6585,13 @@
       if (!inBounds(c, r)) return true;
       const t = this.grid[r][c];
       if (t === 1 || t === 3) return true;
-      const st = this.structures.get(`${c},${r}`);
-      // Gates and Safe-Zone hubs (Barracks/Engineering/Habitat) are walkable for friendly units
-      return !!st && st.type !== 'gate' && st.type !== 'barracks' && st.type !== 'engineering' && st.type !== 'habitat';
+      return !!this.structures.get(`${c},${r}`);
     }
 
     safeZoneOnlyBlocked(c, r) {
       if (!inBounds(c, r)) return true;
       if (this.grid[r][c] !== 2 || !this.safeZones.has(`${c},${r}`)) return true;
-      const st = this.structures.get(`${c},${r}`);
-      return !!st && st.type !== 'gate' && st.type !== 'barracks' && st.type !== 'engineering' && st.type !== 'habitat';
+      return !!this.structures.get(`${c},${r}`);
     }
 
     engineerBlocked(c, r) {
@@ -6587,6 +6607,25 @@
       if (this.unitBlocked(c, r)) return true;
       if (this.safeZones.size > 0 && this.minChebyshevDistToSafeZone(c, r) > 3) return true;
       return false;
+    }
+
+    findPathToAdjacentTile(sc, sr, targetCol, targetRow, isBlockedFn) {
+      if (Math.max(Math.abs(sc - targetCol), Math.abs(sr - targetRow)) <= 1 && !isBlockedFn(sc, sr)) {
+        return [[sc, sr]];
+      }
+      const candidates = [];
+      for (const [dc, dr] of DIRS_8) {
+        const nc = targetCol + dc;
+        const nr = targetRow + dr;
+        if (!inBounds(nc, nr) || isBlockedFn(nc, nr)) continue;
+        candidates.push([nc, nr, Math.hypot(nc - sc, nr - sr)]);
+      }
+      candidates.sort((a, b) => a[2] - b[2]);
+      for (const [nc, nr] of candidates) {
+        const p = findPath(sc, sr, nc, nr, isBlockedFn);
+        if (p) return p;
+      }
+      return null;
     }
 
     selectCivilian(civ) {
@@ -6776,14 +6815,13 @@
         let bestDist = Infinity;
         for (const s of this.soldiers) {
           if (s.hp <= 0 || s.isCommando || s.level !== 1) continue;
+          if (this.isMultiplayer && hub.ownerId && s.ownerId && s.ownerId !== hub.ownerId) continue;
           if (s.assignedHubId || s.targetBunker || s.targetBarracks || s.targetEngineering) continue;
           const sc = Math.floor(s.x / TILE_SIZE);
           const sr = Math.floor(s.y / TILE_SIZE);
           const d = Math.hypot(s.x - hub.x, s.y - hub.y);
           if (d >= bestDist) continue;
-          const p = findPath(sc, sr, hub.col, hub.row, (c, r) =>
-            (c === hub.col && r === hub.row) ? false : this.unitBlocked(c, r)
-          );
+          const p = this.findPathToAdjacentTile(sc, sr, hub.col, hub.row, (c, r) => this.unitBlocked(c, r));
           if (p) {
             bestDist = d;
             bestRec = s;
@@ -6869,10 +6907,9 @@
 
       const sc = Math.floor(soldier.x / TILE_SIZE);
       const sr = Math.floor(soldier.y / TILE_SIZE);
-      const path = findPath(sc, sr, barracks.col, barracks.row, (c, r) => {
-        if (c === barracks.col && r === barracks.row) return false;
-        return soldier.isCommando ? this.commandoBlocked(c, r) : this.unitBlocked(c, r);
-      });
+      const path = this.findPathToAdjacentTile(sc, sr, barracks.col, barracks.row, (c, r) =>
+        soldier.isCommando ? this.commandoBlocked(c, r) : this.unitBlocked(c, r)
+      );
 
       if (path) {
         soldier.path = path.map(([c, r]) => tileCenter(c, r));
@@ -6913,7 +6950,7 @@
         this.structures.get(`${soldier.targetBarracks.col},${soldier.targetBarracks.row}`) === soldier.targetBarracks
       ) {
         const d = Math.hypot(soldier.x - soldier.targetBarracks.x, soldier.y - soldier.targetBarracks.y);
-        if (d <= TILE_SIZE * 0.95 && (soldier.reenterCooldown || 0) <= 0) {
+        if (d <= TILE_SIZE * 1.45 && (soldier.reenterCooldown || 0) <= 0) {
           barracks = soldier.targetBarracks;
         }
       }
@@ -7015,10 +7052,7 @@
 
       const sc = Math.floor(soldier.x / TILE_SIZE);
       const sr = Math.floor(soldier.y / TILE_SIZE);
-      const path = findPath(sc, sr, engBuilding.col, engBuilding.row, (c, r) => {
-        if (c === engBuilding.col && r === engBuilding.row) return false;
-        return this.unitBlocked(c, r);
-      });
+      const path = this.findPathToAdjacentTile(sc, sr, engBuilding.col, engBuilding.row, (c, r) => this.unitBlocked(c, r));
 
       if (path) {
         soldier.path = path.map(([c, r]) => tileCenter(c, r));
@@ -7058,7 +7092,7 @@
         this.structures.get(`${soldier.targetEngineering.col},${soldier.targetEngineering.row}`) === soldier.targetEngineering
       ) {
         const d = Math.hypot(soldier.x - soldier.targetEngineering.x, soldier.y - soldier.targetEngineering.y);
-        if (d <= TILE_SIZE * 0.95) engBld = soldier.targetEngineering;
+        if (d <= TILE_SIZE * 1.45) engBld = soldier.targetEngineering;
       }
 
       if (!engBld) return false;
@@ -7220,7 +7254,7 @@
           const nr = struct.row + dr;
           if (!inBounds(nc, nr)) continue;
           const st = this.structures.get(`${nc},${nr}`);
-          if (this.grid[nr][nc] === 0 && (!st || st.type === 'gate')) return tileCenter(nc, nr);
+          if (this.grid[nr][nc] === 0 && !st) return tileCenter(nc, nr);
         }
       }
       for (const [dc, dr] of dirs) {
@@ -7247,7 +7281,7 @@
         const nr = struct.row + dr;
         if (!inBounds(nc, nr)) continue;
         const st = this.structures.get(`${nc},${nr}`);
-        if ((this.grid[nr][nc] === 0 || this.grid[nr][nc] === 2) && (!st || st.type === 'gate')) {
+        if ((this.grid[nr][nc] === 0 || this.grid[nr][nc] === 2) && !st) {
           return tileCenter(nc, nr);
         }
       }
@@ -8522,8 +8556,9 @@
     attemptMoveStructure(struct, col, row, actorId = null) {
       if (!struct || !inBounds(col, row)) return;
       const effActor = this.getEffectiveActorId(actorId || struct.ownerId);
+      const isRemoteActor = Boolean(actorId && actorId !== this.localPlayerId);
       if (this.isMultiplayer && struct.ownerId && effActor && struct.ownerId !== effActor) {
-        this.denyOwnership(struct, 'structure');
+        if (!isRemoteActor) this.denyOwnership(struct, 'structure');
         return;
       }
       const newKey = `${col},${row}`;
@@ -8531,48 +8566,56 @@
       const p = tileCenter(col, row);
 
       if (newKey === oldKey) {
-        this.movingStructure = null;
-        this.renderUpgradePanel(struct);
-        this.showStatus('Relocation canceled.');
-        this.sound.playClick();
+        if (!isRemoteActor) {
+          this.movingStructure = null;
+          this.renderUpgradePanel(struct);
+          this.showStatus('Relocation canceled.');
+          this.sound.playClick();
+        }
         return;
       }
       if (this.isMultiplayer && struct.ownerId && effActor && struct.ownerId !== effActor) {
-        this.showStatus('Cannot relocate another player\'s structure.');
-        this.sound.playHit();
+        if (!isRemoteActor) {
+          this.showStatus('Cannot relocate another player\'s structure.');
+          this.sound.playHit();
+        }
         return;
       }
       const destSz = this.safeZones.get(newKey);
       if (this.grid[row][col] !== 2 || !destSz || this.structures.has(newKey)) {
-        this.showStatus('Relocation requires an unoccupied green Safe Zone tile.');
-        this.addFloatingText('Valid Safe Zone Only!', p.x, p.y - 12, '#FF3333');
-        this.sound.playHit();
+        if (!isRemoteActor) {
+          this.showStatus('Relocation requires an unoccupied green Safe Zone tile.');
+          this.addFloatingText('Valid Safe Zone Only!', p.x, p.y - 12, '#FF3333');
+          this.sound.playHit();
+        }
         return;
       }
       if (this.isMultiplayer && destSz.ownerId && effActor && destSz.ownerId !== effActor) {
-        this.showStatus('Can only relocate onto your own green Safe Zone tiles!');
-        this.addFloatingText('Your Territory Only!', p.x, p.y - 12, '#FF3333');
-        this.sound.playHit();
+        if (!isRemoteActor) {
+          this.showStatus('Can only relocate onto your own green Safe Zone tiles!');
+          this.addFloatingText('Your Territory Only!', p.x, p.y - 12, '#FF3333');
+          this.sound.playHit();
+        }
         return;
       }
       const cost = Math.round((struct.invested || STRUCTURE_SPECS[struct.type].baseCost) * 0.2);
       if (this.getPlayerWallet(effActor) < cost) {
-        this.movingStructure = null;
-        this.renderUpgradePanel(struct);
-        this.showStatus(`Insufficient Scrap: relocating costs $${cost}.`);
-        this.addFloatingText('Insufficient Scrap', p.x, p.y - 12, '#FF3333');
-        this.sound.playHit();
-        return;
-      }
-
-      if (this.isMultiplayer && !this.isMpHost) {
-        if (this.mp) this.mp.sendAction({ kind: 'move_struct', fromKey: oldKey, col, row });
-        this.movingStructure = null;
-        this.renderUpgradePanel(struct);
+        if (!isRemoteActor) {
+          this.movingStructure = null;
+          this.renderUpgradePanel(struct);
+          this.showStatus(`Insufficient Scrap: relocating costs $${cost}.`);
+          this.addFloatingText('Insufficient Scrap', p.x, p.y - 12, '#FF3333');
+          this.sound.playHit();
+        }
         return;
       }
 
       if (!this.spendPlayerScrap(effActor, cost)) return;
+      const isOptimistic = this.isMultiplayer && !this.isMpHost;
+      if (isOptimistic && this.mp) {
+        this.mp.sendAction({ kind: 'move_struct', fromKey: oldKey, col, row });
+      }
+
       this.structures.delete(oldKey);
       struct.col = col;
       struct.row = row;
@@ -8580,6 +8623,11 @@
       struct.y = p.y;
       struct.moveCooldown = 10;
       struct.moveDuration = 10;
+      if (isOptimistic) {
+        struct.pendingConfirmUntil = performance.now() + 2500;
+        struct.pendingCost = cost;
+        struct.pendingMovedFromKey = oldKey;
+      }
       this.structures.set(newKey, struct);
 
       if (struct.occupants) {
@@ -8597,13 +8645,19 @@
         }
       }
 
-      this.movingStructure = null;
-      this.sound.playUpgrade();
-      this.addFloatingText(`-$${cost} Building (10s)`, p.x, p.y - 14, '#00E5FF');
-      this.addParticles(p.x, p.y, '#00E5FF', 12, 55);
-      this.updateHUD();
-      this.renderUpgradePanel(struct);
-      this.showStatus(`${STRUCTURE_SPECS[struct.type].name} relocated! Under construction for 10s.`);
+      if (!isRemoteActor) {
+        this.movingStructure = null;
+        this.sound.playUpgrade();
+        this.addFloatingText(`-$${cost} Building (10s)`, p.x, p.y - 14, '#00E5FF');
+        this.addParticles(p.x, p.y, '#00E5FF', 12, 55);
+        this.updateHUD();
+        this.renderUpgradePanel(struct);
+        this.showStatus(`${STRUCTURE_SPECS[struct.type].name} relocated! Under construction for 10s.`);
+      } else {
+        this.addFloatingText(`-$${cost} Building (10s)`, p.x, p.y - 14, '#00E5FF');
+        this.addParticles(p.x, p.y, '#00E5FF', 12, 55);
+        this.updateHUD();
+      }
     }
 
     updateMobileFloatingDetails(entity) {
@@ -9118,11 +9172,15 @@
           if (this.selectedCivilian === civ) this.selectedCivilian = null;
 
           const lv1 = SOLDIER_SPECS[0];
+          const pMeta = this.getPlayerMeta(rescueOwner);
           this.soldiers.push({
             id: Math.random().toString(36).slice(2, 11),
             level: 1,
             isCommando: false,
             ownerId: rescueOwner,
+            ownerSlot: pMeta ? pMeta.slot : 0,
+            ownerColor: pMeta ? pMeta.color : null,
+            ownerName: pMeta ? pMeta.callsign : null,
             x: civ.x,
             y: civ.y,
             radius: 7,
@@ -9357,6 +9415,7 @@
                 for (const st of this.structures.values()) {
                   const activeT = st.activeTrainers ? st.activeTrainers.length : 0;
                   if (st.type === 'barracks' && st.occupants && st.occupants.length + activeT < (st.capacity || 4)) {
+                    if (this.isMultiplayer && sol.ownerId && st.ownerId && st.ownerId !== sol.ownerId) continue;
                     const d = Math.hypot(st.x - sol.x, st.y - sol.y);
                     if (d < bestBarD) {
                       bestBarD = d;
@@ -9365,9 +9424,7 @@
                   }
                 }
                 if (bestBar) {
-                  const p = findPath(scNow, srNow, bestBar.col, bestBar.row, (c, r) =>
-                    (c === bestBar.col && r === bestBar.row) ? false : this.commandoBlocked(c, r)
-                  );
+                  const p = this.findPathToAdjacentTile(scNow, srNow, bestBar.col, bestBar.row, (c, r) => this.commandoBlocked(c, r));
                   if (p) {
                     sol.path = p.map(([c, r]) => tileCenter(c, r));
                     sol.targetBarracks = bestBar;

@@ -1,5 +1,5 @@
 /**
- * Zombie Defense Command - 4-Player Co-Op Multiplayer Manager (v0.27.0)
+ * Zombie Defense Command - 4-Player Co-Op Multiplayer Manager (v0.28.0)
  * $0 Zero-Config WebRTC P2P Mesh (PeerJS) + Public Live Room Directory (ntfy.sh & BroadcastChannel)
  * Pure Vanilla JavaScript - 100% Static Client Deployment (Cloudflare Free Tier Safe)
  */
@@ -1559,7 +1559,7 @@
       }
     }
 
-    broadcastState(snap) {
+    broadcastState(snap, force = false) {
       if (this.role !== 'host' || !this.inMatch) return;
       if (snap && typeof snap === 'object') {
         this.stateSeq = Math.max(this.stateSeq || 0, (this.lastSnapshot && this.lastSnapshot.seq) || 0) + 1;
@@ -1568,10 +1568,11 @@
         snap.migrationGen = this.migrationGen || 0;
         this.lastSnapshot = snap;
       }
-      this.broadcastRaw({ type: 'state', snap }, { maxBufferedBytes: 32768 });
+      this.broadcastRaw({ type: 'state', snap }, { maxBufferedBytes: force ? 0 : 32768 });
     }
 
     sendAction(action) {
+      if (!action || typeof action !== 'object') return false;
       if (this.role !== 'guest' || !this.hostConn || !this.hostConn.open || this.pauseState) return false;
       try {
         this.hostConn.send({ type: 'action', action });
