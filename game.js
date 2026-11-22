@@ -1141,6 +1141,22 @@
       this.btnCamReset = $('btnCamReset');
       this.btnCamZoomIn = $('btnCamZoomIn');
       this.btnCamFocusBase = $('btnCamFocusBase');
+
+      // Mobile 6-Tab Navigation Bar & Sub-Drawer
+      this.mobileTabBar = $('mobileTabBar');
+      this.mobileSubDrawer = $('mobileSubDrawer');
+      this.tabSelect = $('tabSelect');
+      this.tabPause = $('tabPause');
+      this.tabPauseIcon = $('tabPauseIcon');
+      this.tabPauseLabel = $('tabPauseLabel');
+      this.tabSafeZone = $('tabSafeZone');
+      this.tabWalls = $('tabWalls');
+      this.tabBuildings = $('tabBuildings');
+      this.tabTowers = $('tabTowers');
+      this.subGroupWalls = $('subGroupWalls');
+      this.subGroupBuildings = $('subGroupBuildings');
+      this.subGroupTowers = $('subGroupTowers');
+      this.activeMobileCategory = null;
     }
 
     bindEvents() {
@@ -1316,6 +1332,42 @@
       if (this.buildPanel) {
         this.buildPanel.querySelectorAll('[data-tool]').forEach((btn) => {
           on(btn, 'click', () => this.setBuildType(btn.dataset.tool));
+        });
+      }
+
+      // Mobile 6-Tab Navigation Bar & Sub-Drawer buttons
+      on(this.tabSelect, 'click', () => {
+        this.closeMobileSubDrawer();
+        this.setBuildType('select');
+      });
+
+      on(this.tabPause, 'click', () => {
+        this.togglePause();
+      });
+
+      on(this.tabSafeZone, 'click', () => {
+        this.closeMobileSubDrawer();
+        this.setBuildType('safezone');
+      });
+
+      on(this.tabWalls, 'click', () => {
+        this.toggleMobileCategory('walls');
+      });
+
+      on(this.tabBuildings, 'click', () => {
+        this.toggleMobileCategory('buildings');
+      });
+
+      on(this.tabTowers, 'click', () => {
+        this.toggleMobileCategory('towers');
+      });
+
+      if (this.mobileSubDrawer) {
+        this.mobileSubDrawer.querySelectorAll('[data-tool]').forEach((btn) => {
+          on(btn, 'click', () => {
+            this.setBuildType(btn.dataset.tool);
+            this.closeMobileSubDrawer();
+          });
         });
       }
 
@@ -1716,7 +1768,7 @@
         this.btnCamReset.innerText = `${this.camera.zoom.toFixed(1)}x`;
       }
       if (this.cameraControls) {
-        if (this.isMobileTouch || this.camera.zoom > 1.001) {
+        if (!this.isMobileTouch && this.camera.zoom > 1.001) {
           showEl(this.cameraControls, 'flex');
         } else {
           hideEl(this.cameraControls);
@@ -2341,6 +2393,36 @@
       if (this.gameContainer) this.gameContainer.classList.remove('tutorial-active');
     }
 
+    toggleMobileCategory(cat) {
+      if (!this.inPlay) return;
+      if (this.activeMobileCategory === cat) {
+        this.closeMobileSubDrawer();
+      } else {
+        this.openMobileCategory(cat);
+      }
+      this.sound.playClick();
+    }
+
+    openMobileCategory(cat) {
+      this.activeMobileCategory = cat;
+      if (this.mobileSubDrawer) showEl(this.mobileSubDrawer, 'block');
+      if (this.subGroupWalls) this.subGroupWalls.classList.toggle('hidden', cat !== 'walls');
+      if (this.subGroupBuildings) this.subGroupBuildings.classList.toggle('hidden', cat !== 'buildings');
+      if (this.subGroupTowers) this.subGroupTowers.classList.toggle('hidden', cat !== 'towers');
+      this.updateBuildPanelUI();
+      this.refreshTutorialArrowPosition();
+    }
+
+    closeMobileSubDrawer() {
+      this.activeMobileCategory = null;
+      if (this.mobileSubDrawer) hideEl(this.mobileSubDrawer);
+      if (this.subGroupWalls) hideEl(this.subGroupWalls);
+      if (this.subGroupBuildings) hideEl(this.subGroupBuildings);
+      if (this.subGroupTowers) hideEl(this.subGroupTowers);
+      this.updateBuildPanelUI();
+      this.refreshTutorialArrowPosition();
+    }
+
     setTutorialPulse(elId, arrowLabel = 'CLICK') {
       if (this.tutorialPulseElId) {
         const prev = document.getElementById(this.tutorialPulseElId);
@@ -2349,11 +2431,38 @@
       this.tutorialPulseElId = elId || null;
       this.tutorialArrowLabel = arrowLabel || 'CLICK';
       if (this.tutorialPulseElId) {
-        const next = document.getElementById(this.tutorialPulseElId);
-        if (next && !next.classList.contains('hidden')) {
-          next.classList.add('tutorial-pulse');
-          if (this.isMobileTouch && typeof next.scrollIntoView === 'function') {
-            next.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' });
+        let targetEl = document.getElementById(this.tutorialPulseElId);
+        if (this.isMobileTouch && targetEl) {
+          // Map desktop build tool button to mobile tab if sub-menu is closed
+          const toolToCategory = {
+            toolWall: { tabId: 'tabWalls', cat: 'walls' },
+            toolGate: { tabId: 'tabWalls', cat: 'walls' },
+            toolBunker: { tabId: 'tabBuildings', cat: 'buildings' },
+            toolBarracks: { tabId: 'tabBuildings', cat: 'buildings' },
+            toolEngineering: { tabId: 'tabBuildings', cat: 'buildings' },
+            toolHabitat: { tabId: 'tabBuildings', cat: 'buildings' },
+            toolSafezone: { tabId: 'tabSafeZone', cat: null },
+            toolSelect: { tabId: 'tabSelect', cat: null },
+            toolSentry: { tabId: 'tabTowers', cat: 'towers' },
+            toolCryo: { tabId: 'tabTowers', cat: 'towers' },
+            toolSniper: { tabId: 'tabTowers', cat: 'towers' }
+          };
+          const mapping = toolToCategory[this.tutorialPulseElId];
+          if (mapping) {
+            if (mapping.cat && this.activeMobileCategory !== mapping.cat) {
+              targetEl = document.getElementById(mapping.tabId) || targetEl;
+            } else if (mapping.cat && this.activeMobileCategory === mapping.cat) {
+              const subItem = this.mobileSubDrawer ? this.mobileSubDrawer.querySelector(`[data-tool="${targetEl.dataset.tool}"]`) : null;
+              if (subItem) targetEl = subItem;
+            } else if (mapping.tabId) {
+              targetEl = document.getElementById(mapping.tabId) || targetEl;
+            }
+          }
+        }
+        if (targetEl && !targetEl.classList.contains('hidden')) {
+          targetEl.classList.add('tutorial-pulse');
+          if (this.isMobileTouch && typeof targetEl.scrollIntoView === 'function') {
+            targetEl.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' });
           }
         }
       }
@@ -2364,7 +2473,33 @@
       const arrowEl = this.tutorialUiArrow;
       if (!arrowEl) return;
       if (this.tutorialPulseElId && this.isTutorialMode && this.inPlay) {
-        const next = document.getElementById(this.tutorialPulseElId);
+        let next = document.getElementById(this.tutorialPulseElId);
+        if (this.isMobileTouch && next) {
+          const toolToCategory = {
+            toolWall: { tabId: 'tabWalls', cat: 'walls' },
+            toolGate: { tabId: 'tabWalls', cat: 'walls' },
+            toolBunker: { tabId: 'tabBuildings', cat: 'buildings' },
+            toolBarracks: { tabId: 'tabBuildings', cat: 'buildings' },
+            toolEngineering: { tabId: 'tabBuildings', cat: 'buildings' },
+            toolHabitat: { tabId: 'tabBuildings', cat: 'buildings' },
+            toolSafezone: { tabId: 'tabSafeZone', cat: null },
+            toolSelect: { tabId: 'tabSelect', cat: null },
+            toolSentry: { tabId: 'tabTowers', cat: 'towers' },
+            toolCryo: { tabId: 'tabTowers', cat: 'towers' },
+            toolSniper: { tabId: 'tabTowers', cat: 'towers' }
+          };
+          const mapping = toolToCategory[this.tutorialPulseElId];
+          if (mapping) {
+            if (mapping.cat && this.activeMobileCategory !== mapping.cat) {
+              next = document.getElementById(mapping.tabId) || next;
+            } else if (mapping.cat && this.activeMobileCategory === mapping.cat) {
+              const subItem = this.mobileSubDrawer ? this.mobileSubDrawer.querySelector(`[data-tool="${next.dataset.tool}"]`) : null;
+              if (subItem) next = subItem;
+            } else if (mapping.tabId) {
+              next = document.getElementById(mapping.tabId) || next;
+            }
+          }
+        }
         if (next && !next.classList.contains('hidden') && typeof next.getBoundingClientRect === 'function') {
           const rect = next.getBoundingClientRect();
           if (rect && (rect.width > 0 || rect.height > 0)) {
@@ -3192,14 +3327,43 @@
         const active = t === 'select' ? (!this.selectedBuildType && this.selectModeActive) : this.selectedBuildType === t;
         btn.classList.toggle('active', active);
       });
+
+      // Sync mobile 6-tab buttons and sub-drawer items
+      if (this.mobileTabBar) {
+        if (this.tabSelect) {
+          this.tabSelect.classList.toggle('active', !this.selectedBuildType && this.selectModeActive);
+        }
+        if (this.tabSafeZone) {
+          this.tabSafeZone.classList.toggle('active', this.selectedBuildType === 'safezone');
+        }
+        const isWallActive = this.selectedBuildType === 'wall' || this.selectedBuildType === 'gate';
+        if (this.tabWalls) {
+          this.tabWalls.classList.toggle('active', this.activeMobileCategory === 'walls' || isWallActive);
+        }
+        const isBuildingActive = this.selectedBuildType === 'bunker' || this.selectedBuildType === 'barracks' || this.selectedBuildType === 'engineering' || this.selectedBuildType === 'habitat';
+        if (this.tabBuildings) {
+          this.tabBuildings.classList.toggle('active', this.activeMobileCategory === 'buildings' || isBuildingActive);
+        }
+        const isTowerActive = this.selectedBuildType === 'sentry' || this.selectedBuildType === 'cryo' || this.selectedBuildType === 'sniper';
+        if (this.tabTowers) {
+          this.tabTowers.classList.toggle('active', this.activeMobileCategory === 'towers' || isTowerActive);
+        }
+      }
+
+      if (this.mobileSubDrawer) {
+        this.mobileSubDrawer.querySelectorAll('[data-tool]').forEach((btn) => {
+          btn.classList.toggle('active', this.selectedBuildType === btn.dataset.tool);
+        });
+      }
     }
 
     updateAffordability() {
       const maxHab = this.getMaxHabitats();
       const curHab = this.countStructures('habitat');
       const habCapped = curHab >= maxHab;
-      if (this.buildPanel) {
-        this.buildPanel.querySelectorAll('[data-tool]').forEach((btn) => {
+      const syncButtons = (container) => {
+        if (!container) return;
+        container.querySelectorAll('[data-tool]').forEach((btn) => {
           const t = btn.dataset.tool;
           const spec = STRUCTURE_SPECS[t];
           btn.classList.toggle('unaffordable', !!spec && this.scrap < spec.baseCost);
@@ -3210,6 +3374,12 @@
             if (costEl) costEl.innerText = habCapped ? `${curHab}/${maxHab}` : `$${spec.baseCost}`;
           }
         });
+      };
+      syncButtons(this.buildPanel);
+      syncButtons(this.mobileSubDrawer);
+      if (this.tabSafeZone) {
+        const szSpec = STRUCTURE_SPECS.safezone;
+        this.tabSafeZone.classList.toggle('unaffordable', !!szSpec && this.scrap < szSpec.baseCost);
       }
     }
 
@@ -3230,6 +3400,11 @@
     setPaused(p) {
       this.isPaused = !!p;
       if (this.btnPause) this.btnPause.innerText = this.isPaused ? 'Resume' : 'Pause';
+      if (this.tabPause) {
+        this.tabPause.classList.toggle('paused', this.isPaused);
+        if (this.tabPauseLabel) this.tabPauseLabel.innerText = this.isPaused ? 'Resume' : 'Pause';
+        if (this.tabPauseIcon) this.tabPauseIcon.innerHTML = this.isPaused ? '&#9654;' : '&#10074;&#10074;';
+      }
       this.updateTimerHud();
     }
 

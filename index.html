@@ -283,6 +283,76 @@
 
     <!-- Command deck (Strictly locked height so canvas never shifts or zooms on selection) -->
     <footer id="commandDeck">
+      <!-- Mobile 6-Tab Floating Sub-Menu Tray (Non-interrupting overlay directly above bottom tab bar) -->
+      <div id="mobileSubDrawer" class="mobile-sub-drawer hidden" role="region" aria-label="Build Category Sub-Menu">
+        <div id="subGroupWalls" class="mobile-sub-group hidden" data-category="walls">
+          <div class="mobile-sub-title">WALL DEFENSES</div>
+          <div class="mobile-sub-btns">
+            <button class="mobile-sub-item tool-btn" data-tool="wall" title="Barricade $10">
+              <span class="tool-icon">&#9646;</span><span class="tool-name">Barricade</span><span class="tool-cost">$10</span>
+            </button>
+            <button class="mobile-sub-item tool-btn" data-tool="gate" title="Security Gate $100">
+              <span class="tool-icon">&#9638;</span><span class="tool-name">Gate</span><span class="tool-cost">$100</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="subGroupBuildings" class="mobile-sub-group hidden" data-category="buildings">
+          <div class="mobile-sub-title">BASE FACILITIES</div>
+          <div class="mobile-sub-btns">
+            <button class="mobile-sub-item tool-btn" data-tool="bunker" title="Combat Bunker $90">
+              <span class="tool-icon">&#9962;</span><span class="tool-name">Bunker</span><span class="tool-cost">$90</span>
+            </button>
+            <button class="mobile-sub-item tool-btn" data-tool="barracks" title="Barracks $80">
+              <span class="tool-icon">&#9874;</span><span class="tool-name">Barracks</span><span class="tool-cost">$80</span>
+            </button>
+            <button class="mobile-sub-item tool-btn" data-tool="engineering" title="Engineering $90">
+              <span class="tool-icon">&#9881;</span><span class="tool-name">Engineering</span><span class="tool-cost">$90</span>
+            </button>
+            <button class="mobile-sub-item tool-btn" data-tool="habitat" title="Habitat $110">
+              <span class="tool-icon">&#8962;</span><span class="tool-name">Habitat</span><span class="tool-cost">$110</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="subGroupTowers" class="mobile-sub-group hidden" data-category="towers">
+          <div class="mobile-sub-title">DEFENSE TOWERS</div>
+          <div class="mobile-sub-btns">
+            <button class="mobile-sub-item tool-btn" data-tool="sentry" title="Sentry $150">
+              <span class="tool-icon">&#9881;</span><span class="tool-name">Sentry</span><span class="tool-cost">$150</span>
+            </button>
+            <button class="mobile-sub-item tool-btn" data-tool="cryo" title="Cryo $180">
+              <span class="tool-icon">&#10052;</span><span class="tool-name">Cryo</span><span class="tool-cost">$180</span>
+            </button>
+            <button class="mobile-sub-item tool-btn" data-tool="sniper" title="Sniper $225">
+              <span class="tool-icon">&#8982;</span><span class="tool-name">Sniper</span><span class="tool-cost">$225</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mobile 6-Tab Navigation Bar (Active on mobile/touch only; desktop keeps #buildPanel) -->
+      <nav id="mobileTabBar" class="mobile-tab-bar" role="tablist" aria-label="Tactical Command Tabs">
+        <button id="tabSelect" class="mobile-tab-btn" data-tab="select" type="button" role="tab" title="Select / Inspect Mode (Q)">
+          <span class="tab-icon">&#9678;</span><span class="tab-label">Select</span>
+        </button>
+        <button id="tabPause" class="mobile-tab-btn" data-tab="pause" type="button" role="tab" title="Pause / Resume Game">
+          <span id="tabPauseIcon" class="tab-icon">&#10074;&#10074;</span><span id="tabPauseLabel" class="tab-label">Pause</span>
+        </button>
+        <button id="tabSafeZone" class="mobile-tab-btn" data-tab="safezone" data-tool="safezone" type="button" role="tab" title="Paint Safe Zone $10">
+          <span class="tab-icon">&#10010;</span><span class="tab-label">Safe Zone</span><span class="tab-cost">$10</span>
+        </button>
+        <button id="tabWalls" class="mobile-tab-btn" data-tab="walls" type="button" role="tab" aria-haspopup="true" aria-expanded="false" title="Walls &amp; Gates">
+          <span class="tab-icon">&#9646;</span><span class="tab-label">Walls</span><span class="tab-arrow">&#9650;</span>
+        </button>
+        <button id="tabBuildings" class="mobile-tab-btn" data-tab="buildings" type="button" role="tab" aria-haspopup="true" aria-expanded="false" title="Base Facilities">
+          <span class="tab-icon">&#9962;</span><span class="tab-label">Buildings</span><span class="tab-arrow">&#9650;</span>
+        </button>
+        <button id="tabTowers" class="mobile-tab-btn" data-tab="towers" type="button" role="tab" aria-haspopup="true" aria-expanded="false" title="Defense Turrets">
+          <span class="tab-icon">&#9881;</span><span class="tab-label">Towers</span><span class="tab-arrow">&#9650;</span>
+        </button>
+      </nav>
+
       <div id="buildPanel" class="deck-section">
         <div class="build-group">
           <div class="build-group-label">CMD</div>
