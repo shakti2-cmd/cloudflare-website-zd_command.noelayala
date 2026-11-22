@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.26.0 (WebRTC Backpressure, 60 FPS Guest Projectiles/Visuals, Synced Web Audio & Optimistic Placement)
+ * Version: v0.27.0 (Mobile Viewport Height & Orientation Lock Fix, 3x3 MP Safe Zones, Randomized Breaches, Equal Civilians & Balanced Wave Split)
  */
 
 (function () {
@@ -1474,7 +1474,7 @@
           on(btn, 'click', () => {
             const rot = btn.dataset.rot || 'auto';
             rotBtns.forEach((b) => b.classList.toggle('active', b === btn));
-            this.applyScreenRotationSetting(rot);
+            this.applyScreenRotationSetting(rot, true);
             this.sound.playClick();
           });
         });
@@ -2159,6 +2159,7 @@
         });
       };
       window.addEventListener('resize', handleLayoutChange);
+      window.addEventListener('orientationchange', handleLayoutChange);
       if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', handleLayoutChange);
       }
@@ -2218,13 +2219,18 @@
     }
 
     updateMobileMode() {
+      const vh = Math.min(window.innerHeight, window.visualViewport ? window.visualViewport.height : window.innerHeight);
+      if (vh > 0) {
+        document.documentElement.style.setProperty('--app-height', `${Math.floor(vh)}px`);
+      }
       const mq = window.matchMedia && window.matchMedia('(max-width: 1024px), (pointer: coarse)').matches;
       this.isMobileTouch = Boolean(mq || (navigator.maxTouchPoints > 0 && window.innerWidth <= 1024));
       if (document.body) {
+        const forcePortrait = this.screenRotationMode === 'portrait';
         document.body.classList.toggle('is-mobile-touch', this.isMobileTouch);
         document.body.classList.toggle(
           'is-mobile-landscape',
-          this.isMobileTouch && window.innerWidth > window.innerHeight && window.innerHeight <= 520
+          !forcePortrait && this.isMobileTouch && window.innerWidth > window.innerHeight && window.innerHeight <= 520
         );
       }
       this.syncCanvasViewportSize();
@@ -2486,11 +2492,20 @@
       }
     }
 
-    applyScreenRotationSetting(mode) {
+    applyScreenRotationSetting(mode, fromUserGesture = false) {
       this.screenRotationMode = mode || 'auto';
       try {
         localStorage.setItem('zdc_screen_rotation', this.screenRotationMode);
       } catch (_) {}
+
+      if (fromUserGesture && (this.screenRotationMode === 'portrait' || this.screenRotationMode === 'landscape')) {
+        try {
+          const el = document.documentElement;
+          if (el && typeof el.requestFullscreen === 'function' && !document.fullscreenElement) {
+            el.requestFullscreen().catch(() => {});
+          }
+        } catch (_) {}
+      }
 
       if (window.screen && window.screen.orientation) {
         try {
@@ -3358,39 +3373,15 @@
       this.pulseRings = [];
       this.floatingTexts = [];
 
-      // 32x24 open co-op arena with border rocks & 4 corner-symmetrical Spawn Breaches
+      // 32x24 open co-op arena with border rocks
       this.grid = Array.from({ length: ROWS }, (_, r) =>
         Array.from({ length: COLS }, (__, c) => (r === 0 || r === ROWS - 1 || c === 0 || c === COLS - 1 ? 1 : 0))
       );
 
-      const breachCoords = [
-        [15, 2],
-        [16, 21],
-        [2, 11],
-        [29, 12]
-      ];
-      const breachHp = 750;
-      for (const [bc, br] of breachCoords) {
-        this.grid[br][bc] = 3;
-        const p = tileCenter(bc, br);
-        this.spawns.set(`${bc},${br}`, {
-          type: 'spawn',
-          col: bc,
-          row: br,
-          x: p.x,
-          y: p.y,
-          hp: breachHp,
-          maxHp: breachHp,
-          flash: 0,
-          timeSinceHit: 99,
-          isRegenerating: false
-        });
-      }
-
       const anchors = [
-        [8, 6],
-        [22, 6],
-        [8, 16],
+        [7, 5],
+        [22, 5],
+        [7, 16],
         [22, 16]
       ];
       const szLv1 = STRUCTURE_SPECS.safezone.levels[0];
@@ -3399,8 +3390,8 @@
       for (const player of this.mpPlayers) {
         const anchor = anchors[player.slot % anchors.length];
         const clusterTiles = [];
-        for (let dr = 0; dr < 2; dr++) {
-          for (let dc = 0; dc < 2; dc++) {
+        for (let dr = 0; dr < 3; dr++) {
+          for (let dc = 0; dc < 3; dc++) {
             const cc = anchor[0] + dc;
             const rr = anchor[1] + dr;
             const p = tileCenter(cc, rr);
@@ -3433,9 +3424,99 @@
       }
 
       if (this.isMpHost) {
+        // Randomize 3-4 Spawn Breaches per connected player (>= 7 tiles from any Safe Zone)
+        const breachesPerPlayer = 3 + Math.floor(Math.random() * 2);
+        const targetBreaches = Math.max(3, this.mpPlayers.length * breachesPerPlayer);
+        const szTiles = Array.from(this.safeZones.values());
+        const candidates = [];
+        for (let r = 1; r < ROWS - 1; r++) {
+          for (let c = 1; c < COLS - 1; c++) {
+            if (this.grid[r][c] !== 0) continue;
+            let minSzDist = Infinity;
+            for (const sz of szTiles) {
+              const d = Math.hypot(c - sz.col, r - sz.row);
+              if (d < minSzDist) minSzDist = d;
+            }
+            if (minSzDist >= 7) candidates.push([c, r]);
+          }
+        }
+        for (let i = candidates.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          const tmp = candidates[i];
+          candidates[i] = candidates[j];
+          candidates[j] = tmp;
+        }
+        const chosenBreaches = [];
+        for (const cand of candidates) {
+          if (chosenBreaches.length >= targetBreaches) break;
+          if (chosenBreaches.every(([bc, br]) => Math.hypot(cand[0] - bc, cand[1] - br) >= 4)) {
+            chosenBreaches.push(cand);
+          }
+        }
+        if (chosenBreaches.length < targetBreaches) {
+          for (const cand of candidates) {
+            if (chosenBreaches.length >= targetBreaches) break;
+            if (!chosenBreaches.some(([bc, br]) => bc === cand[0] && br === cand[1])) {
+              chosenBreaches.push(cand);
+            }
+          }
+        }
+        const breachHp = 750;
+        for (const [bc, br] of chosenBreaches) {
+          this.grid[br][bc] = 3;
+          const p = tileCenter(bc, br);
+          this.spawns.set(`${bc},${br}`, {
+            type: 'spawn',
+            col: bc,
+            row: br,
+            x: p.x,
+            y: p.y,
+            hp: breachHp,
+            maxHp: breachHp,
+            flash: 0,
+            timeSinceHit: 99,
+            isRegenerating: false
+          });
+        }
+
         this.initialSpawnCount = Math.max(1, this.spawns.size);
-        const initCivCount = 8 + this.mpPlayers.length * 2;
-        this.spawnInitialCivilians(initCivCount);
+
+        // Equal starting civilians per player (4 per player, routed toward their Safe Zone)
+        const civsPerPlayer = 4;
+        for (const player of this.mpPlayers) {
+          const anchor = anchors[player.slot % anchors.length];
+          const centerCol = anchor[0] + 1;
+          const centerRow = anchor[1] + 1;
+          const targetSz = this.safeZones.get(`${centerCol},${centerRow}`) || szTiles.find((s) => s.ownerId === player.id);
+          let spawnedForPlayer = 0;
+          for (let attempt = 0; attempt < 80 && spawnedForPlayer < civsPerPlayer; attempt++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 4 + Math.random() * 5;
+            const cc = Math.max(1, Math.min(COLS - 2, Math.round(centerCol + Math.cos(angle) * dist)));
+            const rr = Math.max(1, Math.min(ROWS - 2, Math.round(centerRow + Math.sin(angle) * dist)));
+            if (this.grid[rr][cc] !== 0) continue;
+            const p = tileCenter(cc, rr);
+            const civ = {
+              id: Math.random().toString(36).slice(2, 11),
+              x: p.x,
+              y: p.y,
+              radius: 6,
+              speed: 60,
+              isIncubating: false,
+              incubationTimer: 0,
+              path: [],
+              dest: null,
+              repathTimer: 0.2,
+              targetBarracks: null
+            };
+            if (targetSz) {
+              civ.path = this.findPath(cc, rr, targetSz.col, targetSz.row, true);
+              civ.dest = { col: targetSz.col, row: targetSz.row };
+            }
+            this.civilians.push(civ);
+            spawnedForPlayer++;
+          }
+        }
         this.civTotal = this.civilians.length;
       } else {
         this.initialSpawnCount = Math.max(1, this.spawns.size);
@@ -5265,7 +5346,20 @@
         [batch[i], batch[j]] = [batch[j], batch[i]];
       }
 
-      this.waveSpawnQueue.push(...batch);
+      if (this.isMultiplayer && this.isMpHost) {
+        const activeOwners = Array.from(new Set(Array.from(this.safeZones.values()).map((sz) => sz.ownerId).filter(Boolean)));
+        if (activeOwners.length > 0) {
+          const assignedBatch = batch.map((t, idx) => ({
+            type: t,
+            assignedPlayerId: activeOwners[idx % activeOwners.length]
+          }));
+          this.waveSpawnQueue.push(...assignedBatch);
+        } else {
+          this.waveSpawnQueue.push(...batch);
+        }
+      } else {
+        this.waveSpawnQueue.push(...batch);
+      }
       if (this.spawnTimer <= 0) this.spawnTimer = 0.35;
 
       // Recalculate Horde Scaling dynamically from Base Power every 10th wave boundary (Wave 11, 21, 31...)
@@ -5348,8 +5442,11 @@
       };
     }
 
-    spawnZombie(type) {
+    spawnZombie(entry) {
       if (this.spawns.size === 0) return;
+
+      const type = typeof entry === 'string' ? entry : (entry && entry.type) || 'walker';
+      const assignedPlayerId = typeof entry === 'object' && entry ? (entry.assignedPlayerId || null) : null;
 
       // Enforce Wave 6+ gate and Max 4 Combined on-screen cap for Demolisher & Wrecker
       let actualType = type;
@@ -5360,8 +5457,23 @@
       }
 
       const breachList = Array.from(this.spawns.values());
-      const pick = breachList[Math.floor(Math.random() * breachList.length)];
-      this.zombies.push(this.makeZombie(actualType, pick.x, pick.y));
+      let pick = breachList[Math.floor(Math.random() * breachList.length)];
+      if (this.isMultiplayer && assignedPlayerId && breachList.length > 1) {
+        const pZones = Array.from(this.safeZones.values()).filter((sz) => sz.ownerId === assignedPlayerId);
+        if (pZones.length > 0) {
+          const cx = pZones.reduce((s, sz) => s + sz.x, 0) / pZones.length;
+          const cy = pZones.reduce((s, sz) => s + sz.y, 0) / pZones.length;
+          const sorted = breachList.slice().sort((a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy));
+          const poolCount = Math.min(2, sorted.length);
+          pick = sorted[Math.floor(Math.random() * poolCount)];
+        }
+      }
+      const z = this.makeZombie(actualType, pick.x, pick.y);
+      if (assignedPlayerId) {
+        z.assignedPlayerId = assignedPlayerId;
+        z.targetOwnerId = assignedPlayerId;
+      }
+      this.zombies.push(z);
     }
 
     getMaxHabitats() {
@@ -9693,6 +9805,23 @@
     }
 
     updateZombies(dt) {
+      let activeOwners = [];
+      const ownerCounts = new Map();
+      let maxFairShare = Infinity;
+      if (this.isMultiplayer) {
+        activeOwners = Array.from(new Set(Array.from(this.safeZones.values()).map((sz) => sz.ownerId).filter(Boolean)));
+        if (activeOwners.length > 1) {
+          for (const o of activeOwners) ownerCounts.set(o, 0);
+          for (const zb of this.zombies) {
+            const oid = zb.targetOwnerId || zb.assignedPlayerId;
+            if (oid && ownerCounts.has(oid)) {
+              ownerCounts.set(oid, ownerCounts.get(oid) + 1);
+            }
+          }
+          maxFairShare = Math.ceil(this.zombies.length / activeOwners.length) + 1;
+        }
+      }
+
       for (let i = this.zombies.length - 1; i >= 0; i--) {
         const z = this.zombies[i];
 
@@ -9802,14 +9931,53 @@
           ty = targetUnit.y;
         }
 
-        // 3. Target nearest active green Safe Zone block
+        // 3. Target nearest active green Safe Zone block (with MP overflow redirection)
         if (closest === Infinity) {
+          let desiredOwner = null;
+          if (this.isMultiplayer && activeOwners.length > 1) {
+            desiredOwner = z.targetOwnerId || z.assignedPlayerId;
+            if (!desiredOwner || !ownerCounts.has(desiredOwner)) {
+              let nearestSz = null;
+              let minD = Infinity;
+              for (const sz of this.safeZones.values()) {
+                const d = Math.hypot(sz.x - z.x, sz.y - z.y);
+                if (d < minD) { minD = d; nearestSz = sz; }
+              }
+              desiredOwner = nearestSz ? nearestSz.ownerId : null;
+              if (desiredOwner) z.targetOwnerId = desiredOwner;
+            }
+            if (desiredOwner && (ownerCounts.get(desiredOwner) || 0) > maxFairShare) {
+              let bestAlt = null;
+              let minCount = Infinity;
+              for (const o of activeOwners) {
+                const c = ownerCounts.get(o) || 0;
+                if (c < minCount) { minCount = c; bestAlt = o; }
+              }
+              if (bestAlt && bestAlt !== desiredOwner && minCount < maxFairShare) {
+                ownerCounts.set(desiredOwner, Math.max(0, (ownerCounts.get(desiredOwner) || 0) - 1));
+                ownerCounts.set(bestAlt, minCount + 1);
+                z.targetOwnerId = bestAlt;
+                desiredOwner = bestAlt;
+              }
+            }
+          }
           for (const sz of this.safeZones.values()) {
+            if (desiredOwner && sz.ownerId && sz.ownerId !== desiredOwner) continue;
             const d = Math.hypot(sz.x - z.x, sz.y - z.y);
             if (d < closest) {
               closest = d;
               tx = sz.x;
               ty = sz.y;
+            }
+          }
+          if (closest === Infinity) {
+            for (const sz of this.safeZones.values()) {
+              const d = Math.hypot(sz.x - z.x, sz.y - z.y);
+              if (d < closest) {
+                closest = d;
+                tx = sz.x;
+                ty = sz.y;
+              }
             }
           }
         }
