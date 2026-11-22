@@ -227,19 +227,6 @@
         { range: 400, rate: 1.0, dmg: 300, hp: 250, cost: 525, repairCost: 210, color: '#CC33FF' }
       ]
     },
-    bunker: {
-      name: 'Combat Bunker',
-      role: 'bunker',
-      baseCost: 90,
-      requiresAdjacency: false,
-      capacity: 4,
-      atkBuffMult: 1.5,
-      levels: [
-        { hp: 220, cost: 90, repairCost: 36, capacity: 4, color: '#1E5B4A', border: '#00E08A' },
-        { hp: 400, cost: 150, repairCost: 60, capacity: 4, color: '#1A735D', border: '#38E8FF' },
-        { hp: 650, cost: 270, repairCost: 108, capacity: 4, color: '#148F77', border: '#FFD23F' }
-      ]
-    },
     barracks: {
       name: 'Barracks',
       role: 'barracks',
@@ -329,7 +316,6 @@
     sentry: '&#9881;',
     cryo: '&#10052;',
     sniper: '&#8982;',
-    bunker: '&#9962;',
     barracks: '&#9874;',
     engineering: '&#9881;',
     habitat: '&#8962;',
@@ -996,6 +982,7 @@
 
       this.initLevel(0);
       this.waveState = STATE.START_MENU;
+      if (document.body) document.body.classList.add('in-start-menu');
       this.syncStartCards();
       showEl(this.startScreenOverlay, 'flex');
       this.updateHUD();
@@ -1027,7 +1014,7 @@
     get garrisonedSoldierCount() {
       let total = 0;
       for (const st of this.structures.values()) {
-        if ((st.type === 'bunker' || st.type === 'barracks' || st.type === 'engineering') && st.occupants) {
+        if ((st.type === 'barracks' || st.type === 'engineering') && st.occupants) {
           for (const u of st.occupants) {
             if (u.unitType !== 'engineer') total++;
           }
@@ -1160,7 +1147,7 @@
       this.subGroupTowers = $('subGroupTowers');
       this.activeMobileCategory = null;
 
-      this.btnInspectDetails = $('btnInspectDetails');
+      this.mobileFloatingDetails = $('mobileFloatingDetails');
       this.mobileWaveTimerLabel = $('mobileWaveTimerLabel');
       this.btnMobileSettings = $('btnMobileSettings');
       this.mobileSettingsMenu = $('mobileSettingsMenu');
@@ -1169,6 +1156,9 @@
       this.btnMobileAudio = $('btnMobileAudio');
       this.btnMobileHelp = $('btnMobileHelp');
       this.btnMobileMenu = $('btnMobileMenu');
+      this.startMainSection = $('startMainSection');
+      this.btnCampaignBack = $('btnCampaignBack');
+      this.btnStartCampaignSector = $('btnStartCampaignSector');
     }
 
     bindEvents() {
@@ -1197,21 +1187,30 @@
         on(card, 'click', () => {
           const mode = card.dataset.mode;
           this.startMenuMode = mode;
-          if (this.startLevelSelect) {
-            if (mode === 'random') {
-              this.startLevelSelect.value = 'random';
-            } else if (mode === 'post_defense') {
-              this.startLevelSelect.value = 'post_defense';
-            } else {
-              // Restore currently selected campaign sector card (1..4)
-              const activeLvlCard = document.querySelector('#levelCards .level-card.selected');
+          if (mode === 'campaign') {
+            if (this.startMainSection) hideEl(this.startMainSection);
+            if (this.campaignSectorPanel) showEl(this.campaignSectorPanel, 'block');
+            const activeLvlCard = document.querySelector('#levelCards .level-card.selected');
+            if (this.startLevelSelect) {
               this.startLevelSelect.value = activeLvlCard ? activeLvlCard.dataset.level : '1';
+            }
+          } else {
+            if (this.startLevelSelect) {
+              this.startLevelSelect.value = mode === 'random' ? 'random' : 'post_defense';
             }
           }
           this.syncStartCards();
           this.sound.playClick();
         });
       });
+
+      // Campaign sector sub-panel Back and Start Mission buttons
+      on(this.btnCampaignBack, 'click', () => {
+        if (this.campaignSectorPanel) hideEl(this.campaignSectorPanel);
+        if (this.startMainSection) showEl(this.startMainSection, 'block');
+        this.sound.playClick();
+      });
+      on(this.btnStartCampaignSector, 'click', () => this.deployFromStartScreen());
 
       // Startup screen Campaign Sector sub-cards (1..4)
       document.querySelectorAll('[data-level]').forEach((card) => {
@@ -1387,12 +1386,6 @@
       }
 
       // Inspector buttons
-      on(this.btnInspectDetails, 'click', () => {
-        if (this.upgradePanel) {
-          this.upgradePanel.classList.toggle('details-expanded');
-          this.sound.playClick();
-        }
-      });
       on(this.btnTrainUnit, 'click', () => this.trainFromSelectedBuilding(this.selectedStructure));
       on(this.btnCancelTrain, 'click', () => this.cancelLastQueuedTraining(this.selectedStructure));
       on(this.btnRelease, 'click', () => this.releaseGarrisonedUnits(this.selectedStructure));
@@ -1788,7 +1781,6 @@
         if (key === 'q') this.quickConscript();
         else if (key === '1') this.setBuildType('wall');
         else if (key === '2') this.setBuildType('gate');
-        else if (key === '3') this.setBuildType('bunker');
         else if (key === '4') this.setBuildType('barracks');
         else if (key === '5') this.setBuildType('engineering');
         else if (key === '6') this.setBuildType('habitat');
@@ -1799,7 +1791,7 @@
         else if (key === 'w') this.upgradeSelectedEntity();
         else if (key === 's') this.salvageSelectedStructure(true);
         else if (key === 'e') {
-          if (this.selectedStructure && (this.selectedStructure.type === 'bunker' || this.selectedStructure.type === 'barracks' || this.selectedStructure.type === 'engineering')) {
+          if (this.selectedStructure && (this.selectedStructure.type === 'barracks' || this.selectedStructure.type === 'engineering')) {
             this.releaseGarrisonedUnits(this.selectedStructure);
           }
         } else if (key === ' ') {
@@ -2098,6 +2090,7 @@
       }
 
       hideEl(this.startScreenOverlay);
+      if (document.body) document.body.classList.remove('in-start-menu');
       this.waveState = STATE.PREPARE;
       this.updateHUD();
       this.updateTimerHud();
@@ -2113,9 +2106,12 @@
     returnToStartMenu() {
       this.clearTutorial();
       this.waveState = STATE.START_MENU;
+      if (document.body) document.body.classList.add('in-start-menu');
       this.setPaused(false);
       this.clearSelection();
       hideEl(this.gameOverOverlay);
+      if (this.startMainSection) showEl(this.startMainSection, 'block');
+      if (this.campaignSectorPanel) hideEl(this.campaignSectorPanel);
       this.syncStartCards();
       showEl(this.startScreenOverlay, 'flex');
       this.updateTimerHud();
@@ -2541,6 +2537,7 @@
       this.infectionWindow = preset.infectionWindow;
       this.initLevel('tutorial');
       hideEl(this.startScreenOverlay);
+      if (document.body) document.body.classList.remove('in-start-menu');
       this.waveState = STATE.PREPARE;
       this.updateTutorial();
       this.updateHUD();
@@ -2616,7 +2613,6 @@
           const toolToCategory = {
             toolWall: { tabId: 'tabWalls', cat: 'walls' },
             toolGate: { tabId: 'tabWalls', cat: 'walls' },
-            toolBunker: { tabId: 'tabBuildings', cat: 'buildings' },
             toolBarracks: { tabId: 'tabBuildings', cat: 'buildings' },
             toolEngineering: { tabId: 'tabBuildings', cat: 'buildings' },
             toolHabitat: { tabId: 'tabBuildings', cat: 'buildings' },
@@ -2657,7 +2653,6 @@
           const toolToCategory = {
             toolWall: { tabId: 'tabWalls', cat: 'walls' },
             toolGate: { tabId: 'tabWalls', cat: 'walls' },
-            toolBunker: { tabId: 'tabBuildings', cat: 'buildings' },
             toolBarracks: { tabId: 'tabBuildings', cat: 'buildings' },
             toolEngineering: { tabId: 'tabBuildings', cat: 'buildings' },
             toolHabitat: { tabId: 'tabBuildings', cat: 'buildings' },
@@ -3516,7 +3511,7 @@
         if (this.tabWalls) {
           this.tabWalls.classList.toggle('active', this.activeMobileCategory === 'walls' || isWallActive);
         }
-        const isBuildingActive = this.selectedBuildType === 'bunker' || this.selectedBuildType === 'barracks' || this.selectedBuildType === 'engineering' || this.selectedBuildType === 'habitat';
+        const isBuildingActive = this.selectedBuildType === 'barracks' || this.selectedBuildType === 'engineering' || this.selectedBuildType === 'habitat';
         if (this.tabBuildings) {
           this.tabBuildings.classList.toggle('active', this.activeMobileCategory === 'buildings' || isBuildingActive);
         }
@@ -3617,12 +3612,8 @@
       const key = `${col},${row}`;
       const clickedStruct = this.structures.get(key) || this.safeZones.get(key) || null;
 
-      // Soldier selected -> Combat Bunker (Soldiers & Commandos), Barracks (Lv1 Recruits & Commandos), Engineering (Lv1 Recruits Only)
+      // Soldier selected -> Barracks (Lv1 Recruits & Commandos), Engineering (Lv1 Recruits Only)
       if (this.selectedSoldier && clickedStruct) {
-        if (clickedStruct.type === 'bunker') {
-          this.commandSoldierToBunker(this.selectedSoldier, clickedStruct);
-          return;
-        }
         if (clickedStruct.type === 'barracks') {
           if (this.selectedSoldier.level !== 1 && !this.selectedSoldier.isCommando) {
             this.showStatus('Barracks accept Lv1 Recruits (for training) or standby Commandos only!');
@@ -3651,17 +3642,11 @@
         return;
       }
 
-      // Civilian selected -> Barracks & Engineering require Lv1 Recruits; Bunker requires Soldiers
+      // Civilian selected -> Barracks & Engineering require Lv1 Recruits
       if (this.selectedCivilian && clickedStruct) {
         if (clickedStruct.type === 'barracks' || clickedStruct.type === 'engineering') {
           this.showStatus('Recruits Only! Escort civilian to a green Safe Zone first to convert into a Lv1 Recruit.');
           this.addFloatingText('Recruits Only! Escort to Safe Zone first.', clickedStruct.x, clickedStruct.y - 12, '#FF9A1F');
-          this.sound.playHit();
-          return;
-        }
-        if (clickedStruct.type === 'bunker') {
-          this.showStatus('Combat Bunkers are for Rescued Soldiers & Commandos only!');
-          this.addFloatingText('Soldiers Only!', clickedStruct.x, clickedStruct.y - 12, '#FF9A1F');
           this.sound.playHit();
           return;
         }
@@ -4151,7 +4136,7 @@
           angle: -Math.PI / 2,
           flash: 0
         };
-        if (type === 'bunker' || type === 'barracks' || type === 'engineering') {
+        if (type === 'barracks' || type === 'engineering') {
           struct.capacity = lv.capacity || 4;
           struct.occupants = [];
         }
@@ -5162,89 +5147,6 @@
       if (this.selectedStructure === habitat) this.renderUpgradePanel(habitat);
     }
 
-    commandSoldierToBunker(soldier, bunker) {
-      if (!bunker || bunker.type !== 'bunker' || !soldier) return;
-      const cap = bunker.capacity || 4;
-      if (bunker.occupants.length >= cap) {
-        this.showStatus('Combat Bunker is at full capacity (4/4 Units)!');
-        this.addFloatingText('Bunker Full!', bunker.x, bunker.y - 12, '#FF9A1F');
-        this.sound.playHit();
-        return;
-      }
-
-      const sc = Math.floor(soldier.x / TILE_SIZE);
-      const sr = Math.floor(soldier.y / TILE_SIZE);
-
-      const path = findPath(sc, sr, bunker.col, bunker.row, (c, r) => {
-        if (c === bunker.col && r === bunker.row) return false;
-        return soldier.isCommando ? this.commandoBlocked(c, r) : this.unitBlocked(c, r);
-      });
-
-      if (path) {
-        soldier.path = path.map(([c, r]) => tileCenter(c, r));
-        soldier.dest = { col: bunker.col, row: bunker.row };
-        soldier.targetBunker = bunker;
-        soldier.targetBarracks = null;
-        soldier.targetEngineering = null;
-        soldier.manualOrder = true;
-        this.sound.playClick();
-        this.addFloatingText('Garrison Order', soldier.x, soldier.y - 14, '#38E8FF');
-        this.showStatus(`${soldier.isCommando ? 'Commando' : 'Soldier'} moving to Combat Bunker (${bunker.col}, ${bunker.row}) for +50% ATK.`);
-      } else {
-        this.showStatus('Path to Combat Bunker is blocked!');
-        this.addFloatingText('Path Blocked', soldier.x, soldier.y - 14, '#FF3333');
-        this.sound.playHit();
-      }
-    }
-
-    tryEnterBunkerSoldier(soldier, soldierIndex) {
-      const col = Math.floor(soldier.x / TILE_SIZE);
-      const row = Math.floor(soldier.y / TILE_SIZE);
-      let bunker = null;
-
-      const here = this.structures.get(`${col},${row}`);
-      if (here && here.type === 'bunker' && (soldier.reenterCooldown || 0) <= 0) {
-        bunker = here;
-      } else if (
-        soldier.targetBunker &&
-        this.structures.get(`${soldier.targetBunker.col},${soldier.targetBunker.row}`) === soldier.targetBunker
-      ) {
-        const d = Math.hypot(soldier.x - soldier.targetBunker.x, soldier.y - soldier.targetBunker.y);
-        if (d <= TILE_SIZE * 0.95) bunker = soldier.targetBunker;
-      }
-
-      if (!bunker) return false;
-      const cap = bunker.capacity || 4;
-      if (bunker.occupants.length >= cap) {
-        soldier.targetBunker = null;
-        return false;
-      }
-
-      this.soldiers.splice(soldierIndex, 1);
-      soldier.path = [];
-      soldier.dest = null;
-      soldier.targetBunker = null;
-      soldier.targetBarracks = null;
-      soldier.targetEngineering = null;
-      soldier.manualOrder = false;
-      soldier.x = bunker.x;
-      soldier.y = bunker.y;
-      bunker.occupants.push(soldier);
-
-      if (this.selectedSoldier === soldier) {
-        this.selectedSoldier = null;
-        this.selectStructure(bunker);
-      } else if (this.selectedStructure === bunker) {
-        this.renderUpgradePanel(bunker);
-      }
-
-      this.sound.playClick();
-      this.addFloatingText(`Garrisoned ${bunker.occupants.length}/${cap} (+50% ATK)`, bunker.x, bunker.y - 12, '#38E8FF');
-      this.addParticles(bunker.x, bunker.y, '#38E8FF', 10, 40);
-      this.updateHUD();
-      return true;
-    }
-
     ejectHubTrainingRecruitsAndRefund(struct, refundAll = false) {
       if (!struct) return;
       const dirs = DIRS_8;
@@ -5298,7 +5200,7 @@
     }
 
     releaseGarrisonedUnits(struct, wasDestroyed = false) {
-      if (!struct || (struct.type !== 'bunker' && struct.type !== 'barracks' && struct.type !== 'engineering') || !struct.occupants || struct.occupants.length === 0) {
+      if (!struct || (struct.type !== 'barracks' && struct.type !== 'engineering') || !struct.occupants || struct.occupants.length === 0) {
         if (!wasDestroyed) this.showStatus('No units currently garrisoned inside.');
         return;
       }
@@ -5319,7 +5221,6 @@
       if (anyExits.length === 0) anyExits.push([struct.col, struct.row]);
 
       const count = struct.occupants.length;
-      const isBunker = struct.type === 'bunker';
       for (let i = 0; i < count; i++) {
         const unit = struct.occupants[i];
         const pool = unit.unitType === 'engineer' ? engSafeExits : unit.isCommando ? commSafeExits : anyExits;
@@ -5344,12 +5245,12 @@
       struct.occupants = [];
 
       if (wasDestroyed) {
-        const alertMsg = isBunker ? 'BUNKER BREACHED!' : struct.type === 'engineering' ? 'ENGINEERING BREACHED!' : 'BARRACKS BREACHED!';
+        const alertMsg = struct.type === 'engineering' ? 'ENGINEERING BREACHED!' : 'BARRACKS BREACHED!';
         this.addFloatingText(alertMsg, struct.x, struct.y - 14, '#FF3333');
         this.showStatus(`${STRUCTURE_SPECS[struct.type].name} destroyed! ${count} garrisoned unit(s) ejected!`);
       } else {
         this.sound.playClick();
-        const unitLabel = isBunker ? 'Unit' : struct.type === 'engineering' ? 'Unit' : 'Soldier';
+        const unitLabel = struct.type === 'engineering' ? 'Unit' : 'Soldier';
         this.addFloatingText(`Released ${count} ${unitLabel}${count > 1 ? 's' : ''}!`, struct.x, struct.y - 14, '#38E8FF');
         this.showStatus(`Released ${count} ${unitLabel}(s) from ${STRUCTURE_SPECS[struct.type].name}.`);
         if (this.selectedStructure === struct) this.renderUpgradePanel(struct);
@@ -5376,7 +5277,7 @@
         this.showStatus(`${soldier.name || 'Commando'} (${soldier.dmg} dmg, ${soldier.range}px) selected: patrols green Safe Zones & kites zombies.`);
       } else {
         const spec = SOLDIER_SPECS[soldier.level - 1];
-        this.showStatus(`Soldier (${spec.name} Lv${soldier.level}) selected: click a walkable tile, Combat Bunker (+50% ATK), Barracks, or Engineering.`);
+        this.showStatus(`Soldier (${spec.name} Lv${soldier.level}) selected: click a walkable tile, Barracks, or Engineering.`);
       }
     }
 
@@ -5579,20 +5480,7 @@
       if (this.btnCancelTrain) this.btnCancelTrain.classList.remove('slot-hidden');
       hideEl(this.btnCancelTrain);
 
-      if (struct.type === 'bunker') {
-        hideEl(this.unitTrainSelect);
-        hideEl(this.btnTrainUnit);
-        const occ = struct.occupants ? struct.occupants.length : 0;
-        const cap = struct.capacity || 4;
-        if (this.inspectStatRange) this.inspectStatRange.innerText = `Garrison: ${occ} / ${cap} Soldiers (+50% ATK)`;
-        if (this.inspectStatDmg) this.inspectStatDmg.innerText = 'Pillbox: 1.5x Soldier Damage';
-        if (this.inspectStatKills) this.inspectStatKills.innerText = `Kills: ${struct.kills || 0} (E Release)`;
-        if (this.btnRelease) {
-          showEl(this.btnRelease, 'flex');
-          this.btnRelease.disabled = occ === 0;
-        }
-        if (this.releaseCountLabel) this.releaseCountLabel.innerText = `${occ}/${cap}`;
-      } else if (struct.type === 'barracks') {
+      if (struct.type === 'barracks') {
         const occ = struct.occupants ? struct.occupants.length : 0;
         const cap = struct.capacity || 4;
         const maxRoster = spec.maxRoster || 4;
@@ -5781,20 +5669,40 @@
         if (this.upgradeCostLabel) this.upgradeCostLabel.innerText = '--';
         if (this.btnUpgrade) this.btnUpgrade.disabled = true;
       } else {
-        if (upgradeBtnLabel) upgradeBtnLabel.innerText = 'Upgrade [W]';
+        if (upgradeBtnLabel) upgradeBtnLabel.innerText = this.isMobileTouch ? 'Upgrade' : 'Upgrade [W]';
         if (this.upgradeCostLabel) this.upgradeCostLabel.innerText = next ? `$${next.cost}` : 'MAX';
         if (this.btnUpgrade) this.btnUpgrade.disabled = !next || this.scrap < next.cost;
       }
 
-      const cannotSalvageLastSafe = struct.type === 'safezone' && this.safeZones.size <= 1;
-      const isConfirmingSalvage = this.salvageConfirmId === struct.id && performance.now() < this.salvageConfirmUntil;
-      const salvageBtnLabel = this.btnSalvage ? this.btnSalvage.querySelector('span:first-child') : null;
-      if (salvageBtnLabel) salvageBtnLabel.innerText = isConfirmingSalvage ? 'Confirm [S]' : 'Salvage [S]';
-      if (this.salvageRefundLabel) this.salvageRefundLabel.innerText = cannotSalvageLastSafe ? 'CORE' : `+$${refund}`;
-      if (this.btnSalvage) {
-        this.btnSalvage.disabled = cannotSalvageLastSafe;
-        this.btnSalvage.classList.toggle('confirming', isConfirmingSalvage);
+      if (struct.type === 'safezone') {
+        const salvageBtnLabel = this.btnSalvage ? this.btnSalvage.querySelector('span:first-child') : null;
+        if (salvageBtnLabel) salvageBtnLabel.innerText = this.isMobileTouch ? 'Salvage' : 'Salvage [S]';
+        if (this.salvageRefundLabel) this.salvageRefundLabel.innerText = '--';
+        if (this.btnSalvage) {
+          this.btnSalvage.disabled = true;
+          this.btnSalvage.classList.remove('confirming');
+          this.btnSalvage.title = 'Safe Zones cannot be dismantled';
+        }
+      } else {
+        const isConfirmingSalvage = this.salvageConfirmId === struct.id && performance.now() < this.salvageConfirmUntil;
+        const salvageBtnLabel = this.btnSalvage ? this.btnSalvage.querySelector('span:first-child') : null;
+        if (salvageBtnLabel) {
+          salvageBtnLabel.innerText = isConfirmingSalvage
+            ? (this.isMobileTouch ? 'Confirm' : 'Confirm [S]')
+            : (this.isMobileTouch ? 'Salvage' : 'Salvage [S]');
+        }
+        if (this.salvageRefundLabel) this.salvageRefundLabel.innerText = `+$${refund}`;
+        if (this.btnSalvage) {
+          this.btnSalvage.disabled = false;
+          this.btnSalvage.title = 'Dismantle structure for a 60% refund';
+          this.btnSalvage.classList.toggle('confirming', isConfirmingSalvage);
+        }
       }
+
+      const releaseBtnLabel = this.btnRelease ? this.btnRelease.querySelector('span:first-child') : null;
+      if (releaseBtnLabel) releaseBtnLabel.innerText = this.isMobileTouch ? 'Release All' : 'Release All (E)';
+
+      this.updateMobileFloatingDetails(struct);
     }
 
     renderSoldierInspector(soldier) {
@@ -5816,16 +5724,16 @@
       hideEl(this.btnRelease);
       hideEl(this.inspectRepairStatus);
       const upgradeBtnLabel = this.btnUpgrade ? this.btnUpgrade.querySelector('span:first-child') : null;
-      if (upgradeBtnLabel) upgradeBtnLabel.innerText = 'Upgrade [W]';
+      if (upgradeBtnLabel) upgradeBtnLabel.innerText = this.isMobileTouch ? 'Upgrade' : 'Upgrade [W]';
       const salvageBtnLabel = this.btnSalvage ? this.btnSalvage.querySelector('span:first-child') : null;
-      if (salvageBtnLabel) salvageBtnLabel.innerText = 'Salvage [S]';
+      if (salvageBtnLabel) salvageBtnLabel.innerText = this.isMobileTouch ? 'Salvage' : 'Salvage [S]';
       if (this.btnSalvage) this.btnSalvage.classList.remove('confirming');
       if (this.inspectIcon) this.inspectIcon.innerHTML = STRUCT_ICONS.soldier;
       if (soldier.isCommando) {
         if (this.inspectName) this.inspectName.innerText = `${soldier.name || 'Commando'} (Territory Guard)`;
         if (this.inspectTier) this.inspectTier.innerText = `Lv${soldier.level}/3 \u2022 Linked to Barracks`;
         if (this.inspectStatRange) this.inspectStatRange.innerText = `Range: ${soldier.range}px (Kite)`;
-        if (this.inspectStatDmg) this.inspectStatDmg.innerText = `Damage: ${soldier.dmg} (${Math.round(soldier.dmg * 1.5)} in Bunker)`;
+        if (this.inspectStatDmg) this.inspectStatDmg.innerText = `Damage: ${soldier.dmg}`;
         if (this.inspectStatKills) this.inspectStatKills.innerText = `Kills: ${soldier.kills || 0}`;
         if (this.upgradeCostLabel) this.upgradeCostLabel.innerText = 'HUB';
         if (this.btnUpgrade) this.btnUpgrade.disabled = true;
@@ -5833,7 +5741,7 @@
         if (this.inspectName) this.inspectName.innerText = `Soldier - ${cur.name}`;
         if (this.inspectTier) this.inspectTier.innerText = `Lv${soldier.level}/3 \u2022 Rescued Squad`;
         if (this.inspectStatRange) this.inspectStatRange.innerText = `Range: ${cur.range}px`;
-        if (this.inspectStatDmg) this.inspectStatDmg.innerText = `Damage: ${cur.dmg} (${Math.round(cur.dmg * 1.5)} in Bunker)`;
+        if (this.inspectStatDmg) this.inspectStatDmg.innerText = `Damage: ${cur.dmg}`;
         if (this.inspectStatKills) this.inspectStatKills.innerText = `Kills: ${soldier.kills || 0}`;
         if (this.upgradeCostLabel) this.upgradeCostLabel.innerText = next ? `$${next.upgradeCost}` : 'MAX';
         if (this.btnUpgrade) this.btnUpgrade.disabled = !next || this.scrap < next.upgradeCost;
@@ -5845,6 +5753,8 @@
 
       if (this.salvageRefundLabel) this.salvageRefundLabel.innerText = '--';
       if (this.btnSalvage) this.btnSalvage.disabled = true;
+
+      this.updateMobileFloatingDetails(soldier);
     }
 
     renderEngineerInspector(engineer) {
@@ -5866,9 +5776,9 @@
       hideEl(this.btnRelease);
       hideEl(this.inspectRepairStatus);
       const upgradeBtnLabel = this.btnUpgrade ? this.btnUpgrade.querySelector('span:first-child') : null;
-      if (upgradeBtnLabel) upgradeBtnLabel.innerText = 'Upgrade [W]';
+      if (upgradeBtnLabel) upgradeBtnLabel.innerText = this.isMobileTouch ? 'Upgrade' : 'Upgrade [W]';
       const salvageBtnLabel = this.btnSalvage ? this.btnSalvage.querySelector('span:first-child') : null;
-      if (salvageBtnLabel) salvageBtnLabel.innerText = 'Salvage [S]';
+      if (salvageBtnLabel) salvageBtnLabel.innerText = this.isMobileTouch ? 'Salvage' : 'Salvage [S]';
       if (this.btnSalvage) this.btnSalvage.classList.remove('confirming');
       if (this.inspectIcon) this.inspectIcon.innerHTML = STRUCT_ICONS.engineer;
       if (this.inspectName) this.inspectName.innerText = cur.name;
@@ -5890,6 +5800,8 @@
 
       if (this.salvageRefundLabel) this.salvageRefundLabel.innerText = '--';
       if (this.btnSalvage) this.btnSalvage.disabled = true;
+
+      this.updateMobileFloatingDetails(engineer);
     }
 
     upgradeSelectedEntity() {
@@ -5989,22 +5901,8 @@
       const s = this.selectedStructure;
       if (!s || !this.inPlay) return;
       if (s.type === 'safezone') {
-        if (this.safeZones.size <= 1) {
-          this.showStatus('Cannot salvage your last remaining Safe Zone block!');
-          this.sound.playHit();
-          return;
-        }
-        const key = `${s.col},${s.row}`;
-        const refund = Math.floor(s.invested * 0.6);
-        this.scrap += refund;
-        this.safeZones.delete(key);
-        const topStruct = this.structures.get(key);
-        this.grid[s.row][s.col] = topStruct && topStruct.type === 'wall' ? 4 : 0;
-        this.recalcBaseIntegrity();
-        this.sound.playClick();
-        this.addFloatingText(`+$${refund} Salvaged`, s.x, s.y - 12, '#FFD700');
-        this.closeUpgradePanel();
-        this.updateHUD();
+        this.showStatus('Safe Zones cannot be dismantled! They form the permanent perimeter.');
+        this.sound.playHit();
         return;
       }
 
@@ -6026,7 +5924,7 @@
       this.salvageConfirmId = null;
       this.salvageConfirmUntil = 0;
 
-      if ((s.type === 'bunker' || s.type === 'barracks' || s.type === 'engineering') && s.occupants && s.occupants.length > 0) {
+      if ((s.type === 'barracks' || s.type === 'engineering') && s.occupants && s.occupants.length > 0) {
         this.releaseGarrisonedUnits(s, false);
       }
       if (s.type === 'barracks' || s.type === 'engineering') {
@@ -6061,6 +5959,63 @@
       if (this.btnSalvage) this.btnSalvage.classList.remove('confirming');
       if (this.upgradePanel) this.upgradePanel.classList.remove('details-expanded');
       hideEl(this.upgradePanel);
+      if (this.mobileFloatingDetails) this.mobileFloatingDetails.classList.add('hidden');
+    }
+
+    updateMobileFloatingDetails(entity) {
+      if (!this.mobileFloatingDetails) return;
+      if (!this.isMobileTouch || !entity) {
+        this.mobileFloatingDetails.classList.add('hidden');
+        return;
+      }
+
+      const parts = [];
+      if (entity.hp !== undefined && entity.maxHp !== undefined) {
+        parts.push(`HP: ${Math.ceil(entity.hp)}/${entity.maxHp}`);
+      }
+
+      if (entity.type) {
+        if (entity.type === 'safezone') {
+          const auraPct = Math.round((this.getSafeZoneDmgMult() - 1) * 100);
+          parts.push(`Aura: +${auraPct}% DMG`);
+          parts.push(`Safe Zones: ${this.safeZones.size}`);
+        } else {
+          const spec = STRUCTURE_SPECS[entity.type];
+          if (spec && spec.levels) {
+            const cur = spec.levels[entity.level - 1];
+            if (cur) {
+              if (cur.range) parts.push(`Rng: ${cur.range}px`);
+              if (cur.dmg) {
+                const mult = this.getSafeZoneDmgMult();
+                parts.push(`Dmg: ${Math.round(cur.dmg * mult)}`);
+              } else if (entity.type === 'cryo' && cur.slow) {
+                parts.push(`Slow: ${Math.round(cur.slow * 100)}%`);
+              }
+              if (entity.kills !== undefined) parts.push(`Kills: ${entity.kills}`);
+
+              const key = `${entity.col},${entity.row}`;
+              const canAutoRepair = entity.type === 'safezone'
+                || this.safeZones.has(key)
+                || (entity.type === 'wall' && this.isBarricadeConnectedToSafeZone(entity.col, entity.row));
+              parts.push(canAutoRepair ? 'Auto-Repair: ON' : 'Auto-Repair: OFF');
+            }
+          }
+        }
+      } else if (entity.isCommando !== undefined || entity.kills !== undefined) {
+        if (entity.range) parts.push(`Rng: ${entity.range}px`);
+        if (entity.dmg) parts.push(`Dmg: ${entity.dmg}`);
+        if (entity.kills !== undefined) parts.push(`Kills: ${entity.kills}`);
+      } else if (entity.repairRate !== undefined) {
+        parts.push(`Weld: +${entity.repairRate} HP/s`);
+        if (entity.repairedTotal !== undefined) parts.push(`Repaired: ${Math.floor(entity.repairedTotal)} HP`);
+      }
+
+      if (parts.length > 0) {
+        this.mobileFloatingDetails.innerText = parts.join(' • ');
+        this.mobileFloatingDetails.classList.remove('hidden');
+      } else {
+        this.mobileFloatingDetails.classList.add('hidden');
+      }
     }
 
     // --- EFFECTS & HUD ---
@@ -6473,7 +6428,6 @@
           }
         }
 
-        if (this.tryEnterBunkerSoldier(sol, i)) continue;
         if (this.tryEnterBarracksSoldier(sol, i)) continue;
         if (this.tryEnterEngineeringSoldier(sol, i)) continue;
 
@@ -6482,7 +6436,7 @@
         // 2) Hold & shoot when any zombie is within 120..sol.range
         // 3) Actively intercept any zombie <= 120px of ANY Safe Zone tile or assault any Spawn Breach <= 120px of ANY Safe Zone tile across !commandoBlocked
         // 4) Recall to Barracks only when zero zombies & zero breaches threaten the 3-tile Safe Zone perimeter
-        if (sol.isCommando && !sol.manualOrder && !sol.manualMoveOrder && !sol.targetBunker && !sol.targetBarracks) {
+        if (sol.isCommando && !sol.manualOrder && !sol.manualMoveOrder && !sol.targetBarracks) {
           let nearestZ = null;
           let nearestD = Infinity;
           for (const z of this.zombies) {
@@ -6978,7 +6932,7 @@
 
     destroyStructure(st) {
       if (!st) return;
-      if ((st.type === 'bunker' || st.type === 'barracks' || st.type === 'engineering') && st.occupants && st.occupants.length > 0) {
+      if ((st.type === 'barracks' || st.type === 'engineering') && st.occupants && st.occupants.length > 0) {
         this.releaseGarrisonedUnits(st, true);
       } else {
         this.addFloatingText('BREACHED!', st.x, st.y - 10, '#FF3333');
@@ -7103,7 +7057,7 @@
         let ty = -1;
         let closest = Infinity;
 
-        // 0. If Wrecker, prioritize hunting Turrets, Combat Bunkers & Barracks first, then Barricades
+        // 0. If Wrecker, prioritize hunting Turrets & Barracks first, then Barricades
         if (z.type === 'wrecker') {
           const targetSt = this.findWreckerTargetStructure(z);
           if (targetSt) {
@@ -7367,7 +7321,7 @@
       }
     }
 
-    // --- SMART TOWER & BUNKER TARGETING (Sniper prioritizes Demolisher/Wrecker; Sentry/Bunker target closest front; fallback to Spawn Breaches) ---
+    // --- SMART TOWER TARGETING (Sniper prioritizes Demolisher/Wrecker; Sentry targets closest front; fallback to Spawn Breaches) ---
     updateStructures(dt) {
       for (const sz of this.safeZones.values()) {
         if (sz.flash > 0) sz.flash -= dt;
@@ -7566,53 +7520,6 @@
             struct.trainTimer -= dt;
             if (struct.trainTimer <= 0) {
               this.completeHabitatTraining(struct);
-            }
-          }
-          continue;
-        }
-
-        // Combat Bunker: each garrisoned soldier targets closest front zombie in range (+50% ATK & Safe Zone aura)
-        if (struct.type === 'bunker') {
-          if (!struct.occupants || struct.occupants.length === 0) continue;
-          const buffMult = STRUCTURE_SPECS.bunker.atkBuffMult || 1.5;
-          const auraMult = this.getSafeZoneDmgMult();
-
-          for (const sol of struct.occupants) {
-            sol.cooldown = Math.max(0, (sol.cooldown || 0) - dt);
-            if (sol.cooldown > 0) continue;
-
-            let bestZ = null;
-            let bestD = sol.range;
-            for (const z of this.zombies) {
-              if (z.hp <= 0) continue;
-              const d = Math.hypot(z.x - struct.x, z.y - struct.y);
-              if (d <= bestD) {
-                bestD = d;
-                bestZ = z;
-              }
-            }
-
-            const buffedDmg = Math.round(sol.dmg * buffMult * auraMult);
-            if (bestZ) {
-              sol.cooldown = sol.rate;
-              struct.angle = Math.atan2(bestZ.y - struct.y, bestZ.x - struct.x);
-              this.sound.playLaser(780, 380, 0.05);
-              this.projectiles.push({
-                type: 'bullet',
-                x1: struct.x,
-                y1: struct.y,
-                x2: bestZ.x,
-                y2: bestZ.y,
-                color: '#00E08A',
-                life: 0.11,
-                maxLife: 0.11
-              });
-              bestZ.hp -= buffedDmg;
-              if (bestZ.hp <= 0) {
-                sol.kills = (sol.kills || 0) + 1;
-                struct.kills = (struct.kills || 0) + 1;
-              }
-              this.addParticles(bestZ.x, bestZ.y, '#00E08A', 4, 32);
             }
           }
           continue;
@@ -8047,14 +7954,6 @@
         let range = 0;
         if (s.type === 'barracks') {
           range = STRUCTURE_SPECS.barracks.fireRange || 175;
-        } else if (s.type === 'bunker') {
-          if (s.occupants && s.occupants.length > 0) {
-            for (const sol of s.occupants) {
-              if (sol.range > range) range = sol.range;
-            }
-          } else {
-            range = SOLDIER_SPECS[0].range;
-          }
         } else {
           const lv = STRUCTURE_SPECS[s.type].levels[s.level - 1];
           range = lv.range;
@@ -8141,45 +8040,6 @@
           } else {
             ctx.fillRect(x + 10, y + by, TILE_SIZE - 20, 2.5);
           }
-        }
-      } else if (s.type === 'bunker') {
-        ctx.fillStyle = flash ? '#FFFFFF' : lv.color;
-        ctx.fillRect(x + 3, y + 3, TILE_SIZE - 6, TILE_SIZE - 6);
-        ctx.strokeStyle = lv.border;
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x + 3, y + 3, TILE_SIZE - 6, TILE_SIZE - 6);
-        ctx.lineWidth = 1;
-
-        ctx.fillStyle = '#0a1c17';
-        ctx.fillRect(x + 8, y + 8, TILE_SIZE - 16, TILE_SIZE - 16);
-
-        const occ = s.occupants ? s.occupants.length : 0;
-        const pipCoords = [
-          [x + 15, y + 15],
-          [x + 25, y + 15],
-          [x + 15, y + 23],
-          [x + 25, y + 23]
-        ];
-        for (let idx = 0; idx < 4; idx++) {
-          const [px, py] = pipCoords[idx];
-          ctx.fillStyle = idx < occ ? '#38E8FF' : 'rgba(255, 255, 255, 0.14)';
-          ctx.beginPath();
-          ctx.arc(px, py, 3.2, 0, Math.PI * 2);
-          ctx.fill();
-          if (idx < occ) {
-            ctx.strokeStyle = '#FFD23F';
-            ctx.lineWidth = 1.2;
-            ctx.stroke();
-            ctx.lineWidth = 1;
-          }
-        }
-
-        if (occ > 0) {
-          ctx.font = 'bold 8px Consolas, monospace';
-          ctx.fillStyle = '#00E08A';
-          ctx.textAlign = 'center';
-          ctx.fillText('+50%', x + TILE_SIZE / 2, y + 10);
-          ctx.textAlign = 'left';
         }
       } else if (s.type === 'barracks') {
         // Safe-Zone Barracks: amber-bronze Commando garrison hall (Recruits blue, Commandos cyan + training progress bar)

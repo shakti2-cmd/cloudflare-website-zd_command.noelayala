@@ -79,19 +79,24 @@
         <button id="btnMute" class="hud-btn icon-only-btn" title="Mute / unmute audio (M)" aria-label="Mute / unmute audio">&#128266;</button>
         <button id="btnHudHelp" class="hud-btn icon-only-btn" title="How to play (pauses the game)" aria-label="How to play">?</button>
         <button id="btnMobileSettings" class="hud-btn mobile-settings-btn" title="Settings" aria-label="Settings" aria-haspopup="true" aria-expanded="false">&#9881;</button>
-        <div id="mobileSettingsMenu" class="mobile-settings-menu hidden" role="menu" aria-label="Mobile Settings">
-          <div class="mobile-settings-header">TACTICAL SETTINGS</div>
-          <button id="btnMobileZombies" class="mobile-settings-item" role="menuitem">&#9763; Zombie Bestiary</button>
-          <button id="btnMobileReset" class="mobile-settings-item" role="menuitem">&#8635; Restart Sector</button>
-          <button id="btnMobileAudio" class="mobile-settings-item" role="menuitem">&#128266; Audio: On</button>
-          <button id="btnMobileHelp" class="mobile-settings-item" role="menuitem">? How To Play</button>
-          <button id="btnMobileMenu" class="mobile-settings-item" role="menuitem">&#9776; Main Menu</button>
-        </div>
       </div>
     </header>
 
+    <!-- Floating Mobile Settings Menu (Outside #topHud to avoid overflow clipping) -->
+    <div id="mobileSettingsMenu" class="mobile-settings-menu hidden" role="menu" aria-label="Mobile Settings">
+      <div class="mobile-settings-header">TACTICAL SETTINGS</div>
+      <button id="btnMobileZombies" class="mobile-settings-item" role="menuitem">&#9763; Zombie Bestiary</button>
+      <button id="btnMobileReset" class="mobile-settings-item" role="menuitem">&#8635; Restart Sector</button>
+      <button id="btnMobileAudio" class="mobile-settings-item" role="menuitem">&#128266; Audio: On</button>
+      <button id="btnMobileHelp" class="mobile-settings-item" role="menuitem">? How To Play</button>
+      <button id="btnMobileMenu" class="mobile-settings-item" role="menuitem">&#9776; Main Menu</button>
+    </div>
+
     <!-- Tactical ticker (strictly locked single-line height; never shifts canvas) -->
     <div id="statusMessage" role="status" aria-live="polite">Select threat level and mission mode, then start the mission.</div>
+
+    <!-- Mobile Floating Selection Details Bar (Light faded backdrop beneath status ticker) -->
+    <div id="mobileFloatingDetails" class="mobile-floating-details hidden" aria-live="polite"></div>
 
     <!-- Battlefield -->
     <main id="viewportContainer">
@@ -127,56 +132,61 @@
         <div class="modal-card start-card">
           <div class="start-icon">&#9763;</div>
           <h1 class="start-title">ZOMBIE DEFENSE COMMAND</h1>
+          <div class="start-version-badge">v2.6.0</div>
           <p class="start-subtitle">Expand green Safe Zones within 3 tiles of Red Spawn Breaches and deploy Commandos to destroy them (towers defend against zombies only).</p>
 
-          <div class="option-label">THREAT LEVEL</div>
-          <div class="card-row" id="difficultyCards">
-            <button type="button" class="pick-card diff-card tag-easy" data-diff="easy">
-              <span class="pick-name">EASY</span>
-              <span class="pick-big">160 <small>Scrap</small></span>
-              <span class="pick-desc">Zombies 0.75x HP &amp; speed<br>3.0s infection window</span>
-            </button>
-            <button type="button" class="pick-card diff-card tag-normal selected" data-diff="normal">
-              <span class="pick-name">NORMAL</span>
-              <span class="pick-big">100 <small>Scrap</small></span>
-              <span class="pick-desc">Zombies 1.0x HP &amp; speed<br>2.0s infection window</span>
-            </button>
-            <button type="button" class="pick-card diff-card tag-hard" data-diff="hard">
-              <span class="pick-name">HARD</span>
-              <span class="pick-big">75 <small>Scrap</small></span>
-              <span class="pick-desc">Zombies 1.35x HP &amp; speed<br>1.2s infection window</span>
-            </button>
-          </div>
-          <select id="difficultySelect" class="sync-select" aria-label="Difficulty">
-            <option value="easy">Easy - 160 Scrap, 0.75x zombies, 3.0s incubation</option>
-            <option value="normal" selected>Normal - 100 Scrap, 1.0x zombies, 2.0s incubation</option>
-            <option value="hard">Hard - 75 Scrap, 1.35x zombies, 1.2s incubation</option>
-          </select>
+          <div id="startMainSection">
+            <div class="option-label">THREAT LEVEL</div>
+            <div class="card-row" id="difficultyCards">
+              <button type="button" class="pick-card diff-card tag-easy" data-diff="easy">
+                <span class="pick-name">EASY</span>
+              </button>
+              <button type="button" class="pick-card diff-card tag-normal selected" data-diff="normal">
+                <span class="pick-name">NORMAL</span>
+              </button>
+              <button type="button" class="pick-card diff-card tag-hard" data-diff="hard">
+                <span class="pick-name">HARD</span>
+              </button>
+            </div>
+            <select id="difficultySelect" class="sync-select" aria-label="Difficulty">
+              <option value="easy">Easy - 160 Scrap, 0.75x zombies, 3.0s incubation</option>
+              <option value="normal" selected>Normal - 100 Scrap, 1.0x zombies, 2.0s incubation</option>
+              <option value="hard">Hard - 75 Scrap, 1.35x zombies, 1.2s incubation</option>
+            </select>
 
-          <div class="option-label">MISSION MODE</div>
-          <div class="card-row" id="modeCards">
-            <button type="button" class="pick-card mode-card selected" data-mode="campaign">
-              <span class="pick-name">CAMPAIGN</span>
-              <span class="pick-desc">Sectors 1&ndash;4 Tactical Operations<br>Destroy all Spawn Breaches</span>
-            </button>
-            <button type="button" class="pick-card mode-card tag-random" data-mode="random">
-              <span class="pick-name">RANDOM SECTOR &#8734;</span>
-              <span class="pick-desc">Non-repeating procedural maps<br>Destroy breaches to advance</span>
-            </button>
-            <button type="button" class="pick-card mode-card tag-post" data-mode="post_defense">
-              <span class="pick-name">POST DEFENSE &#8734;</span>
-              <span class="pick-desc">Single random outpost siege<br>Endless 10-wave tier escalation</span>
-            </button>
+            <div class="option-label">MISSION MODE</div>
+            <div class="card-row" id="modeCards">
+              <button type="button" class="pick-card mode-card selected" data-mode="campaign">
+                <span class="pick-name">CAMPAIGN</span>
+              </button>
+              <button type="button" class="pick-card mode-card tag-random" data-mode="random">
+                <span class="pick-name">RANDOM SECTOR &#8734;</span>
+              </button>
+              <button type="button" class="pick-card mode-card tag-post" data-mode="post_defense">
+                <span class="pick-name">POST DEFENSE &#8734;</span>
+              </button>
+            </div>
+
+            <div class="modal-actions" id="mainModalActions">
+              <button id="btnStartMission" class="modal-btn primary-btn">&#9654; Start Mission</button>
+              <button id="btnStartTutorial" class="modal-btn secondary-btn tutorial-start-btn">&#9733; Tutorial</button>
+              <button id="btnStartZombies" class="modal-btn secondary-btn zombies-modal-btn">&#9760; Zombies</button>
+              <button id="btnHowToPlay" class="modal-btn secondary-btn">How to Play</button>
+            </div>
           </div>
 
-          <!-- Expandable Campaign Sector Sub-Selector (Visible when Campaign is selected) -->
-          <div id="campaignSectorPanel" class="campaign-subpanel">
+          <!-- Expandable Campaign Sector Sub-Selector (Swapped into view when Campaign is clicked) -->
+          <div id="campaignSectorPanel" class="campaign-subpanel hidden">
             <div class="option-label sub-label">SELECT CAMPAIGN SECTOR</div>
             <div class="card-row" id="levelCards">
               <button type="button" class="pick-card level-card selected" data-level="1"><span class="pick-name">SECTOR 1</span><span class="pick-desc">Courtyard</span></button>
               <button type="button" class="pick-card level-card" data-level="2"><span class="pick-name">SECTOR 2</span><span class="pick-desc">Choke Alley</span></button>
               <button type="button" class="pick-card level-card" data-level="3"><span class="pick-name">SECTOR 3</span><span class="pick-desc">Twin Fronts</span></button>
               <button type="button" class="pick-card level-card" data-level="4"><span class="pick-name">SECTOR 4</span><span class="pick-desc">Citadel</span></button>
+            </div>
+            <div class="modal-actions campaign-actions">
+              <button id="btnCampaignBack" type="button" class="modal-btn secondary-btn">&#8592; Back</button>
+              <button id="btnStartCampaignSector" type="button" class="modal-btn primary-btn">&#9654; Start Mission</button>
             </div>
           </div>
 
@@ -190,12 +200,6 @@
             <option value="tutorial">Tutorial: Basic Training</option>
           </select>
 
-          <div class="modal-actions">
-            <button id="btnStartMission" class="modal-btn primary-btn">&#9654; Start Mission</button>
-            <button id="btnStartTutorial" class="modal-btn secondary-btn tutorial-start-btn">&#9733; Tutorial</button>
-            <button id="btnStartZombies" class="modal-btn secondary-btn zombies-modal-btn">&#9760; Zombies</button>
-            <button id="btnHowToPlay" class="modal-btn secondary-btn">How to Play</button>
-          </div>
           <div class="start-hint">v2.6.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; M mute</div>
         </div>
       </div>
@@ -276,7 +280,7 @@
               <canvas id="zPortraitWrecker" class="z-portrait" width="52" height="52"></canvas>
               <div class="z-info">
                 <div class="z-head"><span class="z-name c-violet">5. WRECKER (wrecker)</span><span class="z-stats">HP: 110 &bull; Speed: 62 px/s &bull; Dmg: 14 / 0.5s &bull; Bounty: +$14 &bull; Wave 6+</span></div>
-                <p>Anti-tower hunter (electric-violet chassis, hazard-yellow siege ring &amp; claws; unlocked Wave 6+, max 4 combined with Demolishers). Actively hunts Turrets, Bunkers, and Barracks first before advancing on Safe Zones. Prioritized by Snipers!</p>
+                <p>Anti-tower hunter (electric-violet chassis, hazard-yellow siege ring &amp; claws; unlocked Wave 6+, max 4 combined with Demolishers). Actively hunts Turrets and Barracks first before advancing on Safe Zones. Prioritized by Snipers!</p>
               </div>
             </div>
           </div>
@@ -326,9 +330,6 @@
         <div id="subGroupBuildings" class="mobile-sub-group hidden" data-category="buildings">
           <div class="mobile-sub-title">BASE FACILITIES</div>
           <div class="mobile-sub-btns">
-            <button class="mobile-sub-item tool-btn" data-tool="bunker" title="Combat Bunker $90">
-              <span class="tool-icon">&#9962;</span><span class="tool-name">Bunker</span><span class="tool-cost">$90</span>
-            </button>
             <button class="mobile-sub-item tool-btn" data-tool="barracks" title="Barracks $80">
               <span class="tool-icon">&#9874;</span><span class="tool-name">Barracks</span><span class="tool-cost">$80</span>
             </button>
@@ -398,9 +399,6 @@
             <button id="toolGate" class="tool-btn" data-tool="gate" title="Security Gate $100: Safe Zone Only; friendly units &amp; Commandos pass freely while blocking zombies (2)">
               <span class="tool-key">2</span><span class="tool-icon">&#9638;</span><span class="tool-name">Gate</span><span class="tool-cost">$100</span>
             </button>
-            <button id="toolBunker" class="tool-btn" data-tool="bunker" title="Combat Bunker $90: Safe Zone Only; garrisons up to 4 Soldiers or Commandos with +50% Attack Damage (3)">
-              <span class="tool-key">3</span><span class="tool-icon">&#9962;</span><span class="tool-name">Bunker</span><span class="tool-cost">$90</span>
-            </button>
             <button id="toolBarracks" class="tool-btn" data-tool="barracks" title="Barracks $80: Safe Zone Only; trains Commandos (4-unit cap) &mdash; ONLY unit that destroys Red Spawn Breaches (1.25x dmg); intercepts &amp; kites within 3 tiles of Safe Zones (4)">
               <span class="tool-key">4</span><span class="tool-icon">&#9874;</span><span class="tool-name">Barracks</span><span class="tool-cost">$80</span>
             </button>
@@ -451,7 +449,6 @@
             </div>
           </div>
           <div class="inspector-actions">
-            <button id="btnInspectDetails" class="action-btn details-btn" title="Toggle Stats Details"><span>Details</span></button>
             <select id="unitTrainSelect" class="train-select hidden" title="Select specialist unit to train from garrisoned Lv1 Recruits">
               <option value="engineer" selected>Engineer (4.0s Auto-Repair)</option>
             </select>
