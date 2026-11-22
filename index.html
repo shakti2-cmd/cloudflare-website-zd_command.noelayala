@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zombie Defense Command - Tactical Grid Survival (v2.6.0)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="gameContainer">
+
+    <!-- Top tactical HUD (Strictly fixed 52px height) -->
+    <header id="topHud">
+      <div class="hud-brand">
+        <span class="hud-logo">&#9763;</span>
+        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v2.6</small></span>
+      </div>
+
+      <div class="hud-stats">
+        <div class="stat-badge scrap-badge" title="Scrap: build and upgrade currency">
+          <span class="stat-label">&#9874; SCRAP</span>
+          <span id="hudScrap" class="stat-value">100</span>
+        </div>
+        <div class="stat-badge soldier-badge" title="Active Rescued Soldiers, Commandos &amp; Engineers">
+          <span class="stat-label">&#9733; SQUAD</span>
+          <span id="hudSoldiers" class="stat-value">0</span>
+        </div>
+        <div class="stat-badge wave-badge" title="Current wave progression">
+          <span class="stat-label">&#9632; WAVE</span>
+          <span id="hudWave" class="stat-value">Wave 1/5</span>
+        </div>
+        <div id="hudThreatBadge" class="stat-badge threat-badge" title="Dynamic 10-wave horde multiplier scaled from Base Power (ignores Barricades, Gates &amp; Commandos)">
+          <span class="stat-label">&#9888; THREAT</span>
+          <span id="hudThreat" class="stat-value">1.00x</span>
+        </div>
+        <button id="btnHudZombies" class="hud-btn zombies-intel-btn" title="Open Zombie Bestiary &amp; Threat Intel (pauses game)">&#9760; Zombies</button>
+        <div class="stat-badge timer-badge" title="Time to next wave / hostiles remaining">
+          <span class="stat-label">&#9202; STATUS</span>
+          <span id="hudTimer" class="stat-value">--</span>
+        </div>
+        <div class="stat-badge base-badge" title="Aggregated Safe Zone integrity &amp; global +1% damage aura per active Safe Zone (max +50%)">
+          <span class="stat-label">&#9962; BASE &amp; AURA</span>
+          <div class="base-val-row"><span id="hudBase" class="stat-value">100%</span><span id="hudSzDmg" class="sz-dmg-tag" title="Global friendly damage bonus: +1% per active Safe Zone (max +50%)">+4% DMG</span></div>
+        </div>
+      </div>
+
+      <div class="hud-controls">
+        <select id="levelSelect" title="Switch mission sector or mode (restarts the sector)">
+          <option value="1" selected>Sector 1: Courtyard</option>
+          <option value="2">Sector 2: Choke Alley</option>
+          <option value="3">Sector 3: Twin Fronts</option>
+          <option value="4">Sector 4: Citadel</option>
+          <option value="random">Random Sector (Endless)</option>
+          <option value="post_defense">Post Defense (Endless)</option>
+          <option value="tutorial">Tutorial: Basic Training</option>
+        </select>
+        <button id="btnResetLevel" class="hud-btn" title="Restart current sector &amp; roll fresh Safe Zones">&#8635; Reset</button>
+        <button id="btnHudMainMenu" class="hud-btn" title="Return to Main Menu (2-click confirm)">Menu</button>
+        <button id="btnStartWave" class="hud-btn primary-btn" title="Launch the next wave any time. Early bonus: +$30 plus +$2 per second left on the timer, max +$75.">&#9654; Next Wave <span id="waveBonusLabel" class="btn-sub">+$30</span></button>
+        <button id="btnPause" class="hud-btn" title="Pause / resume (Space)">Pause</button>
+        <button id="btnSpeed" class="hud-btn" title="Toggle simulation speed">Speed: 1x</button>
+        <button id="btnMute" class="hud-btn icon-only-btn" title="Mute / unmute audio (M)" aria-label="Mute / unmute audio">&#128266;</button>
+        <button id="btnHudHelp" class="hud-btn icon-only-btn" title="How to play (pauses the game)" aria-label="How to play">?</button>
+      </div>
+    </header>
+
+    <!-- Tactical ticker (strictly locked single-line height; never shifts canvas) -->
+    <div id="statusMessage" role="status" aria-live="polite">Select threat level and mission mode, then start the mission.</div>
+
+    <!-- Battlefield -->
+    <main id="viewportContainer">
+      <canvas id="gameCanvas" width="1280" height="960"></canvas>
+
+      <!-- Non-blocking Centered Visual Tutorial Cue & Bouncing UI Spotlight Arrow (v2.6.0) -->
+      <div id="tutorialOverlay" class="tutorial-overlay hidden" role="region" aria-label="Beginner Tutorial Coach">
+        <div id="tutorialCard" class="tutorial-card">
+          <div class="tutorial-head">
+            <span id="tutorialStepBadge" class="tutorial-step-badge">Step 1 / 7</span>
+            <span id="tutorialIcon" class="tutorial-step-icon" aria-hidden="true">&#10010;</span>
+            <span id="tutorialTitle" class="tutorial-title">Click [7] Safe Zone &rarr; Paint 3 Green Tiles</span>
+            <button id="btnSkipTutorial" class="hud-btn tutorial-skip-btn" title="Exit tutorial">Skip</button>
+          </div>
+          <p id="tutorialBody" class="tutorial-body hidden"></p>
+        </div>
+      </div>
+      <div id="tutorialUiArrow" class="tutorial-ui-arrow hidden" aria-hidden="true">
+        <span id="tutorialUiArrowText" class="tutorial-ui-arrow-label">CLICK</span>
+        <span id="tutorialUiArrowGlyph" class="tutorial-ui-arrow-glyph">&#9660;</span>
+      </div>
+
+      <!-- Startup screen (v1.9.0: Clean 3-Card Campaign / Random / Post Defense Picker + Zombies Button) -->
+      <div id="startScreenOverlay" class="modal-overlay">
+        <div class="modal-card start-card">
+          <div class="start-icon">&#9763;</div>
+          <h1 class="start-title">ZOMBIE DEFENSE COMMAND</h1>
+          <p class="start-subtitle">Expand green Safe Zones within 3 tiles of Red Spawn Breaches and deploy Commandos to destroy them (towers defend against zombies only).</p>
+
+          <div class="option-label">THREAT LEVEL</div>
+          <div class="card-row" id="difficultyCards">
+            <button type="button" class="pick-card diff-card tag-easy" data-diff="easy">
+              <span class="pick-name">EASY</span>
+              <span class="pick-big">160 <small>Scrap</small></span>
+              <span class="pick-desc">Zombies 0.75x HP &amp; speed<br>3.0s infection window</span>
+            </button>
+            <button type="button" class="pick-card diff-card tag-normal selected" data-diff="normal">
+              <span class="pick-name">NORMAL</span>
+              <span class="pick-big">100 <small>Scrap</small></span>
+              <span class="pick-desc">Zombies 1.0x HP &amp; speed<br>2.0s infection window</span>
+            </button>
+            <button type="button" class="pick-card diff-card tag-hard" data-diff="hard">
+              <span class="pick-name">HARD</span>
+              <span class="pick-big">75 <small>Scrap</small></span>
+              <span class="pick-desc">Zombies 1.35x HP &amp; speed<br>1.2s infection window</span>
+            </button>
+          </div>
+          <select id="difficultySelect" class="sync-select" aria-label="Difficulty">
+            <option value="easy">Easy - 160 Scrap, 0.75x zombies, 3.0s incubation</option>
+            <option value="normal" selected>Normal - 100 Scrap, 1.0x zombies, 2.0s incubation</option>
+            <option value="hard">Hard - 75 Scrap, 1.35x zombies, 1.2s incubation</option>
+          </select>
+
+          <div class="option-label">MISSION MODE</div>
+          <div class="card-row" id="modeCards">
+            <button type="button" class="pick-card mode-card selected" data-mode="campaign">
+              <span class="pick-name">CAMPAIGN</span>
+              <span class="pick-desc">Sectors 1&ndash;4 Tactical Operations<br>Destroy all Spawn Breaches</span>
+            </button>
+            <button type="button" class="pick-card mode-card tag-random" data-mode="random">
+              <span class="pick-name">RANDOM SECTOR &#8734;</span>
+              <span class="pick-desc">Non-repeating procedural maps<br>Destroy breaches to advance</span>
+            </button>
+            <button type="button" class="pick-card mode-card tag-post" data-mode="post_defense">
+              <span class="pick-name">POST DEFENSE &#8734;</span>
+              <span class="pick-desc">Single random outpost siege<br>Endless 10-wave tier escalation</span>
+            </button>
+          </div>
+
+          <!-- Expandable Campaign Sector Sub-Selector (Visible when Campaign is selected) -->
+          <div id="campaignSectorPanel" class="campaign-subpanel">
+            <div class="option-label sub-label">SELECT CAMPAIGN SECTOR</div>
+            <div class="card-row" id="levelCards">
+              <button type="button" class="pick-card level-card selected" data-level="1"><span class="pick-name">SECTOR 1</span><span class="pick-desc">Courtyard</span></button>
+              <button type="button" class="pick-card level-card" data-level="2"><span class="pick-name">SECTOR 2</span><span class="pick-desc">Choke Alley</span></button>
+              <button type="button" class="pick-card level-card" data-level="3"><span class="pick-name">SECTOR 3</span><span class="pick-desc">Twin Fronts</span></button>
+              <button type="button" class="pick-card level-card" data-level="4"><span class="pick-name">SECTOR 4</span><span class="pick-desc">Citadel</span></button>
+            </div>
+          </div>
+
+          <select id="startLevelSelect" class="sync-select" aria-label="Starting sector">
+            <option value="1" selected>Sector 1: Courtyard</option>
+            <option value="2">Sector 2: Choke Alley</option>
+            <option value="3">Sector 3: Twin Fronts</option>
+            <option value="4">Sector 4: Citadel</option>
+            <option value="random">Random Sector (Endless)</option>
+            <option value="post_defense">Post Defense (Endless)</option>
+            <option value="tutorial">Tutorial: Basic Training</option>
+          </select>
+
+          <div class="modal-actions">
+            <button id="btnStartMission" class="modal-btn primary-btn">&#9654; Start Mission</button>
+            <button id="btnStartTutorial" class="modal-btn secondary-btn tutorial-start-btn">&#9733; Tutorial</button>
+            <button id="btnStartZombies" class="modal-btn secondary-btn zombies-modal-btn">&#9760; Zombies</button>
+            <button id="btnHowToPlay" class="modal-btn secondary-btn">How to Play</button>
+          </div>
+          <div class="start-hint">v2.6.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; M mute</div>
+        </div>
+      </div>
+
+      <!-- How to play -->
+      <div id="howToPlayModal" class="modal-overlay hidden">
+        <div class="modal-card help-card">
+          <button id="btnCloseHowToPlay" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
+          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v2.6.0)</h2>
+          <div class="help-grid">
+            <section>
+              <h3>Single 3&times;3 Start &amp; Line-Drag Barricades</h3>
+              <p>Every map opens with a single <b>3&times;3 Safe Zone (+9% DMG)</b>. Expand <b>Safe Zones ($10, Key 7)</b> toward breaches; all other buildings &amp; towers build <b>only on Safe Zones</b>. <b>Barricades ($10, Key 1)</b> build up to <b>3 tiles</b> out via line-drag.</p>
+            </section>
+            <section>
+              <h3>Perimeter Commandos &amp; Breach Destruction</h3>
+              <p><b>Commandos</b> (<span class="c-cyan">150/210/280 HP, 24/34/46 dmg, 120/140/160px</span>) actively intercept zombies/breaches within <b>&le;3 tiles of Safe Zones</b>, gain <b class="c-green">+15% RoF</b> on Safe Zones, kite backward at &lt;120px, and are the <b class="c-red">ONLY unit able to destroy Spawn Breaches (1.25&times; dmg)</b>!</p>
+            </section>
+            <section>
+              <h3>Bidirectional 10-Wave Scaling &amp; Supply Drops</h3>
+              <p>Every <b>10 waves</b> awards a <b>Milestone Supply Drop (+$150+)</b> and scales hordes up (diminishing <b>sqrt</b>) or <b>down to 0.75x</b> if battered! Wave 20 unlocks <b>2/2 Habitats</b>; &le;5 Safe Zones grants <b>+25% Kill Scrap</b>.</p>
+            </section>
+            <section>
+              <h3>Engineer Upgrades (+20/+40/+70 HP/s) &amp; Queues</h3>
+              <p><b>Habitat ($110)</b> queues up to 20 Civilians. Upgrading <b>Engineering</b> scales linked Engineers to <b class="c-yellow">+20 / +40 / +70 HP/s</b> ($0 welding across Safe Zones &amp; Barricades). Randomized zombie paths fan across perimeter lanes.</p>
+            </section>
+            <section>
+              <h3>Zombie-Only Towers &amp; 40% Sniper HEADSHOT</h3>
+              <p><b>Sentries</b>, <b>Cryo</b> (slows movement + <b>attack speed</b>) &amp; <b>Snipers</b> (<b class="c-violet">40% HEADSHOT</b>) target <b>zombies exclusively</b> &mdash; expand <b>$10 Safe Zones within 3 tiles of a Spawn Breach</b> so Commandos can assault it!</p>
+            </section>
+            <section>
+              <h3>Visual Spotlight Tutorial &amp; Controls</h3>
+              <p>Click <b>&#9733; Tutorial</b> on startup for visual arrow-guided training! <kbd>Q</kbd> Select/Clear &bull; <kbd>W</kbd> Upgrade &bull; <kbd>S</kbd> Salvage (2x Lv2/3) &bull; <kbd>1&ndash;0</kbd> Build &bull; <kbd>E</kbd> Release &bull; <b>&#8635; Reset</b> / <b>Menu</b>.</p>
+            </section>
+          </div>
+          <div class="modal-actions">
+            <button id="btnDismissHelp" class="modal-btn primary-btn">Got it</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Zombie Bestiary / Threat Intel Modal (v2.6.0: Live Canvas Portraits + Fixed Brute-Breach Damage) -->
+      <div id="zombieGuideModal" class="modal-overlay hidden">
+        <div class="modal-card help-card zombie-guide-card">
+          <button id="btnCloseZombieGuide" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
+          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v2.6.0)</h2>
+          <p class="bestiary-note"><b class="c-orange">25% Random Brute-Breach Trait:</b> Any spawned Walker, Runner, Tank, or Wrecker has a 25% chance (100% on Demolisher) to smash straight toward Safe Zones, dealing a <b>fixed unscaled 12 damage</b> (<b>16 damage</b> for Demolishers) per strike against structures &amp; Safe Zones.</p>
+          <div class="zombie-intel-list">
+            <div class="zombie-intel-row">
+              <canvas id="zPortraitWalker" class="z-portrait" width="52" height="52"></canvas>
+              <div class="z-info">
+                <div class="z-head"><span class="z-name c-red">1. WALKER (walker)</span><span class="z-stats">HP: 40 &bull; Speed: 45 px/s &bull; Dmg: 10 / 0.5s &bull; Bounty: +$5 &bull; Wave 1+</span></div>
+                <p>Standard infected shambler. Pursues nearest uninfected civilian, then Rescued Soldiers/Engineers within 300px, then green Safe Zone blocks. Routes around structures when an open lane exists.</p>
+              </div>
+            </div>
+            <div class="zombie-intel-row">
+              <canvas id="zPortraitRunner" class="z-portrait" width="52" height="52"></canvas>
+              <div class="z-info">
+                <div class="z-head"><span class="z-name c-orange">2. RUNNER (runner)</span><span class="z-stats">HP: 25 &bull; Speed: 85 px/s &bull; Dmg: 8 / 0.5s &bull; Bounty: +$8 &bull; Wave 2+</span></div>
+                <p>High-velocity sprinter appearing from Wave 2+. Closes distance rapidly to bite exposed civilians; also spawns immediately whenever an infected white-dot civilian completes incubation.</p>
+              </div>
+            </div>
+            <div class="zombie-intel-row">
+              <canvas id="zPortraitTank" class="z-portrait" width="52" height="52"></canvas>
+              <div class="z-info">
+                <div class="z-head"><span class="z-name c-red">3. TANK (tank)</span><span class="z-stats">HP: 220 &bull; Speed: 25 px/s &bull; Dmg: 32 / 0.5s &bull; Bounty: +$20 &bull; Wave 3+</span></div>
+                <p>Heavily armored juggernaut (Wave 3+). Soaks kinetic fire and pounds structures or Safe Zone blocks for 32 damage per strike. Counter with Cryo slow + Sniper railguns.</p>
+              </div>
+            </div>
+            <div class="zombie-intel-row">
+              <canvas id="zPortraitDemolisher" class="z-portrait" width="52" height="52"></canvas>
+              <div class="z-info">
+                <div class="z-head"><span class="z-name c-orange">4. DEMOLISHER (demolisher)</span><span class="z-stats">HP: 180 &bull; Speed: 38 px/s &bull; Dmg: 20 / 0.5s &bull; Bounty: +$18 &bull; Wave 6+</span></div>
+                <p>Base-breaching siege brute (crimson-black armor, hazard-orange ring &amp; front spikes; unlocked Wave 6+, max 4 combined with Wreckers). Marches straight toward the nearest Safe Zone and smashes every structure in its path. Prioritized by Snipers!</p>
+              </div>
+            </div>
+            <div class="zombie-intel-row">
+              <canvas id="zPortraitWrecker" class="z-portrait" width="52" height="52"></canvas>
+              <div class="z-info">
+                <div class="z-head"><span class="z-name c-violet">5. WRECKER (wrecker)</span><span class="z-stats">HP: 110 &bull; Speed: 62 px/s &bull; Dmg: 14 / 0.5s &bull; Bounty: +$14 &bull; Wave 6+</span></div>
+                <p>Anti-tower hunter (electric-violet chassis, hazard-yellow siege ring &amp; claws; unlocked Wave 6+, max 4 combined with Demolishers). Actively hunts Turrets, Bunkers, and Barracks first before advancing on Safe Zones. Prioritized by Snipers!</p>
+              </div>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button id="btnDismissZombieGuide" class="modal-btn primary-btn">Resume Command</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Victory / defeat -->
+      <div id="gameOverOverlay" class="modal-overlay hidden">
+        <div class="modal-card end-card">
+          <div id="gameOverIcon" class="modal-icon">&#9760;</div>
+          <h2 id="gameOverTitle">SECTOR OVERRUN</h2>
+          <p id="gameOverSubtitle">The safe zone was overrun.</p>
+          <div id="gameOverStats" class="modal-stats-grid">
+            <div class="modal-stat-box"><span class="modal-stat-label">Civilians Saved</span><span id="modalStatSaved" class="modal-stat-val text-green">0</span></div>
+            <div class="modal-stat-box"><span class="modal-stat-label">Infected</span><span id="modalStatInfected" class="modal-stat-val text-red">0</span></div>
+            <div class="modal-stat-box"><span class="modal-stat-label">Waves</span><span id="modalStatWaves" class="modal-stat-val text-cyan">0</span></div>
+            <div class="modal-stat-box"><span class="modal-stat-label">Scrap</span><span id="modalStatScrap" class="modal-stat-val text-yellow">0</span></div>
+          </div>
+          <div class="modal-actions">
+            <button id="btnRestart" class="modal-btn secondary-btn">Retry Sector</button>
+            <button id="btnNextLevel" class="modal-btn primary-btn hidden">Next Sector &rarr;</button>
+            <button id="btnMainMenu" class="modal-btn secondary-btn">Main Menu</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Command deck (Strictly locked height so canvas never shifts or zooms on selection) -->
+    <footer id="commandDeck">
+      <div id="buildPanel" class="deck-section">
+        <div class="build-group">
+          <div class="build-group-label">CMD</div>
+          <div class="build-group-btns">
+            <button id="toolSelect" class="tool-btn" data-tool="select" title="Toggle Select Mode ON/OFF; Q unselects everything or conscripts unit under cursor (Q)">
+              <span class="tool-key">Q</span><span class="tool-icon">&#9678;</span><span class="tool-name">Select</span><span class="tool-cost">CMD</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="build-group">
+          <div class="build-group-label">BUILDINGS</div>
+          <div class="build-group-btns">
+            <button id="toolWall" class="tool-btn" data-tool="wall" title="Barricade $10 (Lv2 $90, Lv3 $180): Click or Line-Drag on Safe Zone OR within 3 tiles of a Safe Zone; ignored by Horde Scaling (1)">
+              <span class="tool-key">1</span><span class="tool-icon">&#9646;</span><span class="tool-name">Barricade</span><span class="tool-cost">$10</span>
+            </button>
+            <button id="toolGate" class="tool-btn" data-tool="gate" title="Security Gate $100: Safe Zone Only; friendly units &amp; Commandos pass freely while blocking zombies (2)">
+              <span class="tool-key">2</span><span class="tool-icon">&#9638;</span><span class="tool-name">Gate</span><span class="tool-cost">$100</span>
+            </button>
+            <button id="toolBunker" class="tool-btn" data-tool="bunker" title="Combat Bunker $90: Safe Zone Only; garrisons up to 4 Soldiers or Commandos with +50% Attack Damage (3)">
+              <span class="tool-key">3</span><span class="tool-icon">&#9962;</span><span class="tool-name">Bunker</span><span class="tool-cost">$90</span>
+            </button>
+            <button id="toolBarracks" class="tool-btn" data-tool="barracks" title="Barracks $80: Safe Zone Only; trains Commandos (4-unit cap) &mdash; ONLY unit that destroys Red Spawn Breaches (1.25x dmg); intercepts &amp; kites within 3 tiles of Safe Zones (4)">
+              <span class="tool-key">4</span><span class="tool-icon">&#9874;</span><span class="tool-name">Barracks</span><span class="tool-cost">$80</span>
+            </button>
+            <button id="toolEngineering" class="tool-btn" data-tool="engineering" title="Engineering $90: Safe Zone Only; trains linked Engineers scaling +20 / +40 / +70 HP/s $0 repair (4-unit cap) (5)">
+              <span class="tool-key">5</span><span class="tool-icon">&#9881;</span><span class="tool-name">Engineering</span><span class="tool-cost">$90</span>
+            </button>
+            <button id="toolHabitat" class="tool-btn" data-tool="habitat" title="Habitat $110 (Max 1/1): Safe Zone Only; queues up to 20 white-dot Civilians at $65 Scrap (6)">
+              <span class="tool-key">6</span><span class="tool-icon">&#8962;</span><span class="tool-name">Habitat</span><span class="tool-cost">$110</span>
+            </button>
+            <button id="toolSafezone" class="tool-btn" data-tool="safezone" title="Safe Zone Block $10 (Non-Upgradable; +1% Global Damage Aura each, max +50%): Click or Drag-to-Paint connected area (7)">
+              <span class="tool-key">7</span><span class="tool-icon">&#10010;</span><span class="tool-name">Safe Zone</span><span class="tool-cost">$10</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="build-group">
+          <div class="build-group-label">TOWERS</div>
+          <div class="build-group-btns">
+            <button id="toolSentry" class="tool-btn" data-tool="sentry" title="Sentry $150: Safe Zone Only; high-ROF kinetic turret targeting closest zombie (towers target zombies only) (8)">
+              <span class="tool-key">8</span><span class="tool-icon">&#9881;</span><span class="tool-name">Sentry</span><span class="tool-cost">$150</span>
+            </button>
+            <button id="toolCryo" class="tool-btn" data-tool="cryo" title="Cryo $180: Safe Zone Only; slows zombie movement + attack speed &amp; deals AoE chip damage (towers target zombies only) (9)">
+              <span class="tool-key">9</span><span class="tool-icon">&#10052;</span><span class="tool-name">Cryo</span><span class="tool-cost">$180</span>
+            </button>
+            <button id="toolSniper" class="tool-btn" data-tool="sniper" title="Sniper $225: Safe Zone Only; targets Demolishers, Wreckers &amp; high-HP zombies with 40% HEADSHOT instakill (towers target zombies only) (0)">
+              <span class="tool-key">0</span><span class="tool-icon">&#8982;</span><span class="tool-name">Sniper</span><span class="tool-cost">$225</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="inspectorSlot">
+        <div id="upgradePanel" class="deck-section hidden">
+          <div class="inspector-head">
+            <span id="inspectIcon" class="inspect-icon">&#9646;</span>
+            <div>
+              <div id="inspectName" class="inspect-name">Barricade</div>
+              <div id="inspectTier" class="inspect-tier">Lv1/3</div>
+            </div>
+          </div>
+          <div class="inspector-body">
+            <div class="bar-labels"><span>Integrity</span><span id="inspectHpText">100 / 100</span></div>
+            <div class="progress-bar"><div id="inspectHpBar" class="progress-fill" style="width:100%"></div></div>
+            <div class="inspector-stats">
+              <span id="inspectStatRange">Range</span>
+              <span id="inspectStatDmg">Damage</span>
+              <span id="inspectStatKills">Kills: 0</span>
+            </div>
+          </div>
+          <div class="inspector-actions">
+            <select id="unitTrainSelect" class="train-select hidden" title="Select specialist unit to train from garrisoned Lv1 Recruits">
+              <option value="engineer" selected>Engineer (4.0s Auto-Repair)</option>
+            </select>
+            <button id="btnTrainUnit" class="action-btn train-btn hidden" title="Queue unit training &amp; auto-dispatch nearest Recruit"><span>Train Engineer</span><span id="trainCostLabel" class="cost-tag">$50</span></button>
+            <button id="btnCancelTrain" class="action-btn cancel-train-btn hidden" title="Cancel last queued training order and refund Scrap"><span>Cancel</span><span id="cancelTrainLabel" class="cost-tag">+$0</span></button>
+            <button id="btnRelease" class="action-btn release-btn hidden" title="Release all garrisoned units onto adjacent tiles (E)"><span>Release All</span><span id="releaseCountLabel" class="cost-tag">0/4</span></button>
+            <span id="inspectRepairStatus" class="repair-status-badge hidden">Engineer Auto-Repair Active</span>
+            <button id="btnUpgrade" class="action-btn upgrade-btn" title="Upgrade to next level (W)"><span>Upgrade [W]</span><span id="upgradeCostLabel" class="cost-tag">$0</span></button>
+            <button id="btnSalvage" class="action-btn salvage-btn" title="Dismantle for a 60% refund (S; 2x press for Lv2/Lv3)"><span>Salvage [S]</span><span id="salvageRefundLabel" class="cost-tag">+$0</span></button>
+          </div>
+        </div>
+
+        <div id="deckHint">
+          <span class="hint-text">v2.6.0 &bull; Towers target zombies only &bull; Expand $10 Safe Zones &le;3 tiles of a Breach so Commandos destroy it! &bull; Engineers +20/+40/+70 HP/s</span>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
