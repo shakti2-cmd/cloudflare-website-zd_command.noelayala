@@ -52,7 +52,7 @@ body {
   border-bottom: 1px solid var(--line);
   box-shadow: 0 2px 14px rgba(0, 0, 0, 0.6);
   position: relative;
-  z-index: 5;
+  z-index: 40;
   overflow: hidden;
 }
 .hud-brand { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
@@ -96,7 +96,8 @@ body {
   background: linear-gradient(180deg, #241336, #160c22);
   flex: 0 0 auto;
 }
-.zombies-intel-btn:hover {
+.zombies-intel-btn:hover,
+.zombies-intel-btn.active {
   border-color: var(--color-violet);
   background: #2f1847;
   box-shadow: 0 0 10px rgba(184, 51, 255, 0.45);
@@ -329,7 +330,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: #1b2638; border: 1p
   background: linear-gradient(0deg, #0b1019, #101722);
   border-top: 1px solid var(--line);
   position: relative;
-  z-index: 5;
+  z-index: 40;
   overflow: hidden;
 }
 .deck-section { display: flex; gap: 6px; align-items: stretch; }
@@ -710,8 +711,24 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--color-cyan
 /* ---------- Mobile & Touch Reactive Layout ---------- */
 body.is-mobile-touch #cameraControls,
 body.is-mobile-touch #deckHint,
-body.is-mobile-touch #btnPause {
+body.is-mobile-touch #btnPause,
+body.is-mobile-touch #btnStartWave {
   display: none !important;
+}
+
+body.is-mobile-touch #viewportContainer {
+  padding: 0;
+}
+
+body.is-mobile-touch #gameCanvas {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  aspect-ratio: auto;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 body.is-mobile-touch #buildPanel {
@@ -726,8 +743,23 @@ body.is-mobile-touch #mobileTabBar {
   max-width: 900px;
   margin: 0 auto;
   align-items: center;
-  flex: 0 0 62px;
-  height: 62px;
+  flex: 0 0 60px;
+  height: 60px;
+}
+
+.mobile-tab-btn.tab-next-wave {
+  background: linear-gradient(180deg, #0c8a63, #086548);
+  border-color: var(--color-green);
+}
+.mobile-tab-btn.tab-next-wave:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.mobile-tab-btn.tab-next-wave .tab-icon {
+  color: #ffffff;
+}
+.mobile-tab-btn.tab-next-wave .tab-cost {
+  color: #c9ffe9;
 }
 
 .mobile-tab-btn {
@@ -796,7 +828,7 @@ body.is-mobile-touch #mobileSubDrawer {
   display: block !important;
   position: absolute;
   left: 50%;
-  bottom: 128px;
+  bottom: calc(100% + 6px);
   transform: translateX(-50%);
   z-index: 30;
   pointer-events: none;
@@ -868,7 +900,14 @@ body.is-mobile-touch #topHud .hud-controls {
   overflow: visible;
 }
 body.is-mobile-touch #commandDeck {
-  padding: 4px 6px;
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+  z-index: 25;
+  padding: 4px 6px calc(4px + env(safe-area-inset-bottom, 0px));
+  gap: 0;
 }
 body.is-mobile-touch #buildPanel {
   justify-content: flex-start;
@@ -888,13 +927,27 @@ body.is-mobile-touch .tool-key {
   display: none;
 }
 body.is-mobile-touch #inspectorSlot {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: calc(100% + 6px);
+  z-index: 24;
+  width: auto;
+  max-width: none;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
   justify-content: flex-start;
+  pointer-events: none;
 }
 body.is-mobile-touch #upgradePanel {
   width: max-content;
   min-width: 100%;
   flex: 0 0 auto;
   gap: 8px;
+  pointer-events: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
 }
 body.is-mobile-touch .camera-controls {
   right: 8px;
@@ -983,8 +1036,18 @@ body.is-mobile-touch .camera-controls {
 }
 
 @media (max-height: 520px) and (orientation: landscape) {
-  body.is-mobile-touch #mobileSubDrawer {
-    bottom: 94px;
+  body.is-mobile-touch #commandDeck {
+    flex: 0 0 auto;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    padding: 2px 6px calc(2px + env(safe-area-inset-bottom, 0px));
+  }
+  body.is-mobile-touch #inspectorSlot {
+    flex: none;
+    height: auto;
+    min-height: 0;
+    max-height: none;
   }
   body.is-mobile-touch #mobileTabBar {
     flex: 0 0 48px;

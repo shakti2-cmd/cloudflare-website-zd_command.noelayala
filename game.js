@@ -1135,6 +1135,7 @@
       this.salvageRefundLabel = $('salvageRefundLabel');
 
       this.topHud = $('topHud');
+      this.viewportContainer = $('viewportContainer');
       this.inspectorSlot = $('inspectorSlot');
       this.cameraControls = $('cameraControls');
       this.btnCamZoomOut = $('btnCamZoomOut');
@@ -1145,7 +1146,8 @@
       // Mobile 6-Tab Navigation Bar & Sub-Drawer
       this.mobileTabBar = $('mobileTabBar');
       this.mobileSubDrawer = $('mobileSubDrawer');
-      this.tabSelect = $('tabSelect');
+      this.tabNextWave = $('tabNextWave');
+      this.mobileWaveBonusLabel = $('mobileWaveBonusLabel');
       this.tabPause = $('tabPause');
       this.tabPauseIcon = $('tabPauseIcon');
       this.tabPauseLabel = $('tabPauseLabel');
@@ -1228,7 +1230,10 @@
       on(this.btnHudHelp, 'click', () => this.openHowToPlay());
 
       // Zombie Intel modal bindings
-      on(this.btnHudZombies, 'click', () => this.openZombieGuide());
+      on(this.btnHudZombies, 'click', () => {
+        if (this.zombieGuideOpen) this.closeZombieGuide();
+        else this.openZombieGuide();
+      });
       on(this.btnCloseZombieGuide, 'click', () => this.closeZombieGuide());
       on(this.btnDismissZombieGuide, 'click', () => this.closeZombieGuide());
 
@@ -1336,9 +1341,9 @@
       }
 
       // Mobile 6-Tab Navigation Bar & Sub-Drawer buttons
-      on(this.tabSelect, 'click', () => {
+      on(this.tabNextWave, 'click', () => {
         this.closeMobileSubDrawer();
-        this.setBuildType('select');
+        this.triggerNextWaveEarly();
       });
 
       on(this.tabPause, 'click', () => {
@@ -1440,6 +1445,7 @@
           return;
         }
         this.sound.unlock();
+        if (this.activeMobileCategory) this.closeMobileSubDrawer();
         const pt = this.screenToWorld(e.clientX, e.clientY);
         if (!pt) return;
         this.handleCanvasClick(pt.x, pt.y);
@@ -1470,6 +1476,9 @@
           if (!this.isMobileTouch) {
             this.isMobileTouch = true;
             this.updateMobileMode();
+          }
+          if (this.activeMobileCategory) {
+            this.closeMobileSubDrawer();
           }
 
           if (e.touches.length >= 2) {
@@ -1576,11 +1585,11 @@
               this.touchState.panning = true;
               this.touchState.moved = true;
             }
-            if (this.touchState.panning && this.camera.zoom > 1.001) {
+            if (this.touchState.panning && this.canPanCamera()) {
               const rect = this.canvas.getBoundingClientRect();
               if (rect.width > 0 && rect.height > 0) {
-                const dx = (t0.clientX - this.touchState.lastX) * (WIDTH / rect.width);
-                const dy = (t0.clientY - this.touchState.lastY) * (HEIGHT / rect.height);
+                const dx = (t0.clientX - this.touchState.lastX) * (this.canvas.width / rect.width);
+                const dy = (t0.clientY - this.touchState.lastY) * (this.canvas.height / rect.height);
                 this.camera.panX += dx;
                 this.camera.panY += dy;
                 this.clampCamera();
@@ -1730,8 +1739,58 @@
           this.isMobileTouch && window.innerWidth > window.innerHeight && window.innerHeight <= 520
         );
       }
+      this.syncCanvasViewportSize();
       this.clampCamera();
       this.refreshTutorialArrowPosition();
+    }
+
+    syncCanvasViewportSize() {
+      if (!this.canvas) return;
+      if (this.isMobileTouch) {
+        const host = this.viewportContainer || this.canvas;
+        const rect = host.getBoundingClientRect();
+        if (rect && rect.width > 0 && rect.height > 0) {
+          const dpr = Math.min(window.devicePixelRatio || 1, 2);
+          const targetW = Math.max(1, Math.round(rect.width * dpr));
+          const targetH = Math.max(1, Math.round(rect.height * dpr));
+          if (this.canvas.width !== targetW || this.canvas.height !== targetH) {
+            this.canvas.width = targetW;
+            this.canvas.height = targetH;
+          }
+        }
+        this.camera.maxZoom = Math.max(2.8, this.getCoverZoom() * 2.2);
+      } else {
+        if (this.canvas.width !== WIDTH || this.canvas.height !== HEIGHT) {
+          this.canvas.width = WIDTH;
+          this.canvas.height = HEIGHT;
+        }
+        this.camera.maxZoom = 2.8;
+      }
+    }
+
+    getFitScale() {
+      const cw = this.canvas ? this.canvas.width : WIDTH;
+      const ch = this.canvas ? this.canvas.height : HEIGHT;
+      return Math.min(cw / WIDTH, ch / HEIGHT);
+    }
+
+    getCoverZoom() {
+      const cw = this.canvas ? this.canvas.width : WIDTH;
+      const ch = this.canvas ? this.canvas.height : HEIGHT;
+      const fit = Math.min(cw / WIDTH, ch / HEIGHT);
+      const cover = Math.max(cw / WIDTH, ch / HEIGHT);
+      return fit > 0 ? cover / fit : 1;
+    }
+
+    getCameraScale() {
+      return this.getFitScale() * this.camera.zoom;
+    }
+
+    canPanCamera() {
+      const cw = this.canvas ? this.canvas.width : WIDTH;
+      const ch = this.canvas ? this.canvas.height : HEIGHT;
+      const s = this.getCameraScale();
+      return WIDTH * s > cw + 1 || HEIGHT * s > ch + 1;
     }
 
     screenToWorld(clientX, clientY) {
@@ -1740,8 +1799,9 @@
       if (!rect || rect.width <= 0 || rect.height <= 0) return null;
       const canvasX = (clientX - rect.left) * (this.canvas.width / rect.width);
       const canvasY = (clientY - rect.top) * (this.canvas.height / rect.height);
-      const worldX = (canvasX - this.camera.panX) / this.camera.zoom;
-      const worldY = (canvasY - this.camera.panY) / this.camera.zoom;
+      const s = this.getCameraScale();
+      const worldX = (canvasX - this.camera.panX) / s;
+      const worldY = (canvasY - this.camera.panY) / s;
       return {
         x: worldX,
         y: worldY,
@@ -1754,15 +1814,23 @@
 
     clampCamera() {
       this.camera.zoom = Math.max(this.camera.minZoom, Math.min(this.camera.maxZoom, this.camera.zoom));
+      const cw = this.canvas ? this.canvas.width : WIDTH;
+      const ch = this.canvas ? this.canvas.height : HEIGHT;
       if (this.camera.zoom <= 1.001) {
         this.camera.zoom = 1;
-        this.camera.panX = 0;
-        this.camera.panY = 0;
+      }
+      const s = this.getCameraScale();
+      const worldW = WIDTH * s;
+      const worldH = HEIGHT * s;
+      if (worldW <= cw) {
+        this.camera.panX = (cw - worldW) * 0.5;
       } else {
-        const minPanX = WIDTH * (1 - this.camera.zoom);
-        const minPanY = HEIGHT * (1 - this.camera.zoom);
-        this.camera.panX = Math.max(minPanX, Math.min(0, this.camera.panX));
-        this.camera.panY = Math.max(minPanY, Math.min(0, this.camera.panY));
+        this.camera.panX = Math.max(cw - worldW, Math.min(0, this.camera.panX));
+      }
+      if (worldH <= ch) {
+        this.camera.panY = (ch - worldH) * 0.5;
+      } else {
+        this.camera.panY = Math.max(ch - worldH, Math.min(0, this.camera.panY));
       }
       if (this.btnCamReset) {
         this.btnCamReset.innerText = `${this.camera.zoom.toFixed(1)}x`;
@@ -1776,13 +1844,19 @@
       }
     }
 
-    setCameraZoom(nextZoom, focusCanvasX = WIDTH * 0.5, focusCanvasY = HEIGHT * 0.5) {
+    setCameraZoom(nextZoom, focusCanvasX = null, focusCanvasY = null) {
+      const cw = this.canvas ? this.canvas.width : WIDTH;
+      const ch = this.canvas ? this.canvas.height : HEIGHT;
+      const fx = focusCanvasX === null ? cw * 0.5 : focusCanvasX;
+      const fy = focusCanvasY === null ? ch * 0.5 : focusCanvasY;
+      const oldS = this.getCameraScale();
+      const worldFocusX = (fx - this.camera.panX) / oldS;
+      const worldFocusY = (fy - this.camera.panY) / oldS;
       const clampedZoom = Math.max(this.camera.minZoom, Math.min(this.camera.maxZoom, nextZoom));
-      const worldFocusX = (focusCanvasX - this.camera.panX) / this.camera.zoom;
-      const worldFocusY = (focusCanvasY - this.camera.panY) / this.camera.zoom;
       this.camera.zoom = clampedZoom;
-      this.camera.panX = focusCanvasX - worldFocusX * clampedZoom;
-      this.camera.panY = focusCanvasY - worldFocusY * clampedZoom;
+      const newS = this.getCameraScale();
+      this.camera.panX = fx - worldFocusX * newS;
+      this.camera.panY = fy - worldFocusY * newS;
       this.clampCamera();
     }
 
@@ -1790,8 +1864,11 @@
       if (targetZoom !== null) {
         this.camera.zoom = Math.max(this.camera.minZoom, Math.min(this.camera.maxZoom, targetZoom));
       }
-      this.camera.panX = WIDTH * 0.5 - worldX * this.camera.zoom;
-      this.camera.panY = HEIGHT * 0.5 - worldY * this.camera.zoom;
+      const cw = this.canvas ? this.canvas.width : WIDTH;
+      const ch = this.canvas ? this.canvas.height : HEIGHT;
+      const s = this.getCameraScale();
+      this.camera.panX = cw * 0.5 - worldX * s;
+      this.camera.panY = ch * 0.5 - worldY * s;
       this.clampCamera();
     }
 
@@ -1899,6 +1976,7 @@
       }
       this.renderBestiaryPortraits();
       showEl(this.zombieGuideModal, 'flex');
+      if (this.btnHudZombies) this.btnHudZombies.classList.add('active');
       this.sound.playClick();
       this.updateTimerHud();
     }
@@ -1907,6 +1985,7 @@
       if (!this.zombieGuideOpen) return;
       this.zombieGuideOpen = false;
       hideEl(this.zombieGuideModal);
+      if (this.btnHudZombies) this.btnHudZombies.classList.remove('active');
       if (this.zombieGuidePausedGame && this.inPlay) {
         this.setPaused(false);
       }
@@ -2361,8 +2440,10 @@
       } else {
         this.showStatus(`Sector ${this.currentLevel + 1} loaded (${rolledClusters}x 3x3 Safe Zone). Destroy all Red Spawn Breaches!`);
       }
-      if (this.isMobileTouch && window.innerWidth < 720) {
-        this.focusCameraOnSafeZones(1.45);
+      if (this.isMobileTouch) {
+        this.syncCanvasViewportSize();
+        const startZoom = Math.min(this.camera.maxZoom, Math.max(1.45, this.getCoverZoom()));
+        this.focusCameraOnSafeZones(startZoom);
       } else {
         this.setCameraZoom(1.0);
       }
@@ -2406,9 +2487,21 @@
     openMobileCategory(cat) {
       this.activeMobileCategory = cat;
       if (this.mobileSubDrawer) showEl(this.mobileSubDrawer, 'block');
-      if (this.subGroupWalls) this.subGroupWalls.classList.toggle('hidden', cat !== 'walls');
-      if (this.subGroupBuildings) this.subGroupBuildings.classList.toggle('hidden', cat !== 'buildings');
-      if (this.subGroupTowers) this.subGroupTowers.classList.toggle('hidden', cat !== 'towers');
+      if (this.subGroupWalls) {
+        if (cat === 'walls') showEl(this.subGroupWalls, 'block');
+        else hideEl(this.subGroupWalls);
+      }
+      if (this.subGroupBuildings) {
+        if (cat === 'buildings') showEl(this.subGroupBuildings, 'block');
+        else hideEl(this.subGroupBuildings);
+      }
+      if (this.subGroupTowers) {
+        if (cat === 'towers') showEl(this.subGroupTowers, 'block');
+        else hideEl(this.subGroupTowers);
+      }
+      if (this.tabWalls) this.tabWalls.setAttribute('aria-expanded', cat === 'walls' ? 'true' : 'false');
+      if (this.tabBuildings) this.tabBuildings.setAttribute('aria-expanded', cat === 'buildings' ? 'true' : 'false');
+      if (this.tabTowers) this.tabTowers.setAttribute('aria-expanded', cat === 'towers' ? 'true' : 'false');
       this.updateBuildPanelUI();
       this.refreshTutorialArrowPosition();
     }
@@ -2419,6 +2512,9 @@
       if (this.subGroupWalls) hideEl(this.subGroupWalls);
       if (this.subGroupBuildings) hideEl(this.subGroupBuildings);
       if (this.subGroupTowers) hideEl(this.subGroupTowers);
+      if (this.tabWalls) this.tabWalls.setAttribute('aria-expanded', 'false');
+      if (this.tabBuildings) this.tabBuildings.setAttribute('aria-expanded', 'false');
+      if (this.tabTowers) this.tabTowers.setAttribute('aria-expanded', 'false');
       this.updateBuildPanelUI();
       this.refreshTutorialArrowPosition();
     }
@@ -2442,7 +2538,7 @@
             toolEngineering: { tabId: 'tabBuildings', cat: 'buildings' },
             toolHabitat: { tabId: 'tabBuildings', cat: 'buildings' },
             toolSafezone: { tabId: 'tabSafeZone', cat: null },
-            toolSelect: { tabId: 'tabSelect', cat: null },
+            btnStartWave: { tabId: 'tabNextWave', cat: null },
             toolSentry: { tabId: 'tabTowers', cat: 'towers' },
             toolCryo: { tabId: 'tabTowers', cat: 'towers' },
             toolSniper: { tabId: 'tabTowers', cat: 'towers' }
@@ -2483,7 +2579,7 @@
             toolEngineering: { tabId: 'tabBuildings', cat: 'buildings' },
             toolHabitat: { tabId: 'tabBuildings', cat: 'buildings' },
             toolSafezone: { tabId: 'tabSafeZone', cat: null },
-            toolSelect: { tabId: 'tabSelect', cat: null },
+            btnStartWave: { tabId: 'tabNextWave', cat: null },
             toolSentry: { tabId: 'tabTowers', cat: 'towers' },
             toolCryo: { tabId: 'tabTowers', cat: 'towers' },
             toolSniper: { tabId: 'tabTowers', cat: 'towers' }
@@ -3330,9 +3426,6 @@
 
       // Sync mobile 6-tab buttons and sub-drawer items
       if (this.mobileTabBar) {
-        if (this.tabSelect) {
-          this.tabSelect.classList.toggle('active', !this.selectedBuildType && this.selectModeActive);
-        }
         if (this.tabSafeZone) {
           this.tabSafeZone.classList.toggle('active', this.selectedBuildType === 'safezone');
         }
@@ -3421,6 +3514,19 @@
       if (!inBounds(col, row)) return;
 
       if (this.selectedBuildType) {
+        const bKey = `${col},${row}`;
+        if (
+          this.isMobileTouch &&
+          this.selectedBuildType !== 'wall' &&
+          this.selectedBuildType !== 'safezone' &&
+          ((this.grid[row][col] === 0 && !this.safeZones.has(bKey) && !this.structures.has(bKey)) || this.grid[row][col] === 1)
+        ) {
+          this.selectedBuildType = null;
+          this.updateBuildPanelUI();
+          this.showStatus('Build mode exited. Tap any unit or structure to inspect.');
+          this.sound.playClick();
+          return;
+        }
         this.attemptBuild(this.selectedBuildType, col, row);
         return;
       }
@@ -5162,6 +5268,7 @@
     }
 
     selectSoldier(soldier) {
+      if (this.activeMobileCategory) this.closeMobileSubDrawer();
       this.selectedSoldier = soldier;
       this.selectedCivilian = null;
       this.selectedEngineer = null;
@@ -5179,6 +5286,7 @@
     }
 
     selectEngineer(engineer) {
+      if (this.activeMobileCategory) this.closeMobileSubDrawer();
       this.selectedEngineer = engineer;
       this.selectedSoldier = null;
       this.selectedCivilian = null;
@@ -5334,6 +5442,7 @@
 
     // --- STRUCTURE, SAFE ZONE, SOLDIER & ENGINEER INSPECTOR ---
     selectStructure(struct) {
+      if (this.activeMobileCategory) this.closeMobileSubDrawer();
       this.selectedStructure = struct;
       this.selectedBuildType = null;
       this.selectedCivilian = null;
@@ -5935,15 +6044,18 @@
       }
 
       const canEarly = this.canLaunchNextWave();
+      const bonusLabel = canEarly ? `+$${this.computeEarlyWaveBonus()}` : 'SIEGE';
       if (this.btnStartWave) {
         this.btnStartWave.disabled = !canEarly;
       }
       if (this.waveBonusLabel) {
-        if (canEarly) {
-          this.waveBonusLabel.innerText = `+$${this.computeEarlyWaveBonus()}`;
-        } else {
-          this.waveBonusLabel.innerText = 'SIEGE';
-        }
+        this.waveBonusLabel.innerText = bonusLabel;
+      }
+      if (this.tabNextWave) {
+        this.tabNextWave.disabled = !canEarly;
+      }
+      if (this.mobileWaveBonusLabel) {
+        this.mobileWaveBonusLabel.innerText = bonusLabel;
       }
     }
 
@@ -7665,9 +7777,10 @@
     render(now) {
       const ctx = this.ctx;
       const t = (now || performance.now()) / 1000;
+      const s = this.getCameraScale();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, WIDTH, HEIGHT);
-      ctx.setTransform(this.camera.zoom, 0, 0, this.camera.zoom, this.camera.panX, this.camera.panY);
+      ctx.clearRect(0, 0, this.canvas ? this.canvas.width : WIDTH, this.canvas ? this.canvas.height : HEIGHT);
+      ctx.setTransform(s, 0, 0, s, this.camera.panX, this.camera.panY);
       ctx.textAlign = 'left';
       ctx.textBaseline = 'alphabetic';
 
