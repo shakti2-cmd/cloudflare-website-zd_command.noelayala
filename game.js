@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.22.0 (Mobile Fast Unselect, Validated Main Menu, Gate Line-Drag, 3x Hard HP & Compact Actions)
+ * Version: v0.23.0 (4-Player Co-Op Multiplayer, Live Room Browser, Waiting Room, Individual Wallets & Host Disconnect Modal)
  */
 
 (function () {
@@ -979,6 +979,27 @@
       this.uiTimer = 0;
       this.timerText = '';
 
+      // Multiplayer state (v0.23.0)
+      this.isMultiplayer = false;
+      this.isMpHost = false;
+      this.localPlayerId = null;
+      this.mpPlayers = [];
+      this.playerWallets = {};
+      this.mpHostDiff = 'normal';
+      this.mpPendingJoinRoom = null;
+      this.mpSyncAccum = 0;
+      this.mp = typeof window.MultiplayerManager !== 'undefined'
+        ? new window.MultiplayerManager({
+            onRoomsUpdated: (rooms) => this.renderMpRoomList(rooms),
+            onLobbyUpdated: (lobby) => this.renderMpLobby(lobby),
+            onMatchStart: (config) => this.initMultiplayerMatch(config),
+            onStateSnapshot: (snap) => this.applyMpState(snap),
+            onRemoteAction: (senderId, action) => this.handleRemoteAction(senderId, action),
+            onHostDisconnected: (reason) => this.onMpHostDisconnected(reason),
+            onError: (msg) => this.handleMpError(msg)
+          })
+        : null;
+
       this.bindDOM();
       this.bindEvents();
       this.updateMobileMode(true);
@@ -991,6 +1012,14 @@
       showEl(this.startScreenOverlay, 'flex');
       this.updateHUD();
       this.updateTimerHud();
+
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const inviteRoom = (urlParams.get('room') || '').trim();
+        if (inviteRoom && this.mp) {
+          this.openMultiplayerModal('join', inviteRoom);
+        }
+      } catch (_) {}
 
       requestAnimationFrame((ts) => this.loop(ts));
     }
@@ -1174,6 +1203,44 @@
       this.startMainSection = $('startMainSection');
       this.btnCampaignBack = $('btnCampaignBack');
       this.btnStartCampaignSector = $('btnStartCampaignSector');
+
+      // Multiplayer UI Elements (v0.23.0)
+      this.btnStartMultiplayer = $('btnStartMultiplayer');
+      this.mpRoleModal = $('mpRoleModal');
+      this.mpPlayerCallsign = $('mpPlayerCallsign');
+      this.mpRolePicker = $('mpRolePicker');
+      this.btnMpOpenHost = $('btnMpOpenHost');
+      this.btnMpOpenJoin = $('btnMpOpenJoin');
+      this.btnMpRoleBack = $('btnMpRoleBack');
+      this.mpHostPanel = $('mpHostPanel');
+      this.mpHostRoomName = $('mpHostRoomName');
+      this.mpHostPassword = $('mpHostPassword');
+      this.mpHostError = $('mpHostError');
+      this.btnMpHostBack = $('btnMpHostBack');
+      this.btnMpCreateRoom = $('btnMpCreateRoom');
+      this.mpJoinPanel = $('mpJoinPanel');
+      this.btnMpRefreshRooms = $('btnMpRefreshRooms');
+      this.mpRoomList = $('mpRoomList');
+      this.mpJoinPasswordBox = $('mpJoinPasswordBox');
+      this.mpJoinPasswordTarget = $('mpJoinPasswordTarget');
+      this.mpJoinPasswordInput = $('mpJoinPasswordInput');
+      this.btnMpConfirmPasswordJoin = $('btnMpConfirmPasswordJoin');
+      this.btnMpCancelPasswordJoin = $('btnMpCancelPasswordJoin');
+      this.mpDirectRoomCode = $('mpDirectRoomCode');
+      this.btnMpDirectJoin = $('btnMpDirectJoin');
+      this.mpJoinError = $('mpJoinError');
+      this.btnMpJoinBack = $('btnMpJoinBack');
+      this.mpLobbyPanel = $('mpLobbyPanel');
+      this.mpLobbyRoomName = $('mpLobbyRoomName');
+      this.mpLobbyRoomMeta = $('mpLobbyRoomMeta');
+      this.btnMpCopyRoomInfo = $('btnMpCopyRoomInfo');
+      this.mpPlayerSlots = $('mpPlayerSlots');
+      this.mpLobbyReadyHint = $('mpLobbyReadyHint');
+      this.btnMpLeaveRoom = $('btnMpLeaveRoom');
+      this.btnMpToggleReady = $('btnMpToggleReady');
+      this.mpHostDisconnectedModal = $('mpHostDisconnectedModal');
+      this.mpDisconnectReason = $('mpDisconnectReason');
+      this.btnMpDisconnectMenu = $('btnMpDisconnectMenu');
     }
 
     bindEvents() {
@@ -1252,6 +1319,7 @@
       });
 
       on(this.btnStartMission, 'click', () => this.deployFromStartScreen());
+      on(this.btnStartMultiplayer, 'click', () => this.openMultiplayerModal('role'));
       on(this.btnStartTutorial, 'click', () => this.startTutorial());
       on(this.btnSkipTutorial, 'click', () => this.returnToStartMenu());
       on(this.btnStartZombies, 'click', () => this.openZombieGuide());
@@ -1321,9 +1389,126 @@
       on(this.btnPause, 'click', () => this.togglePause());
 
       on(this.btnSpeed, 'click', () => {
+        if (this.isMultiplayer) {
+          this.gameSpeed = 1;
+          if (this.btnSpeed) this.btnSpeed.innerText = 'Speed: 1x';
+          return;
+        }
         this.gameSpeed = this.gameSpeed === 1 ? 2 : 1;
         if (this.btnSpeed) this.btnSpeed.innerText = `Speed: ${this.gameSpeed}x`;
         this.sound.playClick();
+      });
+
+      // Multiplayer UI bindings (v0.23.0)
+      on(this.mpPlayerCallsign, 'input', () => {
+        if (this.mp && this.mpPlayerCallsign) {
+          this.mp.saveCallsign(this.mpPlayerCallsign.value);
+        }
+      });
+      on(this.mpPlayerCallsign, 'blur', () => {
+        if (this.mp && this.mpPlayerCallsign) {
+          this.mpPlayerCallsign.value = this.mp.saveCallsign(this.mpPlayerCallsign.value);
+        }
+      });
+      on(this.btnMpOpenHost, 'click', () => this.openMultiplayerModal('host'));
+      on(this.btnMpOpenJoin, 'click', () => this.openMultiplayerModal('join'));
+      on(this.btnMpRoleBack, 'click', () => {
+        if (this.mp) {
+          this.mp.stopDirectoryWatch();
+          this.mp.leaveRoom(true);
+        }
+        hideEl(this.mpRoleModal);
+        showEl(this.startScreenOverlay, 'flex');
+      });
+
+      document.querySelectorAll('[data-mp-diff]').forEach((card) => {
+        on(card, 'click', () => {
+          this.mpHostDiff = card.dataset.mpDiff || 'normal';
+          document.querySelectorAll('[data-mp-diff]').forEach((c) => {
+            c.classList.toggle('selected', c.dataset.mpDiff === this.mpHostDiff);
+          });
+          this.sound.playClick();
+        });
+      });
+
+      on(this.btnMpHostBack, 'click', () => this.openMultiplayerModal('role'));
+      on(this.btnMpCreateRoom, 'click', () => {
+        if (!this.mp) return;
+        const rName = this.mpHostRoomName ? this.mpHostRoomName.value.trim() : '';
+        if (!rName) {
+          if (this.mpHostError) {
+            this.mpHostError.textContent = 'PLEASE ENTER A ROOM NAME';
+            this.mpHostError.classList.remove('hidden');
+          }
+          this.sound.playHit();
+          return;
+        }
+        if (this.mpHostError) this.mpHostError.classList.add('hidden');
+        const pw = this.mpHostPassword ? this.mpHostPassword.value : '';
+        const callsign = this.mpPlayerCallsign ? this.mpPlayerCallsign.value : this.mp.callsign;
+        this.mp.createRoom({
+          roomName: rName,
+          password: pw,
+          difficulty: this.mpHostDiff || 'normal',
+          callsign
+        });
+      });
+
+      on(this.btnMpRefreshRooms, 'click', () => {
+        if (this.mp) this.mp.refreshRooms();
+        this.sound.playClick();
+      });
+      on(this.btnMpJoinBack, 'click', () => {
+        if (this.mp) this.mp.stopDirectoryWatch();
+        this.mpPendingJoinRoom = null;
+        if (this.mpJoinPasswordBox) hideEl(this.mpJoinPasswordBox);
+        this.openMultiplayerModal('role');
+      });
+      on(this.btnMpCancelPasswordJoin, 'click', () => {
+        this.mpPendingJoinRoom = null;
+        if (this.mpJoinPasswordInput) this.mpJoinPasswordInput.value = '';
+        if (this.mpJoinPasswordBox) hideEl(this.mpJoinPasswordBox);
+      });
+      on(this.btnMpConfirmPasswordJoin, 'click', () => {
+        if (!this.mp || !this.mpPendingJoinRoom) return;
+        const pw = this.mpJoinPasswordInput ? this.mpJoinPasswordInput.value : '';
+        const callsign = this.mpPlayerCallsign ? this.mpPlayerCallsign.value : this.mp.callsign;
+        if (this.mpJoinError) this.mpJoinError.classList.add('hidden');
+        this.mp.joinRoom({
+          roomId: this.mpPendingJoinRoom.roomId,
+          password: pw,
+          callsign
+        });
+      });
+      on(this.btnMpDirectJoin, 'click', () => {
+        if (!this.mp) return;
+        const code = this.mpDirectRoomCode ? this.mpDirectRoomCode.value.trim() : '';
+        if (!code) {
+          this.handleMpError('Please enter a Room Code (e.g. zdc-...).');
+          return;
+        }
+        const pw = this.mpJoinPasswordInput ? this.mpJoinPasswordInput.value : '';
+        const callsign = this.mpPlayerCallsign ? this.mpPlayerCallsign.value : this.mp.callsign;
+        if (this.mpJoinError) this.mpJoinError.classList.add('hidden');
+        this.mp.joinRoom({ roomId: code, password: pw, callsign });
+      });
+
+      on(this.btnMpCopyRoomInfo, 'click', () => this.copyMpRoomInfo());
+      on(this.btnMpToggleReady, 'click', () => {
+        if (this.mp) this.mp.toggleReady();
+        this.sound.playClick();
+      });
+      on(this.btnMpLeaveRoom, 'click', () => {
+        if (this.mp) this.mp.leaveRoom();
+        this.openMultiplayerModal('role');
+      });
+      on(this.btnMpDisconnectMenu, 'click', () => {
+        hideEl(this.mpHostDisconnectedModal);
+        this.returnToStartMenu();
+      });
+
+      window.addEventListener('pagehide', () => {
+        if (this.mp && this.mp.role) this.mp.leaveRoom(true);
       });
 
       on(this.btnMute, 'click', () => this.toggleMute());
@@ -1821,7 +2006,7 @@
           }
         } else if (key === ' ') {
           e.preventDefault();
-          this.togglePause();
+          if (!this.isMultiplayer) this.togglePause();
         }
       });
     }
@@ -2044,7 +2229,7 @@
       if (this.zombieGuideOpen) this.closeZombieGuide();
       this.helpOpen = true;
       this.helpPausedGame = false;
-      if (this.inPlay && !this.isPaused) {
+      if (this.inPlay && !this.isPaused && !this.isMultiplayer) {
         this.setPaused(true);
         this.helpPausedGame = true;
       }
@@ -2056,7 +2241,7 @@
       if (!this.helpOpen) return;
       this.helpOpen = false;
       hideEl(this.howToPlayModal);
-      if (this.helpPausedGame && this.inPlay) {
+      if (this.helpPausedGame && this.inPlay && !this.isMultiplayer) {
         this.setPaused(false);
       }
       this.helpPausedGame = false;
@@ -2068,7 +2253,7 @@
       if (this.helpOpen) this.closeHowToPlay();
       this.zombieGuideOpen = true;
       this.zombieGuidePausedGame = false;
-      if (this.inPlay && !this.isPaused) {
+      if (this.inPlay && !this.isPaused && !this.isMultiplayer) {
         this.setPaused(true);
         this.zombieGuidePausedGame = true;
       }
@@ -2189,8 +2374,22 @@
 
     returnToStartMenu() {
       this.clearTutorial();
+      if (this.mp) {
+        this.mp.stopDirectoryWatch();
+        if (this.mp.role) this.mp.leaveRoom(true);
+      }
+      this.isMultiplayer = false;
+      this.isMpHost = false;
+      this.localPlayerId = null;
+      this.mpPlayers = [];
+      this.playerWallets = {};
+      if (document.body) {
+        document.body.classList.remove('is-multiplayer');
+        document.body.classList.add('in-start-menu');
+      }
+      hideEl(this.mpRoleModal);
+      hideEl(this.mpHostDisconnectedModal);
       this.waveState = STATE.START_MENU;
-      if (document.body) document.body.classList.add('in-start-menu');
       this.setPaused(false);
       this.clearSelection();
       this.selectedDifficulty = null;
@@ -2205,6 +2404,818 @@
       showEl(this.startScreenOverlay, 'flex');
       this.updateTimerHud();
       this.showStatus('Select threat level and mission mode, then start the mission.');
+    }
+
+    // --- 4-PLAYER CO-OP MULTIPLAYER UI & STATE (v0.23.0) ---
+    openMultiplayerModal(view = 'role', inviteRoomCode = '') {
+      if (this.mpPlayerCallsign && this.mp) {
+        this.mpPlayerCallsign.value = this.mp.getSavedCallsign();
+      }
+      hideEl(this.startScreenOverlay);
+      hideEl(this.mpHostDisconnectedModal);
+      showEl(this.mpRoleModal, 'flex');
+      hideEl(this.mpRolePicker);
+      hideEl(this.mpHostPanel);
+      hideEl(this.mpJoinPanel);
+      hideEl(this.mpLobbyPanel);
+      if (this.mpHostError) this.mpHostError.classList.add('hidden');
+      if (this.mpJoinError) this.mpJoinError.classList.add('hidden');
+
+      if (view === 'host') {
+        showEl(this.mpHostPanel, 'block');
+        if (this.mpHostRoomName && !this.mpHostRoomName.value.trim()) {
+          const cs = this.mp ? this.mp.callsign : 'Commander';
+          this.mpHostRoomName.value = `${cs}'s Defense`;
+        }
+      } else if (view === 'join') {
+        showEl(this.mpJoinPanel, 'block');
+        if (this.mpJoinPasswordBox) hideEl(this.mpJoinPasswordBox);
+        if (inviteRoomCode && this.mpDirectRoomCode) {
+          this.mpDirectRoomCode.value = inviteRoomCode;
+          if (this.mpJoinError) {
+            this.mpJoinError.textContent = `Invite link ready (${inviteRoomCode}). Enter password if needed or click Join Code.`;
+            this.mpJoinError.classList.remove('hidden');
+          }
+        }
+        if (this.mp) this.mp.startDirectoryWatch();
+      } else if (view === 'lobby') {
+        showEl(this.mpLobbyPanel, 'block');
+      } else {
+        showEl(this.mpRolePicker, 'block');
+      }
+    }
+
+    handleMpError(msg) {
+      if (!msg) return;
+      if (this.mpHostPanel && !this.mpHostPanel.classList.contains('hidden') && this.mpHostError) {
+        this.mpHostError.textContent = msg;
+        this.mpHostError.classList.remove('hidden');
+      } else if (this.mpJoinPanel && !this.mpJoinPanel.classList.contains('hidden') && this.mpJoinError) {
+        this.mpJoinError.textContent = msg;
+        this.mpJoinError.classList.remove('hidden');
+      } else {
+        this.showStatus(msg);
+      }
+      this.sound.playHit();
+    }
+
+    renderMpRoomList(rooms = []) {
+      if (!this.mpRoomList) return;
+      this.mpRoomList.innerHTML = '';
+      if (!rooms || rooms.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'mp-room-empty';
+        empty.textContent = 'No active rooms found. Host a room or paste a Room Code below!';
+        this.mpRoomList.appendChild(empty);
+        return;
+      }
+
+      for (const rm of rooms) {
+        const row = document.createElement('div');
+        row.className = 'mp-room-item';
+
+        const main = document.createElement('div');
+        main.className = 'mp-room-main';
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'mp-room-name';
+        if (rm.hasPassword) {
+          const lock = document.createElement('span');
+          lock.className = 'mp-lock-badge';
+          lock.innerHTML = '&#128274;';
+          lock.title = 'Password Protected';
+          nameEl.appendChild(lock);
+        }
+        const titleTxt = document.createElement('span');
+        titleTxt.textContent = rm.roomName;
+        nameEl.appendChild(titleTxt);
+
+        const meta = document.createElement('div');
+        meta.className = 'mp-room-meta';
+        const diffUp = String(rm.difficulty || 'normal').toUpperCase();
+        meta.textContent = `Host: ${rm.hostName} • ${diffUp} • ${rm.playerCount}/${rm.maxPlayers || 4}`;
+
+        main.appendChild(nameEl);
+        main.appendChild(meta);
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'modal-btn primary-btn mp-room-join-btn';
+        btn.textContent = rm.playerCount >= 4 ? 'Full' : 'Join';
+        btn.disabled = rm.playerCount >= 4;
+        btn.addEventListener('click', () => {
+          if (!this.mp) return;
+          if (this.mpJoinError) this.mpJoinError.classList.add('hidden');
+          const cs = this.mpPlayerCallsign ? this.mpPlayerCallsign.value : this.mp.callsign;
+          if (rm.hasPassword) {
+            this.mpPendingJoinRoom = rm;
+            if (this.mpJoinPasswordTarget) {
+              this.mpJoinPasswordTarget.textContent = `Enter password for "${rm.roomName}":`;
+            }
+            if (this.mpJoinPasswordInput) this.mpJoinPasswordInput.value = '';
+            if (this.mpJoinPasswordBox) {
+              showEl(this.mpJoinPasswordBox, 'block');
+              this.mpJoinPasswordInput && this.mpJoinPasswordInput.focus();
+            }
+          } else {
+            this.mpPendingJoinRoom = null;
+            if (this.mpJoinPasswordBox) hideEl(this.mpJoinPasswordBox);
+            this.mp.joinRoom({ roomId: rm.roomId, password: '', callsign: cs });
+          }
+        });
+
+        row.appendChild(main);
+        row.appendChild(btn);
+        this.mpRoomList.appendChild(row);
+      }
+    }
+
+    renderMpLobby(lobby) {
+      if (!lobby) return;
+      if (this.mp) this.mp.stopDirectoryWatch();
+      this.openMultiplayerModal('lobby');
+
+      if (this.mpLobbyRoomName) this.mpLobbyRoomName.textContent = lobby.roomName || lobby.roomId;
+      if (this.mpLobbyRoomMeta) {
+        const diffUp = String(lobby.difficulty || 'normal').toUpperCase();
+        const lockTxt = lobby.hasPassword ? 'Password Protected' : 'Open Room';
+        this.mpLobbyRoomMeta.textContent = `Threat: ${diffUp} • ${lockTxt} • ${lobby.players.length}/4 Players`;
+      }
+
+      if (this.mpPlayerSlots) {
+        this.mpPlayerSlots.innerHTML = '';
+        const colors = window.MultiplayerManager ? window.MultiplayerManager.PLAYER_COLORS : ['#00E5FF', '#00E08A', '#FFD23F', '#B833FF'];
+        for (let slot = 0; slot < 4; slot++) {
+          const p = (lobby.players || []).find((pl) => pl.slot === slot);
+          const card = document.createElement('div');
+          card.className = p ? 'mp-slot-card' : 'mp-slot-card is-empty';
+          card.style.setProperty('--slot-color', (p && p.color) || colors[slot]);
+
+          const info = document.createElement('div');
+          info.className = 'mp-slot-info';
+          const name = document.createElement('div');
+          name.className = 'mp-slot-name';
+          name.textContent = p ? `${p.callsign}${p.id === lobby.localId ? ' (You)' : ''}` : `Open Slot ${slot + 1}`;
+          const role = document.createElement('div');
+          role.className = 'mp-slot-role';
+          role.textContent = p ? (p.isHost ? 'HOST' : `PLAYER ${slot + 1}`) : 'Waiting...';
+          info.appendChild(name);
+          info.appendChild(role);
+
+          const badge = document.createElement('span');
+          badge.className = p && p.ready ? 'mp-ready-badge is-ready' : 'mp-ready-badge';
+          badge.textContent = p ? (p.ready ? 'READY' : 'WAITING') : '--';
+
+          card.appendChild(info);
+          card.appendChild(badge);
+          this.mpPlayerSlots.appendChild(card);
+        }
+      }
+
+      const me = (lobby.players || []).find((p) => p.id === lobby.localId);
+      const isMeReady = !!(me && me.ready);
+      const readyCount = (lobby.players || []).filter((p) => p.ready).length;
+      if (this.btnMpToggleReady) {
+        this.btnMpToggleReady.classList.toggle('is-ready', isMeReady);
+        this.btnMpToggleReady.innerHTML = isMeReady ? '&#10003; Ready (Click to Unready)' : '&#9654; Start / Ready';
+      }
+      if (this.mpLobbyReadyHint) {
+        this.mpLobbyReadyHint.textContent = `${readyCount}/${lobby.players.length} Ready — All connected players must press Start / Ready to deploy.`;
+      }
+    }
+
+    copyMpRoomInfo() {
+      if (!this.mp || !this.btnMpCopyRoomInfo) return;
+      const text = this.mp.getInviteText();
+      const markCopied = () => {
+        this.btnMpCopyRoomInfo.classList.add('copied');
+        this.btnMpCopyRoomInfo.textContent = 'Copied!';
+        setTimeout(() => {
+          if (this.btnMpCopyRoomInfo) {
+            this.btnMpCopyRoomInfo.classList.remove('copied');
+            this.btnMpCopyRoomInfo.innerHTML = '&#128203; Copy Room Info';
+          }
+        }, 2000);
+      };
+      const fallbackCopy = () => {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); } catch (_) {}
+        document.body.removeChild(ta);
+        markCopied();
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(markCopied).catch(fallbackCopy);
+      } else {
+        fallbackCopy();
+      }
+      this.sound.playClick();
+    }
+
+    onMpHostDisconnected(reason = 'Host disconnected — room closed.') {
+      this.isMultiplayer = false;
+      this.isMpHost = false;
+      this.waveState = STATE.START_MENU;
+      if (document.body) document.body.classList.remove('is-multiplayer');
+      this.clearSelection();
+      hideEl(this.mpRoleModal);
+      hideEl(this.gameOverOverlay);
+      if (this.mpDisconnectReason) {
+        this.mpDisconnectReason.textContent = reason || 'Host disconnected — room closed.';
+      }
+      showEl(this.mpHostDisconnectedModal, 'flex');
+      this.sound.playBarricadeBreak();
+    }
+
+    // --- MULTIPLAYER WALLETS & TERRITORY OWNERSHIP ---
+    getEffectiveActorId(actorId = null) {
+      if (!this.isMultiplayer) return null;
+      return actorId || this.localPlayerId;
+    }
+
+    getPlayerWallet(playerId = null) {
+      if (!this.isMultiplayer) return this.scrap;
+      const pid = playerId || this.localPlayerId;
+      return Number(this.playerWallets[pid] || 0);
+    }
+
+    addPlayerScrap(playerId, delta) {
+      if (!this.isMultiplayer) {
+        this.scrap += delta;
+        return this.scrap;
+      }
+      const pid = playerId || this.localPlayerId;
+      const next = Math.max(0, (Number(this.playerWallets[pid]) || 0) + delta);
+      this.playerWallets[pid] = next;
+      if (pid === this.localPlayerId) this.scrap = next;
+      return next;
+    }
+
+    spendPlayerScrap(playerId, cost) {
+      if (!this.isMultiplayer) {
+        if (this.scrap < cost) return false;
+        this.scrap -= cost;
+        return true;
+      }
+      const pid = playerId || this.localPlayerId;
+      const cur = Number(this.playerWallets[pid]) || 0;
+      if (cur < cost) return false;
+      this.playerWallets[pid] = cur - cost;
+      if (pid === this.localPlayerId) this.scrap = this.playerWallets[pid];
+      return true;
+    }
+
+    getPlayerMeta(playerId) {
+      if (!playerId || !this.mpPlayers) return null;
+      return this.mpPlayers.find((p) => p.id === playerId) || null;
+    }
+
+    getNearestSafeZoneOwner(x, y) {
+      let bestOwner = this.localPlayerId;
+      let bestD = Infinity;
+      for (const sz of this.safeZones.values()) {
+        if (!sz.ownerId) continue;
+        const d = Math.hypot(sz.x - x, sz.y - y);
+        if (d < bestD) {
+          bestD = d;
+          bestOwner = sz.ownerId;
+        }
+      }
+      return bestOwner;
+    }
+
+    initMultiplayerMatch(config) {
+      this.clearTutorial();
+      this.isMultiplayer = true;
+      this.isMpHost = !!(this.mp && this.mp.role === 'host');
+      this.localPlayerId = (this.mp && this.mp.localId) || (config.players && config.players[0] && config.players[0].id) || 'local';
+      this.mpPlayers = (config.players || []).map((p) => ({ ...p }));
+      this.difficulty = DIFFICULTY_PRESETS[config.difficulty] ? config.difficulty : 'normal';
+      const preset = DIFFICULTY_PRESETS[this.difficulty];
+      this.zombieHpMult = preset.zombieHpMult;
+      this.zombieSpeedMult = preset.zombieSpeedMult;
+      this.infectionWindow = preset.infectionWindow;
+
+      this.isTutorialMode = false;
+      this.isPostDefenseMode = false;
+      this.isRandomMode = false;
+      this.isEndlessMode = false;
+      this.currentLevel = 0;
+
+      this.gameSpeed = 1;
+      if (this.btnSpeed) this.btnSpeed.innerText = 'Speed: 1x';
+      this.isPaused = false;
+
+      if (document.body) {
+        document.body.classList.remove('in-start-menu');
+        document.body.classList.add('is-multiplayer');
+      }
+      hideEl(this.startScreenOverlay);
+      hideEl(this.mpRoleModal);
+      hideEl(this.mpHostDisconnectedModal);
+      hideEl(this.gameOverOverlay);
+
+      this.playerWallets = {};
+      for (const p of this.mpPlayers) {
+        this.playerWallets[p.id] = preset.startingScrap;
+      }
+      this.scrap = preset.startingScrap;
+      this.score = 0;
+      this.totalCommandoKills = 0;
+      this.movingStructure = null;
+      this.savedCount = 0;
+      this.infectedCount = 0;
+      this.baseIntegrity = 100;
+      this.elapsedTime = 0;
+      this.threatMult = 1.0;
+      this.hordeScale = { hp: 1.0, dmg: 1.0, speed: 1.0, weakened: false };
+      this.breachCivTimer = 16.0;
+      this.wave = 0;
+      this.totalWaves = Infinity;
+      this.nextWaveTimer = 20.0;
+      this.waveSpawnQueue = [];
+      this.spawnTimer = 0;
+
+      this.structures.clear();
+      this.safeZones.clear();
+      this.spawns.clear();
+      this.sealedSpawns = [];
+      this.civilians = [];
+      this.soldiers = [];
+      this.engineers = [];
+      this.zombies = [];
+      this.projectiles = [];
+      this.particles = [];
+      this.pulseRings = [];
+      this.floatingTexts = [];
+
+      // 32x24 open co-op arena with border rocks & 4 corner-symmetrical Spawn Breaches
+      this.grid = Array.from({ length: ROWS }, (_, r) =>
+        Array.from({ length: COLS }, (__, c) => (r === 0 || r === ROWS - 1 || c === 0 || c === COLS - 1 ? 1 : 0))
+      );
+
+      const breachCoords = [
+        [15, 2],
+        [16, 21],
+        [2, 11],
+        [29, 12]
+      ];
+      const breachHp = 750;
+      for (const [bc, br] of breachCoords) {
+        this.grid[br][bc] = 3;
+        const p = tileCenter(bc, br);
+        this.spawns.set(`${bc},${br}`, {
+          type: 'spawn',
+          col: bc,
+          row: br,
+          x: p.x,
+          y: p.y,
+          hp: breachHp,
+          maxHp: breachHp,
+          flash: 0,
+          timeSinceHit: 99,
+          isRegenerating: false
+        });
+      }
+
+      const anchors = [
+        [8, 6],
+        [22, 6],
+        [8, 16],
+        [22, 16]
+      ];
+      const szLv1 = STRUCTURE_SPECS.safezone.levels[0];
+      const wl = STRUCTURE_SPECS.wall.levels[0];
+
+      for (const player of this.mpPlayers) {
+        const anchor = anchors[player.slot % anchors.length];
+        const clusterTiles = [];
+        for (let dr = 0; dr < 2; dr++) {
+          for (let dc = 0; dc < 2; dc++) {
+            const cc = anchor[0] + dc;
+            const rr = anchor[1] + dr;
+            const p = tileCenter(cc, rr);
+            this.grid[rr][cc] = 2;
+            this.safeZones.set(`${cc},${rr}`, {
+              id: Math.random().toString(36).slice(2, 11),
+              type: 'safezone',
+              level: 1,
+              hp: szLv1.hp,
+              maxHp: szLv1.hp,
+              col: cc,
+              row: rr,
+              x: p.x,
+              y: p.y,
+              invested: szLv1.cost,
+              preplaced: true,
+              flash: 0,
+              ownerId: player.id,
+              ownerSlot: player.slot,
+              ownerColor: player.color,
+              ownerName: player.callsign
+            });
+            clusterTiles.push([cc, rr]);
+          }
+        }
+
+        if (this.isMpHost) {
+          this.rollStartingBarricadesForPlayer(clusterTiles, 6, player, wl);
+        }
+      }
+
+      if (this.isMpHost) {
+        this.initialSpawnCount = Math.max(1, this.spawns.size);
+        const initCivCount = 8 + this.mpPlayers.length * 2;
+        this.spawnInitialCivilians(initCivCount);
+        this.civTotal = this.civilians.length;
+      } else {
+        this.initialSpawnCount = Math.max(1, this.spawns.size);
+        this.civTotal = 8 + this.mpPlayers.length * 2;
+      }
+
+      this.recalcBaseIntegrity();
+      this.clearSelection();
+      this.waveState = STATE.PREPARE;
+      this.updateHUD();
+      this.updateTimerHud();
+      this.showStatus(`Co-Op Mission (${preset.name} • ${this.mpPlayers.length} Players). Defend your 4 Safe Zones & destroy all Breaches!`);
+
+      if (this.isMobileTouch) {
+        this.syncCanvasViewportSize();
+        const myZones = Array.from(this.safeZones.values()).filter((sz) => sz.ownerId === this.localPlayerId);
+        if (myZones.length > 0) {
+          const avgX = myZones.reduce((sum, sz) => sum + sz.x, 0) / myZones.length;
+          const avgY = myZones.reduce((sum, sz) => sum + sz.y, 0) / myZones.length;
+          const startZoom = Math.min(this.camera.maxZoom, Math.max(1.45, this.getCoverZoom()));
+          this.centerCameraOnWorld(avgX, avgY, startZoom);
+        } else {
+          this.focusCameraOnSafeZones(1.45);
+        }
+      } else {
+        this.setCameraZoom(1.0);
+      }
+
+      if (this.isMpHost && this.mp) {
+        this.mp.broadcastState(this.serializeMpState());
+      }
+    }
+
+    rollStartingBarricadesForPlayer(clusterTiles, targetCount, player, wl) {
+      const candidates = [];
+      for (let r = 1; r < ROWS - 1; r++) {
+        for (let c = 1; c < COLS - 1; c++) {
+          const key = `${c},${r}`;
+          if (this.grid[r][c] !== 0 || this.structures.has(key) || this.safeZones.has(key)) continue;
+          let minD = Infinity;
+          for (const [sc, sr] of clusterTiles) {
+            const d = Math.max(Math.abs(c - sc), Math.abs(r - sr));
+            if (d < minD) minD = d;
+          }
+          if (minD === 2) candidates.push([c, r]);
+        }
+      }
+      for (let i = candidates.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+      }
+      let placed = 0;
+      for (const [c, r] of candidates) {
+        if (placed >= targetCount) break;
+        const p = tileCenter(c, r);
+        this.grid[r][c] = 4;
+        this.structures.set(`${c},${r}`, {
+          id: Math.random().toString(36).slice(2, 11),
+          type: 'wall',
+          level: 1,
+          hp: wl.hp,
+          maxHp: wl.hp,
+          col: c,
+          row: r,
+          x: p.x,
+          y: p.y,
+          kills: 0,
+          invested: wl.cost,
+          preplaced: true,
+          flash: 0,
+          ownerId: player.id,
+          ownerSlot: player.slot,
+          ownerColor: player.color,
+          ownerName: player.callsign
+        });
+        placed++;
+      }
+    }
+
+    handleRemoteAction(senderId, action) {
+      if (!this.isMultiplayer || !this.isMpHost || !action || !senderId) return;
+      switch (action.kind) {
+        case 'build':
+          this.attemptBuild(action.type, action.col, action.row, senderId);
+          break;
+        case 'sz_drag':
+          this.executeSafeZoneDragPurchase(action.sc, action.sr, action.cc, action.cr, senderId);
+          break;
+        case 'line_drag':
+          this.executeWallLineDragPurchase(action.sc, action.sr, action.cc, action.cr, action.bType || 'wall', senderId);
+          break;
+        case 'upgrade_struct': {
+          const st = this.structures.get(action.key) || this.safeZones.get(action.key);
+          if (st) this.upgradeStructureForActor(st, senderId);
+          break;
+        }
+        case 'upgrade_unit': {
+          if (action.unitType === 'soldier') {
+            const sol = this.soldiers.find((s) => s.id === action.unitId);
+            if (sol) this.upgradeSoldierForActor(sol, senderId);
+          } else if (action.unitType === 'engineer') {
+            const eng = this.engineers.find((e) => e.id === action.unitId);
+            if (eng) this.upgradeEngineerForActor(eng, senderId);
+          }
+          break;
+        }
+        case 'salvage_struct': {
+          const st = this.structures.get(action.key);
+          if (st) this.salvageStructureForActor(st, senderId);
+          break;
+        }
+        case 'move_struct': {
+          const st = this.structures.get(action.fromKey);
+          if (st) this.attemptMoveStructure(st, action.col, action.row, senderId);
+          break;
+        }
+        case 'train': {
+          const st = this.structures.get(action.key);
+          if (st) this.trainFromSelectedBuilding(st, senderId);
+          break;
+        }
+        case 'release': {
+          const st = this.structures.get(action.key);
+          if (st) this.releaseGarrisonedUnits(st, false, senderId);
+          break;
+        }
+        case 'unit_move':
+          this.applyRemoteUnitCommand(senderId, action);
+          break;
+        case 'next_wave':
+          this.triggerNextWaveEarly(senderId);
+          break;
+      }
+      if (this.mp) this.mp.broadcastState(this.serializeMpState());
+    }
+
+    applyRemoteUnitCommand(actorId, action) {
+      const col = action.col;
+      const row = action.row;
+      if (!inBounds(col, row)) return;
+      const key = `${col},${row}`;
+      const clickedStruct = this.structures.get(key) || this.safeZones.get(key) || null;
+      if (action.unitType === 'civilian') {
+        const civ = this.civilians.find((c) => c.id === action.unitId);
+        if (civ) {
+          civ.targetBarracks = null;
+          if (this.commandCivilianMove(civ, col, row) && civ.path.length > 0) civ.manualMoveOrder = true;
+        }
+      } else if (action.unitType === 'engineer') {
+        const eng = this.engineers.find((e) => e.id === action.unitId);
+        if (!eng) return;
+        if (eng.ownerId && eng.ownerId !== actorId) return;
+        if (clickedStruct && clickedStruct.type === 'engineering') {
+          this.commandEngineerToEngineering(eng, clickedStruct);
+        } else if (clickedStruct && clickedStruct.type !== 'safezone' && !(clickedStruct.type === 'gate' && clickedStruct.hp >= clickedStruct.maxHp)) {
+          this.commandEngineerToTarget(eng, clickedStruct);
+        } else {
+          eng.targetEngineering = null;
+          eng.manualOrder = true;
+          if (this.commandUnitMove(eng, col, row, 'Engineer', true) && eng.path.length > 0) eng.manualMoveOrder = true;
+        }
+      } else if (action.unitType === 'soldier') {
+        const sol = this.soldiers.find((s) => s.id === action.unitId);
+        if (!sol) return;
+        if (sol.ownerId && sol.ownerId !== actorId) return;
+        if (clickedStruct && clickedStruct.type === 'barracks') {
+          this.commandSoldierToBarracks(sol, clickedStruct);
+        } else if (clickedStruct && clickedStruct.type === 'engineering') {
+          this.commandSoldierToEngineering(sol, clickedStruct);
+        } else {
+          sol.targetBunker = null;
+          sol.targetBarracks = null;
+          sol.targetEngineering = null;
+          sol.manualOrder = true;
+          if (this.commandUnitMove(sol, col, row, sol.isCommando ? 'Commando' : 'Soldier', !!sol.isCommando) && sol.path.length > 0) {
+            sol.manualMoveOrder = true;
+          }
+        }
+      }
+    }
+
+    serializeMpState() {
+      const szArr = [];
+      for (const sz of this.safeZones.values()) {
+        szArr.push({
+          id: sz.id, col: sz.col, row: sz.row, level: sz.level, hp: sz.hp, maxHp: sz.maxHp,
+          invested: sz.invested, preplaced: !!sz.preplaced,
+          ownerId: sz.ownerId || null, ownerSlot: sz.ownerSlot || 0, ownerColor: sz.ownerColor || null, ownerName: sz.ownerName || null
+        });
+      }
+      const stArr = [];
+      for (const st of this.structures.values()) {
+        stArr.push({
+          id: st.id, type: st.type, col: st.col, row: st.row, level: st.level, hp: st.hp, maxHp: st.maxHp,
+          kills: st.kills || 0, invested: st.invested || 0, preplaced: !!st.preplaced,
+          angle: st.angle || 0, capacity: st.capacity || 4,
+          trainTimer: st.trainTimer || 0, trainDuration: st.trainDuration || 0,
+          moveCooldown: st.moveCooldown || 0, moveDuration: st.moveDuration || 10,
+          spawnedCivs: st.spawnedCivs || 0,
+          occCount: st.occupants ? st.occupants.length : 0,
+          qLen: st.trainQueue ? st.trainQueue.length : 0,
+          activeT: st.activeTrainers ? st.activeTrainers.length : 0,
+          ownerId: st.ownerId || null, ownerSlot: st.ownerSlot || 0, ownerColor: st.ownerColor || null, ownerName: st.ownerName || null
+        });
+      }
+      const spArr = [];
+      for (const sp of this.spawns.values()) {
+        spArr.push({
+          col: sp.col, row: sp.row, hp: sp.hp, maxHp: sp.maxHp,
+          isRegenerating: !!sp.isRegenerating
+        });
+      }
+      return {
+        wave: this.wave,
+        waveState: this.waveState,
+        nextWaveTimer: this.nextWaveTimer,
+        threatMult: this.threatMult,
+        score: this.score,
+        savedCount: this.savedCount,
+        infectedCount: this.infectedCount,
+        civTotal: this.civTotal,
+        baseIntegrity: this.baseIntegrity,
+        totalCommandoKills: this.totalCommandoKills,
+        qCount: this.waveSpawnQueue.length,
+        wallets: { ...this.playerWallets },
+        grid: this.grid,
+        safeZones: szArr,
+        structures: stArr,
+        spawns: spArr,
+        civilians: this.civilians.map((c) => ({
+          id: c.id, x: Math.round(c.x), y: Math.round(c.y),
+          isIncubating: !!c.isIncubating, incubationTimer: c.incubationTimer || 0
+        })),
+        soldiers: this.soldiers.map((s) => ({
+          id: s.id, level: s.level, isCommando: !!s.isCommando,
+          x: Math.round(s.x), y: Math.round(s.y), hp: s.hp, maxHp: s.maxHp,
+          range: s.range, dmg: s.dmg, rate: s.rate, kills: s.kills || 0,
+          angle: s.angle || 0, name: s.name || '', color: s.color || '#38E8FF',
+          homeHubId: s.homeHubId || null, ownerId: s.ownerId || null
+        })),
+        engineers: this.engineers.map((e) => ({
+          id: e.id, level: e.level, x: Math.round(e.x), y: Math.round(e.y),
+          hp: e.hp, maxHp: e.maxHp, speed: e.speed, repairRate: e.repairRate,
+          repairedTotal: e.repairedTotal || 0, name: e.name || '', color: e.color || '#FFD23F',
+          homeHubId: e.homeHubId || null, ownerId: e.ownerId || null
+        })),
+        zombies: this.zombies.map((z) => ({
+          id: z.id, type: z.type, x: Math.round(z.x), y: Math.round(z.y),
+          hp: z.hp, maxHp: z.maxHp, radius: z.radius, color: z.color,
+          angle: z.angle || 0, slowTimer: z.slowTimer || 0, bruteBreach: !!z.bruteBreach
+        })),
+        projectiles: this.projectiles.map((p) => ({ ...p }))
+      };
+    }
+
+    applyMpState(snap) {
+      if (!this.isMultiplayer || this.isMpHost || !snap) return;
+
+      const prevSelKey = this.selectedStructure ? `${this.selectedStructure.col},${this.selectedStructure.row}` : null;
+      const prevSolId = this.selectedSoldier ? this.selectedSoldier.id : null;
+      const prevEngId = this.selectedEngineer ? this.selectedEngineer.id : null;
+      const prevCivId = this.selectedCivilian ? this.selectedCivilian.id : null;
+
+      this.wave = snap.wave || 0;
+      const prevState = this.waveState;
+      this.waveState = snap.waveState || STATE.PREPARE;
+      this.nextWaveTimer = Number(snap.nextWaveTimer) || 0;
+      this.threatMult = Number(snap.threatMult) || 1.0;
+      this.score = snap.score || 0;
+      this.savedCount = snap.savedCount || 0;
+      this.infectedCount = snap.infectedCount || 0;
+      this.civTotal = snap.civTotal || 0;
+      this.baseIntegrity = Number(snap.baseIntegrity) || 0;
+      this.totalCommandoKills = snap.totalCommandoKills || 0;
+      this.waveSpawnQueue = new Array(snap.qCount || 0).fill('walker');
+
+      if (snap.wallets) {
+        this.playerWallets = { ...snap.wallets };
+        if (this.localPlayerId && this.playerWallets[this.localPlayerId] !== undefined) {
+          this.scrap = this.playerWallets[this.localPlayerId];
+        }
+      }
+      if (snap.grid) this.grid = snap.grid;
+
+      this.safeZones.clear();
+      for (const sz of snap.safeZones || []) {
+        const p = tileCenter(sz.col, sz.row);
+        this.safeZones.set(`${sz.col},${sz.row}`, {
+          ...sz,
+          type: 'safezone',
+          x: p.x,
+          y: p.y,
+          flash: 0
+        });
+      }
+
+      this.structures.clear();
+      for (const st of snap.structures || []) {
+        const p = tileCenter(st.col, st.row);
+        this.structures.set(`${st.col},${st.row}`, {
+          ...st,
+          x: p.x,
+          y: p.y,
+          cooldown: 0,
+          flash: 0,
+          occupants: new Array(st.occCount || 0).fill(0).map(() => ({ isCommando: false, unitType: 'recruit', hp: 100, maxHp: 100 })),
+          trainQueue: new Array(st.qLen || 0).fill(0).map(() => ({ cost: 50, started: true })),
+          activeTrainers: new Array(st.activeT || 0).fill(0).map(() => ({ timer: st.trainTimer || 0 }))
+        });
+      }
+
+      this.spawns.clear();
+      for (const sp of snap.spawns || []) {
+        const p = tileCenter(sp.col, sp.row);
+        this.spawns.set(`${sp.col},${sp.row}`, {
+          type: 'spawn',
+          col: sp.col,
+          row: sp.row,
+          x: p.x,
+          y: p.y,
+          hp: sp.hp,
+          maxHp: sp.maxHp,
+          flash: 0,
+          timeSinceHit: 99,
+          isRegenerating: !!sp.isRegenerating
+        });
+      }
+
+      this.civilians = (snap.civilians || []).map((c) => ({
+        ...c,
+        radius: 6,
+        speed: 60,
+        path: [],
+        dest: null
+      }));
+      this.soldiers = (snap.soldiers || []).map((s) => ({
+        ...s,
+        radius: 7,
+        speed: 70,
+        path: [],
+        dest: null
+      }));
+      this.engineers = (snap.engineers || []).map((e) => ({
+        ...e,
+        radius: 7,
+        unitType: 'engineer',
+        path: [],
+        dest: null
+      }));
+      this.zombies = (snap.zombies || []).map((z) => ({
+        ...z,
+        speed: 45,
+        baseSpeed: 45,
+        path: []
+      }));
+      this.projectiles = snap.projectiles || [];
+
+      if (prevSelKey) {
+        const match = this.structures.get(prevSelKey) || this.safeZones.get(prevSelKey) || null;
+        this.selectedStructure = match;
+        if (match) this.renderUpgradePanel(match);
+        else this.closeUpgradePanel();
+      } else if (prevSolId) {
+        const sol = this.soldiers.find((s) => s.id === prevSolId) || null;
+        this.selectedSoldier = sol;
+        if (sol) this.renderSoldierInspector(sol);
+        else this.closeUpgradePanel();
+      } else if (prevEngId) {
+        const eng = this.engineers.find((e) => e.id === prevEngId) || null;
+        this.selectedEngineer = eng;
+        if (eng) this.renderEngineerInspector(eng);
+        else this.closeUpgradePanel();
+      } else if (prevCivId) {
+        this.selectedCivilian = this.civilians.find((c) => c.id === prevCivId) || null;
+      }
+
+      if (this.waveState === STATE.VICTORY && prevState !== STATE.VICTORY) {
+        this.onVictory();
+      } else if (this.waveState === STATE.GAMEOVER && prevState !== STATE.GAMEOVER) {
+        this.onDefeat('All green Base Safe Zone blocks were destroyed by the horde.');
+      }
+
+      this.updateHUD();
+      this.updateTimerHud();
     }
 
     toggleMute() {
@@ -2329,40 +3340,52 @@
       return 0;
     }
 
-    minChebyshevDistToSafeZone(col, row) {
+    minChebyshevDistToSafeZone(col, row, actorId = null) {
       let minDist = Infinity;
+      const effActor = this.getEffectiveActorId(actorId);
       for (const sz of this.safeZones.values()) {
+        if (this.isMultiplayer && effActor && sz.ownerId && sz.ownerId !== effActor) continue;
         const d = Math.max(Math.abs(col - sz.col), Math.abs(row - sz.row));
         if (d < minDist) minDist = d;
       }
       return minDist;
     }
 
-    isValidBarricadeTile(col, row) {
+    isValidBarricadeTile(col, row, actorId = null) {
       if (!inBounds(col, row)) return false;
       const key = `${col},${row}`;
       if (this.structures.has(key)) return false;
-      if (this.grid[row][col] === 2 && this.safeZones.has(key)) return true;
+      const effActor = this.getEffectiveActorId(actorId);
+      if (this.grid[row][col] === 2 && this.safeZones.has(key)) {
+        const sz = this.safeZones.get(key);
+        return !this.isMultiplayer || !effActor || !sz.ownerId || sz.ownerId === effActor;
+      }
       if (this.grid[row][col] !== 0 || this.safeZones.has(key)) return false;
-      return this.minChebyshevDistToSafeZone(col, row) <= 3;
+      return this.minChebyshevDistToSafeZone(col, row, effActor) <= 3;
     }
 
-    canBuildBarricadeAt(col, row) {
-      return this.isValidBarricadeTile(col, row);
+    canBuildBarricadeAt(col, row, actorId = null) {
+      return this.isValidBarricadeTile(col, row, actorId);
     }
 
-    isValidGateTile(col, row) {
+    isValidGateTile(col, row, actorId = null) {
       if (!inBounds(col, row)) return false;
       const key = `${col},${row}`;
+      const effActor = this.getEffectiveActorId(actorId);
       const existing = this.structures.get(key);
-      if (existing) return existing.type === 'wall';
-      return this.isValidBarricadeTile(col, row);
+      if (existing) {
+        return existing.type === 'wall' && (!this.isMultiplayer || !effActor || !existing.ownerId || existing.ownerId === effActor);
+      }
+      return this.isValidBarricadeTile(col, row, effActor);
     }
 
-    countStructures(type) {
+    countStructures(type, ownerId = null) {
       let count = 0;
       for (const s of this.structures.values()) {
-        if (s.type === type) count++;
+        if (s.type === type) {
+          if (this.isMultiplayer && ownerId && s.ownerId && s.ownerId !== ownerId) continue;
+          count++;
+        }
       }
       return count;
     }
@@ -3288,10 +4311,19 @@
       return this.isEndlessMode || this.wave < this.totalWaves || this.spawns.size > 0;
     }
 
-    triggerNextWaveEarly() {
+    triggerNextWaveEarly(actorId = null) {
       if (!this.canLaunchNextWave()) return;
+      if (this.isMultiplayer && !this.isMpHost) {
+        if (this.mp) this.mp.sendAction({ kind: 'next_wave' });
+        return;
+      }
       const bonus = this.computeEarlyWaveBonus();
-      this.scrap += bonus;
+      const effActor = this.getEffectiveActorId(actorId);
+      if (this.isMultiplayer) {
+        this.addPlayerScrap(effActor, bonus);
+      } else {
+        this.scrap += bonus;
+      }
       this.score += bonus * 2;
       this.addFloatingText(`+$${bonus} Early Wave!`, WIDTH / 2, 70, '#FFD700');
       this.launchNextWave(true, bonus);
@@ -3305,24 +4337,31 @@
       this.wave += 1;
       this.waveState = STATE.ACTIVE;
 
-      if (this.isEndlessMode || this.wave < this.totalWaves || this.spawns.size > 0) {
-        this.nextWaveTimer = this.isEndlessMode ? Math.max(25.0, 44.0 - this.wave * 1.0) : 45.0;
+      if (this.isEndlessMode || !Number.isFinite(this.totalWaves) || this.wave < this.totalWaves || this.spawns.size > 0) {
+        this.nextWaveTimer = (this.isEndlessMode || !Number.isFinite(this.totalWaves)) ? Math.max(25.0, 44.0 - this.wave * 1.0) : 45.0;
       } else {
         this.nextWaveTimer = 0;
       }
 
       // v1.9.0 Rule: Demolishers and Wreckers ONLY appear on Wave 6+ (never in Waves 1-5)
+      // v0.23.0 Multiplayer Scaling: 1.0x / 1.4x / 1.8x / 2.2x by player count
       const w = this.wave;
       const L = this.currentLevel;
       const allowSiege = w >= 6;
+      const mpScaleArr = [1.0, 1.0, 1.4, 1.8, 2.2];
+      const mpMult = this.isMultiplayer
+        ? (mpScaleArr[Math.min(4, Math.max(1, (this.mpPlayers || []).length))] || 1.0)
+        : 1.0;
+      const scaleCnt = (n) => (n > 0 ? Math.max(1, Math.round(n * mpMult)) : 0);
+
       const cfg = (this.isTutorialMode && w === 1)
         ? { walkers: 4, runners: 0, tanks: 0, demolishers: 0, wreckers: 0 }
         : {
-            walkers: 8 + L * 2 + w * 3,
-            runners: w >= 2 ? 3 + L + w * 2 : 0,
-            tanks: w >= 3 ? 2 + Math.floor((w - 2) * 1.3) : 0,
-            demolishers: allowSiege ? Math.min(2, 1 + Math.floor((w - 6) / 3)) : 0,
-            wreckers: allowSiege ? Math.min(2, 1 + Math.floor((w - 6) / 2)) : 0
+            walkers: scaleCnt(8 + L * 2 + w * 3),
+            runners: scaleCnt(w >= 2 ? 3 + L + w * 2 : 0),
+            tanks: scaleCnt(w >= 3 ? 2 + Math.floor((w - 2) * 1.3) : 0),
+            demolishers: scaleCnt(allowSiege ? Math.min(2, 1 + Math.floor((w - 6) / 3)) : 0),
+            wreckers: scaleCnt(allowSiege ? Math.min(2, 1 + Math.floor((w - 6) / 2)) : 0)
           };
 
       const batch = [];
@@ -3356,7 +4395,7 @@
 
       this.computeThreatMultipliers();
       const earlyNote = wasEarly ? ` (+$${earlyBonus} early launch bonus!)` : '';
-      const waveLabel = this.isEndlessMode
+      const waveLabel = (this.isEndlessMode || !Number.isFinite(this.totalWaves))
         ? `Wave ${this.wave} (Threat ${this.threatMult.toFixed(2)}x)`
         : `Wave ${this.wave}/${Math.max(this.totalWaves, this.wave)}`;
       const specials = [];
@@ -3456,7 +4495,12 @@
         this.spawns.delete(key);
         this.grid[breach.row][breach.col] = 0;
 
-        this.scrap += 100;
+        if (this.isMultiplayer) {
+          const ownerId = (sourceUnitOrStruct && sourceUnitOrStruct.ownerId) || this.getNearestSafeZoneOwner(breach.x, breach.y);
+          this.addPlayerScrap(ownerId, 100);
+        } else {
+          this.scrap += 100;
+        }
         this.score += 500;
         if (sourceUnitOrStruct) {
           sourceUnitOrStruct.kills = (sourceUnitOrStruct.kills || 0) + 1;
@@ -3679,6 +4723,10 @@
     }
 
     setPaused(p) {
+      if (this.isMultiplayer) {
+        this.isPaused = false;
+        return;
+      }
       this.isPaused = !!p;
       if (this.btnPause) this.btnPause.innerText = this.isPaused ? 'Resume' : 'Pause';
       if (this.tabPause) {
@@ -3690,7 +4738,7 @@
     }
 
     togglePause() {
-      if (!this.inPlay) return;
+      if (!this.inPlay || this.isMultiplayer) return;
       this.setPaused(!this.isPaused);
       this.showStatus(this.isPaused ? 'Defense paused.' : 'Defense resumed.');
     }
@@ -3742,6 +4790,14 @@
             this.sound.playHit();
             return;
           }
+          if (this.isMultiplayer && !this.isMpHost) {
+            if (this.mp) this.mp.sendAction({ kind: 'unit_move', unitType: 'soldier', unitId: this.selectedSoldier.id, col, row });
+            if (this.isMobileTouch) {
+              this.selectedSoldier = null;
+              this.closeUpgradePanel();
+            }
+            return;
+          }
           this.commandSoldierToBarracks(this.selectedSoldier, clickedStruct);
           if (this.isMobileTouch) {
             this.selectedSoldier = null;
@@ -3756,6 +4812,14 @@
             this.sound.playHit();
             return;
           }
+          if (this.isMultiplayer && !this.isMpHost) {
+            if (this.mp) this.mp.sendAction({ kind: 'unit_move', unitType: 'soldier', unitId: this.selectedSoldier.id, col, row });
+            if (this.isMobileTouch) {
+              this.selectedSoldier = null;
+              this.closeUpgradePanel();
+            }
+            return;
+          }
           this.commandSoldierToEngineering(this.selectedSoldier, clickedStruct);
           if (this.isMobileTouch) {
             this.selectedSoldier = null;
@@ -3767,6 +4831,14 @@
 
       // Engineer selected -> clicking Engineering puts Engineer on standby inside (+6 HP/s)
       if (this.selectedEngineer && clickedStruct && clickedStruct.type === 'engineering') {
+        if (this.isMultiplayer && !this.isMpHost) {
+          if (this.mp) this.mp.sendAction({ kind: 'unit_move', unitType: 'engineer', unitId: this.selectedEngineer.id, col, row });
+          if (this.isMobileTouch) {
+            this.selectedEngineer = null;
+            this.closeUpgradePanel();
+          }
+          return;
+        }
         this.commandEngineerToEngineering(this.selectedEngineer, clickedStruct);
         if (this.isMobileTouch) {
           this.selectedEngineer = null;
@@ -3853,6 +4925,14 @@
 
       // Issue move order if a Civilian is selected
       if (this.selectedCivilian) {
+        if (this.isMultiplayer && !this.isMpHost) {
+          if (this.mp) this.mp.sendAction({ kind: 'unit_move', unitType: 'civilian', unitId: this.selectedCivilian.id, col, row });
+          if (this.isMobileTouch) {
+            this.selectedCivilian = null;
+            this.closeUpgradePanel();
+          }
+          return;
+        }
         this.selectedCivilian.targetBarracks = null;
         if (this.commandCivilianMove(this.selectedCivilian, col, row)) {
           if (this.selectedCivilian.path.length > 0) this.selectedCivilian.manualMoveOrder = true;
@@ -3866,6 +4946,19 @@
 
       // Issue move order if an Engineer is selected (Strict Safe Zone Territory Confinement)
       if (this.selectedEngineer) {
+        if (this.isMultiplayer && !this.isMpHost) {
+          if (!this.selectedEngineer.ownerId || this.selectedEngineer.ownerId === this.localPlayerId) {
+            if (this.mp) this.mp.sendAction({ kind: 'unit_move', unitType: 'engineer', unitId: this.selectedEngineer.id, col, row });
+          } else {
+            this.showStatus('Cannot command another player\'s Engineer.');
+            this.sound.playHit();
+          }
+          if (this.isMobileTouch) {
+            this.selectedEngineer = null;
+            this.closeUpgradePanel();
+          }
+          return;
+        }
         if (clickedStruct && clickedStruct.type !== 'safezone' && !(clickedStruct.type === 'gate' && clickedStruct.hp >= clickedStruct.maxHp)) {
           this.commandEngineerToTarget(this.selectedEngineer, clickedStruct);
           if (this.isMobileTouch) {
@@ -3890,6 +4983,19 @@
       if (this.selectedSoldier) {
         if (clickedStruct && clickedStruct.type !== 'safezone' && clickedStruct.type !== 'gate') {
           this.selectStructure(clickedStruct);
+          return;
+        }
+        if (this.isMultiplayer && !this.isMpHost) {
+          if (!this.selectedSoldier.ownerId || this.selectedSoldier.ownerId === this.localPlayerId) {
+            if (this.mp) this.mp.sendAction({ kind: 'unit_move', unitType: 'soldier', unitId: this.selectedSoldier.id, col, row });
+          } else {
+            this.showStatus('Cannot command another player\'s unit.');
+            this.sound.playHit();
+          }
+          if (this.isMobileTouch) {
+            this.selectedSoldier = null;
+            this.closeUpgradePanel();
+          }
           return;
         }
         this.selectedSoldier.targetBunker = null;
@@ -3922,19 +5028,29 @@
     }
 
     // --- PERIMETER 8-WAY ADJACENCY CHECK & BUILDING ---
-    hasAdjacentStructureOrBase(col, row) {
+    hasAdjacentStructureOrBase(col, row, actorId = null) {
+      const effActor = this.getEffectiveActorId(actorId);
       for (let i = 0; i < DIRS_8.length; i++) {
         const nc = col + DIRS_8[i][0];
         const nr = row + DIRS_8[i][1];
         if (!inBounds(nc, nr)) continue;
-        if (this.grid[nr][nc] === 2 || this.safeZones.has(`${nc},${nr}`)) return true;
-        if (this.structures.has(`${nc},${nr}`)) return true;
+        const nKey = `${nc},${nr}`;
+        const sz = this.safeZones.get(nKey);
+        if (sz) {
+          if (!this.isMultiplayer || !effActor || !sz.ownerId || sz.ownerId === effActor) return true;
+        } else if (!this.isMultiplayer && this.grid[nr][nc] === 2) {
+          return true;
+        }
+        const st = this.structures.get(nKey);
+        if (st) {
+          if (!this.isMultiplayer || !effActor || !st.ownerId || st.ownerId === effActor) return true;
+        }
       }
       return false;
     }
 
-    hasAdjacentAnchor(col, row) {
-      return this.hasAdjacentStructureOrBase(col, row);
+    hasAdjacentAnchor(col, row, actorId = null) {
+      return this.hasAdjacentStructureOrBase(col, row, actorId);
     }
 
     hasAdjacentSafeZone(col, row) {
@@ -3947,16 +5063,21 @@
       return false;
     }
 
-    canBuildSafeZoneAt(col, row) {
+    canBuildSafeZoneAt(col, row, actorId = null) {
       if (!inBounds(col, row)) return false;
       const key = `${col},${row}`;
       if (this.safeZones.has(key)) return false;
-      // Can build Safe Zone on empty ground 8-way adjacent OR directly atop an existing structure
-      if (this.structures.has(key)) return true;
-      return this.grid[row][col] === 0 && this.hasAdjacentAnchor(col, row);
+      const effActor = this.getEffectiveActorId(actorId);
+      // Can build Safe Zone on empty ground 8-way adjacent OR directly atop own existing structure
+      if (this.structures.has(key)) {
+        const st = this.structures.get(key);
+        return !this.isMultiplayer || !effActor || !st.ownerId || st.ownerId === effActor;
+      }
+      return this.grid[row][col] === 0 && this.hasAdjacentAnchor(col, row, effActor);
     }
 
-    getSafeZoneDragPlan(startCol, startRow, curCol, curRow) {
+    getSafeZoneDragPlan(startCol, startRow, curCol, curRow, actorId = null) {
+      const effActor = this.getEffectiveActorId(actorId);
       const minC = Math.max(0, Math.min(startCol, curCol));
       const maxC = Math.min(COLS - 1, Math.max(startCol, curCol));
       const minR = Math.max(0, Math.min(startRow, curRow));
@@ -3966,7 +5087,10 @@
         for (let c = minC; c <= maxC; c++) {
           const key = `${c},${r}`;
           if (this.safeZones.has(key)) continue;
-          if (this.structures.has(key) || this.grid[r][c] === 0) {
+          const st = this.structures.get(key);
+          if (st) {
+            if (!this.isMultiplayer || !effActor || !st.ownerId || st.ownerId === effActor) eligible.add(key);
+          } else if (this.grid[r][c] === 0) {
             eligible.add(key);
           }
         }
@@ -3978,7 +5102,7 @@
         for (let c = minC; c <= maxC; c++) {
           const key = `${c},${r}`;
           if (!eligible.has(key)) continue;
-          if (this.canBuildSafeZoneAt(c, r)) {
+          if (this.canBuildSafeZoneAt(c, r, effActor)) {
             visited.add(key);
             q.push([c, r]);
           }
@@ -3998,7 +5122,8 @@
         }
       }
       const unitCost = STRUCTURE_SPECS.safezone.baseCost;
-      const affordCount = Math.min(orderedTiles.length, Math.floor(this.scrap / unitCost));
+      const wallet = this.getPlayerWallet(effActor);
+      const affordCount = Math.min(orderedTiles.length, Math.floor(wallet / unitCost));
       return {
         minC,
         maxC,
@@ -4011,11 +5136,12 @@
       };
     }
 
-    executeSafeZoneDragPurchase(startCol, startRow, curCol, curRow) {
-      const plan = this.getSafeZoneDragPlan(startCol, startRow, curCol, curRow);
+    executeSafeZoneDragPurchase(startCol, startRow, curCol, curRow, actorId = null) {
+      const effActor = this.getEffectiveActorId(actorId);
+      const plan = this.getSafeZoneDragPlan(startCol, startRow, curCol, curRow, effActor);
       if (plan.orderedTiles.length === 0) {
         const p = tileCenter(curCol, curRow);
-        this.showStatus('Safe Zones must connect to existing base/structures.');
+        this.showStatus('Safe Zones must connect to your existing base/structures.');
         this.addFloatingText('No Connected Tiles!', p.x, p.y - 12, '#FF3333');
         this.sound.playHit();
         return;
@@ -4029,8 +5155,18 @@
         return;
       }
 
+      if (this.isMultiplayer && !this.isMpHost) {
+        if (this.mp) this.mp.sendAction({ kind: 'sz_drag', sc: startCol, sr: startRow, cc: curCol, cr: curRow });
+        if (this.isMobileTouch) {
+          this.selectedBuildType = null;
+          this.updateBuildPanelUI();
+        }
+        return;
+      }
+
+      if (!this.spendPlayerScrap(effActor, plan.totalCost)) return;
       const lv = STRUCTURE_SPECS.safezone.levels[0];
-      this.scrap -= plan.totalCost;
+      const pMeta = this.getPlayerMeta(effActor);
       let lastX = 0;
       let lastY = 0;
       for (let i = 0; i < plan.affordableTiles.length; i++) {
@@ -4051,23 +5187,28 @@
           y: p.y,
           invested: unitCost,
           preplaced: false,
-          flash: 0
+          flash: 0,
+          ownerId: effActor || null,
+          ownerSlot: pMeta ? pMeta.slot : 0,
+          ownerColor: pMeta ? pMeta.color : null,
+          ownerName: pMeta ? pMeta.callsign : null
         });
         this.grid[r][c] = 2;
-        this.addParticles(p.x, p.y, '#00E08A', 5, 36);
+        this.addParticles(p.x, p.y, (pMeta && pMeta.color) || '#00E08A', 5, 36);
       }
       this.recalcBaseIntegrity();
       this.sound.playClick();
       this.addFloatingText(`-$${plan.totalCost}`, lastX, lastY - 12, '#00E08A');
       this.updateHUD();
       this.showStatus(`Painted ${plan.affordableTiles.length} Safe Zone tile${plan.affordableTiles.length > 1 ? 's' : ''} (-$${plan.totalCost}).`);
-      if (this.isMobileTouch) {
+      if (this.isMobileTouch && (!effActor || effActor === this.localPlayerId)) {
         this.selectedBuildType = null;
         this.updateBuildPanelUI();
       }
     }
 
-    getWallLineDragPlan(startCol, startRow, curCol, curRow, type = 'wall') {
+    getWallLineDragPlan(startCol, startRow, curCol, curRow, type = 'wall', actorId = null) {
+      const effActor = this.getEffectiveActorId(actorId);
       const sc = Math.max(0, Math.min(COLS - 1, startCol));
       const sr = Math.max(0, Math.min(ROWS - 1, startRow));
       const cc = Math.max(0, Math.min(COLS - 1, curCol));
@@ -4085,13 +5226,16 @@
         }
       }
       const unitCost = STRUCTURE_SPECS[type]?.baseCost || (type === 'gate' ? 100 : 10);
-      let affordQuota = Math.floor(this.scrap / unitCost);
+      const wallet = this.getPlayerWallet(effActor);
+      let affordQuota = Math.floor(wallet / unitCost);
       const validAffordable = [];
       const validUnaffordable = [];
       const invalidTiles = [];
       for (let i = 0; i < coords.length; i++) {
         const [c, r] = coords[i];
-        const isValid = type === 'gate' ? this.isValidGateTile(c, r) : this.isValidBarricadeTile(c, r);
+        const isValid = type === 'gate'
+          ? this.isValidGateTile(c, r, effActor)
+          : this.isValidBarricadeTile(c, r, effActor);
         if (isValid) {
           if (validAffordable.length < affordQuota) {
             validAffordable.push([c, r]);
@@ -4112,8 +5256,9 @@
       };
     }
 
-    executeWallLineDragPurchase(startCol, startRow, curCol, curRow, type = 'wall') {
-      const plan = this.getWallLineDragPlan(startCol, startRow, curCol, curRow, type);
+    executeWallLineDragPurchase(startCol, startRow, curCol, curRow, type = 'wall', actorId = null) {
+      const effActor = this.getEffectiveActorId(actorId);
+      const plan = this.getWallLineDragPlan(startCol, startRow, curCol, curRow, type, effActor);
       const spec = STRUCTURE_SPECS[type] || STRUCTURE_SPECS.wall;
       if (plan.validAffordable.length === 0) {
         const p = tileCenter(curCol, curRow);
@@ -4122,8 +5267,8 @@
           this.addFloatingText('Insufficient Scrap', p.x, p.y - 12, '#FF3333');
         } else {
           const msg = type === 'gate'
-            ? 'Gates must be on Barricades, Safe Zones, or within 3 tiles of a Safe Zone!'
-            : 'Barricades must be placed on Safe Zones or empty tiles within 3 tiles of a Safe Zone!';
+            ? 'Gates must be on your Barricades, Safe Zones, or within 3 tiles of your Safe Zone!'
+            : 'Barricades must be on your Safe Zones or empty tiles within 3 tiles of your Safe Zone!';
           this.showStatus(msg);
           this.addFloatingText('Max 3 Tiles From Safe Zone!', p.x, p.y - 12, '#FF3333');
         }
@@ -4131,8 +5276,18 @@
         return;
       }
 
+      if (this.isMultiplayer && !this.isMpHost) {
+        if (this.mp) this.mp.sendAction({ kind: 'line_drag', sc: startCol, sr: startRow, cc: curCol, cr: curRow, bType: type });
+        if (this.isMobileTouch) {
+          this.selectedBuildType = null;
+          this.updateBuildPanelUI();
+        }
+        return;
+      }
+
+      if (!this.spendPlayerScrap(effActor, plan.totalCost)) return;
       const lv = spec.levels[0];
-      this.scrap -= plan.totalCost;
+      const pMeta = this.getPlayerMeta(effActor);
       let lastX = 0;
       let lastY = 0;
       let replacedCount = 0;
@@ -4160,7 +5315,11 @@
           invested: spec.baseCost,
           preplaced: false,
           angle: -Math.PI / 2,
-          flash: 0
+          flash: 0,
+          ownerId: effActor || null,
+          ownerSlot: pMeta ? pMeta.slot : 0,
+          ownerColor: pMeta ? pMeta.color : null,
+          ownerName: pMeta ? pMeta.callsign : null
         });
         if (type === 'wall' && !this.safeZones.has(key)) {
           this.grid[r][c] = 4;
@@ -4176,21 +5335,22 @@
       const count = plan.validAffordable.length;
       const desc = replacedCount > 0 ? ` (${replacedCount} replaced Barricades)` : '';
       this.showStatus(`Built ${count} ${name}${count > 1 ? 's' : ''}${desc} (-$${plan.totalCost}).`);
-      if (this.isMobileTouch) {
+      if (this.isMobileTouch && (!effActor || effActor === this.localPlayerId)) {
         this.selectedBuildType = null;
         this.updateBuildPanelUI();
       }
     }
 
-    attemptBuild(type, col, row) {
+    attemptBuild(type, col, row, actorId = null) {
       const spec = STRUCTURE_SPECS[type];
       if (!spec || !inBounds(col, row)) return;
       const key = `${col},${row}`;
       const p = tileCenter(col, row);
+      const effActor = this.getEffectiveActorId(actorId);
 
-      if (type === 'habitat' && this.countStructures('habitat') >= this.getMaxHabitats()) {
+      if (type === 'habitat' && this.countStructures('habitat', effActor) >= this.getMaxHabitats()) {
         const cap = this.getMaxHabitats();
-        this.showStatus(`Max ${cap} Habitat${cap > 1 ? 's' : ''} allowed!`);
+        this.showStatus(`Max ${cap} Habitat${cap > 1 ? 's' : ''} allowed per base!`);
         this.addFloatingText(`Max ${cap} Habitat${cap > 1 ? 's' : ''}!`, p.x, p.y - 12, '#FF3333');
         this.sound.playHit();
         return;
@@ -4203,16 +5363,24 @@
           this.sound.playHit();
           return;
         }
-        if (!this.structures.has(key)) {
+        if (this.structures.has(key)) {
+          const existing = this.structures.get(key);
+          if (this.isMultiplayer && effActor && existing.ownerId && existing.ownerId !== effActor) {
+            this.showStatus('Cannot expand Safe Zone onto another player\'s structure!');
+            this.addFloatingText('Not Your Territory!', p.x, p.y - 12, '#FF3333');
+            this.sound.playHit();
+            return;
+          }
+        } else {
           if (this.grid[row][col] !== 0) {
             this.showStatus('Invalid tile: cannot place Safe Zone on rock or Spawn Breach.');
             this.addFloatingText('Invalid Tile', p.x, p.y - 12, '#FF3333');
             this.sound.playHit();
             return;
           }
-          if (!this.hasAdjacentStructureOrBase(col, row)) {
-            this.showStatus(`${spec.name} must be adjacent to base/structure or placed atop an existing structure.`);
-            this.addFloatingText('Build beside structure/base!', p.x, p.y - 12, '#FF3333');
+          if (!this.hasAdjacentStructureOrBase(col, row, effActor)) {
+            this.showStatus(`${spec.name} must be adjacent to your base/structure.`);
+            this.addFloatingText('Build beside your base!', p.x, p.y - 12, '#FF3333');
             this.sound.playHit();
             return;
           }
@@ -4226,23 +5394,23 @@
           this.sound.playHit();
           return;
         }
-        if (!this.isValidBarricadeTile(col, row)) {
-          this.showStatus('Must be within 3 tiles of a Safe Zone!');
+        if (!this.isValidBarricadeTile(col, row, effActor)) {
+          this.showStatus('Must be within 3 tiles of your Safe Zone!');
           this.addFloatingText('Max 3 Tiles From Safe Zone!', p.x, p.y - 12, '#FF3333');
           this.sound.playHit();
           return;
         }
       } else if (type === 'gate') {
-        if (!this.isValidGateTile(col, row)) {
+        if (!this.isValidGateTile(col, row, effActor)) {
           const existing = this.structures.get(key);
           if (existing && existing.type !== 'wall') {
-            this.showStatus('Gate can only replace a Barricade or be placed on an unoccupied tile.');
+            this.showStatus('Gate can only replace your Barricade or be placed on an unoccupied tile.');
             this.addFloatingText('Tile Occupied!', p.x, p.y - 12, '#FF3333');
           } else if (this.grid[row][col] !== 0 && this.grid[row][col] !== 2) {
             this.showStatus('Invalid tile: cannot build Gate on rock or Spawn Breach.');
             this.addFloatingText('Invalid Tile', p.x, p.y - 12, '#FF3333');
           } else {
-            this.showStatus('Gate must be on a Barricade, Safe Zone, or within 3 tiles of a Safe Zone!');
+            this.showStatus('Gate must be within 3 tiles of your Safe Zone!');
             this.addFloatingText('Max 3 Tiles From Safe Zone!', p.x, p.y - 12, '#FF3333');
           }
           this.sound.playHit();
@@ -4256,6 +5424,13 @@
           this.sound.playHit();
           return;
         }
+        const sz = this.safeZones.get(key);
+        if (this.isMultiplayer && effActor && sz && sz.ownerId && sz.ownerId !== effActor) {
+          this.showStatus('Cannot build on another player\'s Safe Zone!');
+          this.addFloatingText('Ally Territory!', p.x, p.y - 12, '#FF9A1F');
+          this.sound.playHit();
+          return;
+        }
         if (this.structures.has(key)) {
           this.showStatus('This green Safe Zone tile already has a structure built on it.');
           this.addFloatingText('Tile Occupied!', p.x, p.y - 12, '#FF3333');
@@ -4264,15 +5439,25 @@
         }
       }
 
-      if (this.scrap < spec.baseCost) {
+      if (this.getPlayerWallet(effActor) < spec.baseCost) {
         this.showStatus(`Insufficient Scrap: need $${spec.baseCost}.`);
         this.addFloatingText('Insufficient Scrap', p.x, p.y - 12, '#FF3333');
         this.sound.playHit();
         return;
       }
 
-      this.scrap -= spec.baseCost;
+      if (this.isMultiplayer && !this.isMpHost) {
+        if (this.mp) this.mp.sendAction({ kind: 'build', type, col, row });
+        if (this.isMobileTouch) {
+          this.selectedBuildType = null;
+          this.updateBuildPanelUI();
+        }
+        return;
+      }
+
+      if (!this.spendPlayerScrap(effActor, spec.baseCost)) return;
       const lv = spec.levels[0];
+      const pMeta = this.getPlayerMeta(effActor);
 
       if (type === 'safezone') {
         const hadStruct = this.structures.has(key);
@@ -4288,16 +5473,24 @@
           y: p.y,
           invested: spec.baseCost,
           preplaced: false,
-          flash: 0
+          flash: 0,
+          ownerId: effActor || null,
+          ownerSlot: pMeta ? pMeta.slot : 0,
+          ownerColor: pMeta ? pMeta.color : null,
+          ownerName: pMeta ? pMeta.callsign : null
         };
         this.safeZones.set(key, szBlock);
         this.grid[row][col] = 2;
         this.recalcBaseIntegrity();
         this.sound.playClick();
         this.addFloatingText(`-$${spec.baseCost}`, p.x, p.y - 10, '#00E08A');
-        this.addParticles(p.x, p.y, '#00E08A', 8, 45);
+        this.addParticles(p.x, p.y, (pMeta && pMeta.color) || '#00E08A', 8, 45);
         this.updateHUD();
         this.showStatus(hadStruct ? 'Safe Zone expanded directly under existing structure! (+1% DMG)' : 'Constructed Safe Zone Block (Lv1, +1% DMG Aura).');
+        if (this.isMobileTouch && (!effActor || effActor === this.localPlayerId)) {
+          this.selectedBuildType = null;
+          this.updateBuildPanelUI();
+        }
         return;
       } else {
         const struct = {
@@ -4315,7 +5508,11 @@
           invested: spec.baseCost,
           preplaced: false,
           angle: -Math.PI / 2,
-          flash: 0
+          flash: 0,
+          ownerId: effActor || null,
+          ownerSlot: pMeta ? pMeta.slot : 0,
+          ownerColor: pMeta ? pMeta.color : null,
+          ownerName: pMeta ? pMeta.callsign : null
         };
         if (type === 'barracks' || type === 'engineering') {
           struct.capacity = lv.capacity || 4;
@@ -5064,19 +6261,30 @@
       return { x: struct.x, y: struct.y };
     }
 
-    trainFromSelectedBuilding(struct) {
+    trainFromSelectedBuilding(struct, actorId = null) {
       if (!this.inPlay || !struct) return;
-      if (struct.type === 'barracks') this.trainUnitFromBarracks(struct);
-      else if (struct.type === 'engineering') this.trainUnitFromEngineering(struct);
-      else if (struct.type === 'habitat') this.trainUnitFromHabitat(struct);
+      const effActor = this.getEffectiveActorId(actorId);
+      if (this.isMultiplayer && struct.ownerId && effActor && struct.ownerId !== effActor) {
+        this.showStatus('Cannot train from another player\'s building.');
+        this.sound.playHit();
+        return;
+      }
+      if (this.isMultiplayer && !this.isMpHost) {
+        if (this.mp) this.mp.sendAction({ kind: 'train', key: `${struct.col},${struct.row}` });
+        return;
+      }
+      if (struct.type === 'barracks') this.trainUnitFromBarracks(struct, effActor);
+      else if (struct.type === 'engineering') this.trainUnitFromEngineering(struct, effActor);
+      else if (struct.type === 'habitat') this.trainUnitFromHabitat(struct, effActor);
     }
 
     hasRecruitOccupant(struct) {
       return !!(struct && struct.occupants && struct.occupants.some((u) => !u.isCommando && u.unitType !== 'engineer'));
     }
 
-    trainUnitFromBarracks(barracks) {
+    trainUnitFromBarracks(barracks, actorId = null) {
       if (!this.inPlay || !barracks || barracks.type !== 'barracks') return;
+      const effActor = this.getEffectiveActorId(actorId || barracks.ownerId);
       if (!barracks.trainQueue) barracks.trainQueue = [];
       if (!barracks.activeTrainers) barracks.activeTrainers = [];
       const maxRoster = STRUCTURE_SPECS.barracks.maxRoster || 4;
@@ -5094,14 +6302,13 @@
         return;
       }
       const trainCost = STRUCTURE_SPECS.barracks.trainCost || 75;
-      if (this.scrap < trainCost) {
+      if (!this.spendPlayerScrap(effActor, trainCost)) {
         this.showStatus(`Insufficient Scrap: training a Commando requires $${trainCost}.`);
         this.addFloatingText('Insufficient Scrap', barracks.x, barracks.y - 12, '#FF3333');
         this.sound.playHit();
         return;
       }
 
-      this.scrap -= trainCost;
       barracks.trainQueue.push({
         id: Math.random().toString(36).slice(2, 11),
         cost: trainCost,
@@ -5140,6 +6347,7 @@
       this.score += 200;
       const exitPos = this.findSafeExitPos(barracks, false, false, true);
       const commando = this.createCommando(exitPos.x, exitPos.y, recruit, barracks.level || 1, barracks.id);
+      commando.ownerId = barracks.ownerId || recruit.ownerId || null;
       this.soldiers.push(commando);
       barracks.trainTimer = barracks.activeTrainers && barracks.activeTrainers.length > 0
         ? Math.min(...barracks.activeTrainers.map((t) => t.timer))
@@ -5153,8 +6361,9 @@
       if (this.selectedStructure === barracks) this.renderUpgradePanel(barracks);
     }
 
-    trainUnitFromEngineering(engBld) {
+    trainUnitFromEngineering(engBld, actorId = null) {
       if (!this.inPlay || !engBld || engBld.type !== 'engineering') return;
+      const effActor = this.getEffectiveActorId(actorId || engBld.ownerId);
       if (!engBld.trainQueue) engBld.trainQueue = [];
       if (!engBld.activeTrainers) engBld.activeTrainers = [];
       const maxRoster = STRUCTURE_SPECS.engineering.maxRoster || 4;
@@ -5172,14 +6381,13 @@
         return;
       }
       const trainCost = STRUCTURE_SPECS.engineering.trainCost || 50;
-      if (this.scrap < trainCost) {
+      if (!this.spendPlayerScrap(effActor, trainCost)) {
         this.showStatus(`Insufficient Scrap: training an Engineer requires $${trainCost}.`);
         this.addFloatingText('Insufficient Scrap', engBld.x, engBld.y - 12, '#FF3333');
         this.sound.playHit();
         return;
       }
 
-      this.scrap -= trainCost;
       engBld.trainQueue.push({
         id: Math.random().toString(36).slice(2, 11),
         cost: trainCost,
@@ -5225,6 +6433,7 @@
         level: lvSpec.level,
         name: lvSpec.name,
         homeHubId: engBld.id,
+        ownerId: engBld.ownerId || recruit.ownerId || null,
         x: spawnPos.x,
         y: spawnPos.y,
         radius: 7,
@@ -5257,8 +6466,9 @@
       if (this.selectedStructure === engBld) this.renderUpgradePanel(engBld);
     }
 
-    trainUnitFromHabitat(habitat) {
+    trainUnitFromHabitat(habitat, actorId = null) {
       if (!this.inPlay || !habitat || habitat.type !== 'habitat') return;
+      const effActor = this.getEffectiveActorId(actorId || habitat.ownerId);
       if (!habitat.trainQueue) habitat.trainQueue = [];
       const maxQ = STRUCTURE_SPECS.habitat.maxQueue || 20;
       if (habitat.trainQueue.length >= maxQ) {
@@ -5268,14 +6478,12 @@
         return;
       }
       const trainCost = STRUCTURE_SPECS.habitat.trainCost || 65;
-      if (this.scrap < trainCost) {
+      if (!this.spendPlayerScrap(effActor, trainCost)) {
         this.showStatus(`Insufficient Scrap: Habitat civilian recruitment requires $${trainCost}.`);
         this.addFloatingText('Insufficient Scrap', habitat.x, habitat.y - 12, '#FF3333');
         this.sound.playHit();
         return;
       }
-
-      this.scrap -= trainCost;
       const lv = STRUCTURE_SPECS.habitat.levels[habitat.level - 1];
       if (habitat.trainQueue.length === 0) {
         habitat.trainDuration = lv.trainDuration || 3.5;
@@ -5357,7 +6565,7 @@
         if (exits.length === 0) exits.push([struct.col, struct.row]);
         for (let i = 0; i < struct.activeTrainers.length; i++) {
           const tr = struct.activeTrainers[i];
-          if (refundAll) this.scrap += tr.cost || 0;
+          if (refundAll) this.addPlayerScrap(struct.ownerId, tr.cost || 0);
           if (tr.unit) {
             const spot = exits[i % exits.length];
             const p = tileCenter(spot[0], spot[1]);
@@ -5379,7 +6587,7 @@
       }
       if (struct.trainQueue && struct.trainQueue.length > 0) {
         for (const order of struct.trainQueue) {
-          if (refundAll) this.scrap += order.cost || 0;
+          if (refundAll) this.addPlayerScrap(struct.ownerId, order.cost || 0);
           if (order.assignedRecruitId) {
             const rec = this.soldiers.find((s) => s.id === order.assignedRecruitId);
             if (rec && rec.assignedHubId === struct.id) {
@@ -5396,10 +6604,22 @@
       struct.trainTimer = 0;
     }
 
-    releaseGarrisonedUnits(struct, wasDestroyed = false) {
+    releaseGarrisonedUnits(struct, wasDestroyed = false, actorId = null) {
       if (!struct || (struct.type !== 'barracks' && struct.type !== 'engineering') || !struct.occupants || struct.occupants.length === 0) {
         if (!wasDestroyed) this.showStatus('No units currently garrisoned inside.');
         return;
+      }
+      if (!wasDestroyed && this.isMultiplayer) {
+        const effActor = this.getEffectiveActorId(actorId);
+        if (struct.ownerId && effActor && struct.ownerId !== effActor) {
+          this.showStatus('Cannot release units from another player\'s building.');
+          this.sound.playHit();
+          return;
+        }
+        if (!this.isMpHost) {
+          if (this.mp) this.mp.sendAction({ kind: 'release', key: `${struct.col},${struct.row}` });
+          return;
+        }
       }
 
       const commSafeExits = [];
@@ -5857,6 +7077,7 @@
           const moveCost = Math.round((struct.invested || spec.baseCost) * 0.2);
           const onMoveCd = (struct.moveCooldown || 0) > 0;
           const isMovingThis = this.movingStructure === struct;
+          const notMine = this.isMultiplayer && struct.ownerId && struct.ownerId !== this.localPlayerId;
           const moveBtnLabel = this.btnMoveStructure.querySelector('span:first-child');
           if (onMoveCd) {
             if (moveBtnLabel) moveBtnLabel.innerText = 'Building';
@@ -5867,7 +7088,7 @@
           } else {
             if (moveBtnLabel) moveBtnLabel.innerText = isMovingThis ? 'Cancel' : 'Move';
             if (this.moveCostLabel) this.moveCostLabel.innerText = `$${moveCost}`;
-            this.btnMoveStructure.disabled = !isMovingThis && this.scrap < moveCost;
+            this.btnMoveStructure.disabled = notMine || (!isMovingThis && this.scrap < moveCost);
             this.btnMoveStructure.classList.toggle('moving-active', isMovingThis);
             this.btnMoveStructure.classList.remove('on-cooldown');
           }
@@ -5877,6 +7098,10 @@
         }
       }
 
+      const notMine = this.isMultiplayer && struct.ownerId && struct.ownerId !== this.localPlayerId;
+      if (this.btnTrainUnit && notMine) this.btnTrainUnit.disabled = true;
+      if (this.btnRelease && notMine) this.btnRelease.disabled = true;
+
       const upgradeBtnLabel = this.btnUpgrade ? this.btnUpgrade.querySelector('span:first-child') : null;
       if (struct.type === 'safezone') {
         if (upgradeBtnLabel) upgradeBtnLabel.innerText = 'N/A';
@@ -5885,7 +7110,7 @@
       } else {
         if (upgradeBtnLabel) upgradeBtnLabel.innerText = this.isMobileTouch ? 'Upgrade' : 'Upgrade [W]';
         if (this.upgradeCostLabel) this.upgradeCostLabel.innerText = next ? `$${next.cost}` : 'MAX';
-        if (this.btnUpgrade) this.btnUpgrade.disabled = !next || this.scrap < next.cost;
+        if (this.btnUpgrade) this.btnUpgrade.disabled = notMine || !next || this.scrap < next.cost;
       }
 
       if (struct.type === 'safezone') {
@@ -5907,7 +7132,7 @@
         }
         if (this.salvageRefundLabel) this.salvageRefundLabel.innerText = `+$${refund}`;
         if (this.btnSalvage) {
-          this.btnSalvage.disabled = false;
+          this.btnSalvage.disabled = notMine;
           this.btnSalvage.title = 'Dismantle structure for a 60% refund';
           this.btnSalvage.classList.toggle('confirming', isConfirmingSalvage);
         }
@@ -6025,28 +7250,51 @@
     upgradeSelectedEntity() {
       if (!this.inPlay) return;
       if (this.selectedSoldier) {
-        this.upgradeSelectedSoldier();
+        if (this.isMultiplayer && !this.isMpHost) {
+          if (this.mp) this.mp.sendAction({ kind: 'upgrade_unit', unitType: 'soldier', unitId: this.selectedSoldier.id });
+          return;
+        }
+        this.upgradeSoldierForActor(this.selectedSoldier, this.localPlayerId);
         return;
       }
       if (this.selectedEngineer) {
-        this.upgradeSelectedEngineer();
+        if (this.isMultiplayer && !this.isMpHost) {
+          if (this.mp) this.mp.sendAction({ kind: 'upgrade_unit', unitType: 'engineer', unitId: this.selectedEngineer.id });
+          return;
+        }
+        this.upgradeEngineerForActor(this.selectedEngineer, this.localPlayerId);
         return;
       }
       const s = this.selectedStructure;
       if (!s) return;
+      if (this.isMultiplayer && s.ownerId && s.ownerId !== this.localPlayerId) {
+        this.showStatus('Cannot upgrade another player\'s structure.');
+        this.sound.playHit();
+        return;
+      }
+      if (this.isMultiplayer && !this.isMpHost) {
+        if (this.mp) this.mp.sendAction({ kind: 'upgrade_struct', key: `${s.col},${s.row}` });
+        return;
+      }
+      this.upgradeStructureForActor(s, this.localPlayerId);
+    }
+
+    upgradeStructureForActor(s, actorId = null) {
+      if (!s) return;
+      const effActor = this.getEffectiveActorId(actorId || s.ownerId);
+      if (this.isMultiplayer && s.ownerId && effActor && s.ownerId !== effActor) return;
       const spec = STRUCTURE_SPECS[s.type];
-      if (s.level >= spec.levels.length) {
+      if (!spec || s.level >= spec.levels.length) {
         this.showStatus('Already at max level.');
         return;
       }
       const next = spec.levels[s.level];
-      if (this.scrap < next.cost) {
+      if (!this.spendPlayerScrap(effActor, next.cost)) {
         this.addFloatingText('Insufficient Scrap', s.x, s.y - 12, '#FF3333');
         this.showStatus(`Insufficient Scrap: upgrade costs $${next.cost}.`);
         this.sound.playHit();
         return;
       }
-      this.scrap -= next.cost;
       s.level += 1;
       s.maxHp = next.hp;
       s.hp = next.hp;
@@ -6062,21 +7310,21 @@
       this.addFloatingText(`Upgraded Lv${s.level}!`, s.x, s.y - 12, '#00FF88');
       this.addParticles(s.x, s.y, '#00FF88', 12, 55);
       this.updateHUD();
-      this.renderUpgradePanel(s);
+      if (this.selectedStructure === s) this.renderUpgradePanel(s);
       this.showStatus(`${spec.name} upgraded to Lv${s.level}.`);
     }
 
-    upgradeSelectedSoldier() {
-      const sol = this.selectedSoldier;
+    upgradeSoldierForActor(sol, actorId = null) {
       if (!sol || sol.isCommando || sol.level >= SOLDIER_SPECS.length) return;
+      const effActor = this.getEffectiveActorId(actorId || sol.ownerId);
+      if (this.isMultiplayer && sol.ownerId && effActor && sol.ownerId !== effActor) return;
       const next = SOLDIER_SPECS[sol.level];
-      if (this.scrap < next.upgradeCost) {
+      if (!this.spendPlayerScrap(effActor, next.upgradeCost)) {
         this.addFloatingText('Insufficient Scrap', sol.x, sol.y - 14, '#FF3333');
         this.showStatus(`Insufficient Scrap: promotion costs $${next.upgradeCost}.`);
         this.sound.playHit();
         return;
       }
-      this.scrap -= next.upgradeCost;
       sol.level += 1;
       sol.maxHp = next.maxHp;
       sol.hp = next.maxHp;
@@ -6087,21 +7335,21 @@
       this.addFloatingText(`Promoted: ${next.name}!`, sol.x, sol.y - 14, '#FFD700');
       this.addParticles(sol.x, sol.y, '#FFD700', 14, 60);
       this.updateHUD();
-      this.renderSoldierInspector(sol);
+      if (this.selectedSoldier === sol) this.renderSoldierInspector(sol);
       this.showStatus(`Rescued Soldier promoted to ${next.name} (Lv${sol.level})!`);
     }
 
-    upgradeSelectedEngineer() {
-      const eng = this.selectedEngineer;
+    upgradeEngineerForActor(eng, actorId = null) {
       if (!eng || eng.homeHubId || eng.level >= ENGINEER_SPECS.length) return;
+      const effActor = this.getEffectiveActorId(actorId || eng.ownerId);
+      if (this.isMultiplayer && eng.ownerId && effActor && eng.ownerId !== effActor) return;
       const next = ENGINEER_SPECS[eng.level];
-      if (this.scrap < next.upgradeCost) {
+      if (!this.spendPlayerScrap(effActor, next.upgradeCost)) {
         this.addFloatingText('Insufficient Scrap', eng.x, eng.y - 14, '#FF3333');
         this.showStatus(`Insufficient Scrap: promotion costs $${next.upgradeCost}.`);
         this.sound.playHit();
         return;
       }
-      this.scrap -= next.upgradeCost;
       eng.level += 1;
       eng.maxHp = next.maxHp;
       eng.hp = next.maxHp;
@@ -6111,7 +7359,7 @@
       this.addFloatingText(`Promoted: ${next.name}!`, eng.x, eng.y - 14, '#FFD23F');
       this.addParticles(eng.x, eng.y, '#FFD23F', 14, 60);
       this.updateHUD();
-      this.renderEngineerInspector(eng);
+      if (this.selectedEngineer === eng) this.renderEngineerInspector(eng);
       this.showStatus(`Engineer promoted to ${next.name} (Lv${eng.level}, +${eng.repairRate} HP/s)!`);
     }
 
@@ -6120,6 +7368,11 @@
       if (!s || !this.inPlay) return;
       if (s.type === 'safezone') {
         this.showStatus('Safe Zones cannot be dismantled! They form the permanent perimeter.');
+        this.sound.playHit();
+        return;
+      }
+      if (this.isMultiplayer && s.ownerId && s.ownerId !== this.localPlayerId) {
+        this.showStatus('Cannot salvage another player\'s structure.');
         this.sound.playHit();
         return;
       }
@@ -6142,20 +7395,33 @@
       this.salvageConfirmId = null;
       this.salvageConfirmUntil = 0;
 
+      if (this.isMultiplayer && !this.isMpHost) {
+        if (this.mp) this.mp.sendAction({ kind: 'salvage_struct', key: `${s.col},${s.row}` });
+        this.closeUpgradePanel();
+        return;
+      }
+      this.salvageStructureForActor(s, this.localPlayerId);
+    }
+
+    salvageStructureForActor(s, actorId = null) {
+      if (!s || s.type === 'safezone') return;
+      const effActor = this.getEffectiveActorId(actorId || s.ownerId);
+      if (this.isMultiplayer && s.ownerId && effActor && s.ownerId !== effActor) return;
+
       if ((s.type === 'barracks' || s.type === 'engineering') && s.occupants && s.occupants.length > 0) {
-        this.releaseGarrisonedUnits(s, false);
+        this.releaseGarrisonedUnits(s, false, effActor);
       }
       if (s.type === 'barracks' || s.type === 'engineering') {
         this.ejectHubTrainingRecruitsAndRefund(s, true);
       }
       if (s.type === 'habitat' && s.trainQueue && s.trainQueue.length > 0) {
-        for (const o of s.trainQueue) this.scrap += o.cost || (STRUCTURE_SPECS.habitat.trainCost || 65);
+        for (const o of s.trainQueue) this.addPlayerScrap(effActor, o.cost || (STRUCTURE_SPECS.habitat.trainCost || 65));
         s.trainQueue = [];
         s.trainTimer = 0;
       }
       const key = `${s.col},${s.row}`;
       const refund = Math.floor(s.invested * 0.6);
-      this.scrap += refund;
+      this.addPlayerScrap(effActor, refund);
       this.structures.delete(key);
       if (this.grid[s.row][s.col] === 4) {
         this.grid[s.row][s.col] = this.safeZones.has(key) ? 2 : 0;
@@ -6163,7 +7429,7 @@
       this.sound.playClick();
       this.addFloatingText(`+$${refund} Salvaged`, s.x, s.y - 12, '#FFD700');
       this.addParticles(s.x, s.y, '#FFD700', 10, 50);
-      this.closeUpgradePanel();
+      if (this.selectedStructure === s) this.closeUpgradePanel();
       this.updateHUD();
       this.showStatus(`${STRUCTURE_SPECS[s.type].name} salvaged for $${refund} (60%).`);
     }
@@ -6191,6 +7457,11 @@
     toggleMoveSelectedStructure() {
       const s = this.selectedStructure;
       if (!s || !this.inPlay || !this.isMovableStructure(s)) return;
+      if (this.isMultiplayer && s.ownerId && s.ownerId !== this.localPlayerId) {
+        this.showStatus('Cannot relocate another player\'s structure.');
+        this.sound.playHit();
+        return;
+      }
       if (this.movingStructure === s) {
         this.movingStructure = null;
         this.renderUpgradePanel(s);
@@ -6204,7 +7475,7 @@
         return;
       }
       const cost = Math.round((s.invested || STRUCTURE_SPECS[s.type].baseCost) * 0.2);
-      if (this.scrap < cost) {
+      if (this.getPlayerWallet(this.localPlayerId) < cost) {
         this.showStatus(`Insufficient Scrap: relocating costs $${cost}.`);
         this.addFloatingText('Insufficient Scrap', s.x, s.y - 12, '#FF3333');
         this.sound.playHit();
@@ -6218,8 +7489,9 @@
       this.sound.playClick();
     }
 
-    attemptMoveStructure(struct, col, row) {
+    attemptMoveStructure(struct, col, row, actorId = null) {
       if (!struct || !inBounds(col, row)) return;
+      const effActor = this.getEffectiveActorId(actorId || struct.ownerId);
       const newKey = `${col},${row}`;
       const oldKey = `${struct.col},${struct.row}`;
       const p = tileCenter(col, row);
@@ -6231,14 +7503,26 @@
         this.sound.playClick();
         return;
       }
-      if (this.grid[row][col] !== 2 || !this.safeZones.has(newKey) || this.structures.has(newKey)) {
+      if (this.isMultiplayer && struct.ownerId && effActor && struct.ownerId !== effActor) {
+        this.showStatus('Cannot relocate another player\'s structure.');
+        this.sound.playHit();
+        return;
+      }
+      const destSz = this.safeZones.get(newKey);
+      if (this.grid[row][col] !== 2 || !destSz || this.structures.has(newKey)) {
         this.showStatus('Relocation requires an unoccupied green Safe Zone tile.');
         this.addFloatingText('Valid Safe Zone Only!', p.x, p.y - 12, '#FF3333');
         this.sound.playHit();
         return;
       }
+      if (this.isMultiplayer && destSz.ownerId && effActor && destSz.ownerId !== effActor) {
+        this.showStatus('Can only relocate onto your own green Safe Zone tiles!');
+        this.addFloatingText('Your Territory Only!', p.x, p.y - 12, '#FF3333');
+        this.sound.playHit();
+        return;
+      }
       const cost = Math.round((struct.invested || STRUCTURE_SPECS[struct.type].baseCost) * 0.2);
-      if (this.scrap < cost) {
+      if (this.getPlayerWallet(effActor) < cost) {
         this.movingStructure = null;
         this.renderUpgradePanel(struct);
         this.showStatus(`Insufficient Scrap: relocating costs $${cost}.`);
@@ -6247,7 +7531,14 @@
         return;
       }
 
-      this.scrap -= cost;
+      if (this.isMultiplayer && !this.isMpHost) {
+        if (this.mp) this.mp.sendAction({ kind: 'move_struct', fromKey: oldKey, col, row });
+        this.movingStructure = null;
+        this.renderUpgradePanel(struct);
+        return;
+      }
+
+      if (!this.spendPlayerScrap(effActor, cost)) return;
       this.structures.delete(oldKey);
       struct.col = col;
       struct.row = row;
@@ -6414,12 +7705,17 @@
     }
 
     updateHUD() {
+      if (this.isMultiplayer && this.playerWallets[this.localPlayerId] !== undefined) {
+        this.scrap = this.playerWallets[this.localPlayerId];
+      }
       if (this.hudScrap) this.hudScrap.innerText = Math.floor(this.scrap);
       if (this.hudSoldiers) {
         this.hudSoldiers.innerText = this.soldiers.length + this.garrisonedSoldierCount + this.engineers.length + this.garrisonedEngineerCount;
       }
       if (this.hudWave) {
-        if (this.isEndlessMode) {
+        if (this.isMultiplayer) {
+          this.hudWave.innerText = `Wave ${Math.max(1, this.wave)} (Co-Op)`;
+        } else if (this.isEndlessMode) {
           this.hudWave.innerText = `Wave ${Math.max(1, this.wave)} (\u221E)`;
         } else {
           const dispWave = Math.max(1, this.wave || 1);
@@ -6488,13 +7784,22 @@
       const rawDt = Math.max(0, (timestamp - this.lastTimestamp) / 1000);
       this.lastTimestamp = timestamp;
 
-      const simActive = this.inPlay && !this.isPaused && !this.modalBlocking;
-      const dt = simActive ? Math.min(rawDt, 0.1) * this.gameSpeed : 0;
+      const effectiveSpeed = this.isMultiplayer ? 1 : this.gameSpeed;
+      const simActive = this.inPlay && (this.isMultiplayer ? this.isMpHost : (!this.isPaused && !this.modalBlocking));
+      const dt = simActive ? Math.min(rawDt, 0.1) * effectiveSpeed : 0;
 
       try {
         if (dt > 0) this.update(dt);
       } catch (err) {
         if (window.console) console.error('Simulation error:', err);
+      }
+
+      if (this.isMultiplayer && this.isMpHost && this.inPlay && this.mp) {
+        this.mpSyncAccum += rawDt;
+        if (this.mpSyncAccum >= 0.06) {
+          this.mpSyncAccum = 0;
+          this.mp.broadcastState(this.serializeMpState());
+        }
       }
 
       this.uiTimer -= Math.min(rawDt, 0.1);
@@ -6582,12 +7887,20 @@
         }
       } else if (this.waveState === STATE.ACTIVE && this.zombies.length === 0) {
         const clearBonus = 120 + 30 * this.wave;
-        this.scrap += clearBonus;
+        if (this.isMultiplayer && this.mpPlayers.length > 0) {
+          for (const pl of this.mpPlayers) this.addPlayerScrap(pl.id, clearBonus);
+        } else {
+          this.scrap += clearBonus;
+        }
         this.score += 250;
         let milestoneNote = '';
         if (this.wave > 0 && this.wave % 10 === 0) {
           const supplyDrop = 150 + 30 * Math.floor(this.wave / 10);
-          this.scrap += supplyDrop;
+          if (this.isMultiplayer && this.mpPlayers.length > 0) {
+            for (const pl of this.mpPlayers) this.addPlayerScrap(pl.id, supplyDrop);
+          } else {
+            this.scrap += supplyDrop;
+          }
           this.addFloatingText(`MILESTONE SUPPLY DROP +$${supplyDrop}!`, WIDTH / 2, HEIGHT / 2 - 36, '#FFD23F');
           milestoneNote = ` +$${supplyDrop} Milestone Supply Drop!`;
         }
@@ -6698,10 +8011,16 @@
         // Rescue -> Lv1 Recruit Soldier conversion on any open green Safe Zone block (tile === 2)
         const col = Math.floor(civ.x / TILE_SIZE);
         const row = Math.floor(civ.y / TILE_SIZE);
-        if (inBounds(col, row) && this.grid[row][col] === 2 && this.safeZones.has(`${col},${row}`)) {
+        const rescueSz = inBounds(col, row) && this.grid[row][col] === 2 ? this.safeZones.get(`${col},${row}`) : null;
+        if (rescueSz) {
+          const rescueOwner = rescueSz.ownerId || this.localPlayerId || null;
           this.civilians.splice(i, 1);
           this.savedCount++;
-          this.scrap += 50;
+          if (this.isMultiplayer) {
+            this.addPlayerScrap(rescueOwner, 50);
+          } else {
+            this.scrap += 50;
+          }
           this.score += 200;
           this.sound.playRescue();
           this.addFloatingText('+50 Scrap Saved!', civ.x, civ.y - 12, '#00FF88');
@@ -6713,6 +8032,7 @@
             id: Math.random().toString(36).slice(2, 11),
             level: 1,
             isCommando: false,
+            ownerId: rescueOwner,
             x: civ.x,
             y: civ.y,
             radius: 7,
@@ -7013,6 +8333,7 @@
               life: 0.1,
               maxLife: 0.1
             });
+            fireTarget.lastAttackerOwnerId = sol.ownerId || fireTarget.lastAttackerOwnerId || null;
             fireTarget.hp -= hitDmg;
             if (fireTarget.hp <= 0) {
               sol.kills = (sol.kills || 0) + 1;
@@ -7399,7 +8720,12 @@
           this.zombies.splice(i, 1);
           const lastStand = this.safeZones.size <= 5;
           const bounty = lastStand ? Math.ceil(z.reward * 1.25) : z.reward;
-          this.scrap += bounty;
+          if (this.isMultiplayer) {
+            const killOwner = z.lastAttackerOwnerId || this.getNearestSafeZoneOwner(z.x, z.y);
+            this.addPlayerScrap(killOwner, bounty);
+          } else {
+            this.scrap += bounty;
+          }
           this.score += bounty * 10;
           this.sound.playHit();
           this.addFloatingText(`+$${bounty}`, z.x, z.y - 10, lastStand ? '#00E5FF' : '#FFD700');
@@ -7775,6 +9101,7 @@
                   life: 0.1,
                   maxLife: 0.1
                 });
+                fireTarget.lastAttackerOwnerId = sol.ownerId || struct.ownerId || fireTarget.lastAttackerOwnerId || null;
                 fireTarget.hp -= sDmg;
                 if (fireTarget.hp <= 0) {
                   sol.kills = (sol.kills || 0) + 1;
@@ -7989,6 +9316,7 @@
         maxLife: 0.11
       });
       const hitDmg = Math.round(lv.dmg * this.getSafeZoneDmgMult());
+      target.lastAttackerOwnerId = t.ownerId || target.lastAttackerOwnerId || null;
       target.hp -= hitDmg;
       if (target.hp <= 0) t.kills = (t.kills || 0) + 1;
       this.addParticles(target.x, target.y, '#FFD23F', 4, 35);
@@ -8012,6 +9340,7 @@
         if (z.hp <= 0 || Math.hypot(z.x - t.x, z.y - t.y) > lv.range) continue;
         z.slowTimer = lv.slowDur;
         z.slowFactor = Math.max(z.slowFactor, lv.slow);
+        z.lastAttackerOwnerId = t.ownerId || z.lastAttackerOwnerId || null;
         z.hp -= chipZ;
         if (z.hp <= 0) t.kills = (t.kills || 0) + 1;
         this.addParticles(z.x, z.y, '#00FFFF', 4, 30);
@@ -8031,6 +9360,7 @@
         life: 0.2,
         maxLife: 0.2
       });
+      target.lastAttackerOwnerId = t.ownerId || target.lastAttackerOwnerId || null;
       if (Math.random() < 0.40) {
         target.hp = 0;
         t.kills = (t.kills || 0) + 1;
@@ -8138,7 +9468,11 @@
       const bonusEarned = this.civTotal > 0 && this.savedCount >= target;
       let bonusText = '';
       if (bonusEarned) {
-        this.scrap += 150;
+        if (this.isMultiplayer && this.mpPlayers.length > 0) {
+          for (const pl of this.mpPlayers) this.addPlayerScrap(pl.id, 150);
+        } else {
+          this.scrap += 150;
+        }
         this.score += 500;
         this.addFloatingText('RESCUE BONUS +$150!', WIDTH / 2, HEIGHT / 2 - 40, '#FFD23F');
         bonusText = ' Rescue Efficiency Bonus (50%+ saved): +$150 Scrap & +500 Score!';
@@ -8214,33 +9548,51 @@
     }
 
     renderSafeZones(ctx) {
+      const clusterMeta = new Map();
       for (const sz of this.safeZones.values()) {
         const x = sz.col * TILE_SIZE;
         const y = sz.row * TILE_SIZE;
         const flash = sz.flash > 0;
         const isHovered = this.mouseTile.col === sz.col && this.mouseTile.row === sz.row;
         const isSelected = this.selectedStructure === sz;
+        const ownerCol = (this.isMultiplayer && sz.ownerColor) ? sz.ownerColor : null;
+
+        if (this.isMultiplayer && sz.ownerId && sz.ownerName) {
+          let m = clusterMeta.get(sz.ownerId);
+          if (!m) {
+            m = { minX: x, maxX: x + TILE_SIZE, minY: y, color: sz.ownerColor || '#00E08A', name: sz.ownerName };
+            clusterMeta.set(sz.ownerId, m);
+          } else {
+            if (x < m.minX) m.minX = x;
+            if (x + TILE_SIZE > m.maxX) m.maxX = x + TILE_SIZE;
+            if (y < m.minY) m.minY = y;
+          }
+        }
 
         // 30% opacity territory pad with merged outer perimeter borders (no internal grid lines)
         ctx.fillStyle = flash ? 'rgba(255, 255, 255, 0.55)' : 'rgba(0, 224, 138, 0.30)';
         ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
 
-        ctx.strokeStyle = 'rgba(0, 224, 138, 0.55)';
-        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = ownerCol || 'rgba(0, 224, 138, 0.55)';
+        ctx.lineWidth = ownerCol ? 2 : 1.5;
         ctx.beginPath();
-        if (!this.safeZones.has(`${sz.col},${sz.row - 1}`)) {
+        const sameTop = this.safeZones.get(`${sz.col},${sz.row - 1}`);
+        const sameBot = this.safeZones.get(`${sz.col},${sz.row + 1}`);
+        const sameLeft = this.safeZones.get(`${sz.col - 1},${sz.row}`);
+        const sameRight = this.safeZones.get(`${sz.col + 1},${sz.row}`);
+        if (!sameTop || (this.isMultiplayer && sameTop.ownerId !== sz.ownerId)) {
           ctx.moveTo(x, y + 0.75);
           ctx.lineTo(x + TILE_SIZE, y + 0.75);
         }
-        if (!this.safeZones.has(`${sz.col},${sz.row + 1}`)) {
+        if (!sameBot || (this.isMultiplayer && sameBot.ownerId !== sz.ownerId)) {
           ctx.moveTo(x, y + TILE_SIZE - 0.75);
           ctx.lineTo(x + TILE_SIZE, y + TILE_SIZE - 0.75);
         }
-        if (!this.safeZones.has(`${sz.col - 1},${sz.row}`)) {
+        if (!sameLeft || (this.isMultiplayer && sameLeft.ownerId !== sz.ownerId)) {
           ctx.moveTo(x + 0.75, y);
           ctx.lineTo(x + 0.75, y + TILE_SIZE);
         }
-        if (!this.safeZones.has(`${sz.col + 1},${sz.row}`)) {
+        if (!sameRight || (this.isMultiplayer && sameRight.ownerId !== sz.ownerId)) {
           ctx.moveTo(x + TILE_SIZE - 0.75, y);
           ctx.lineTo(x + TILE_SIZE - 0.75, y + TILE_SIZE);
         }
@@ -8267,6 +9619,28 @@
           ctx.fillStyle = ratio > 0.4 ? '#00E08A' : '#FF3B3B';
           ctx.fillRect(x + 4, y + 3, (TILE_SIZE - 8) * ratio, 4);
         }
+      }
+
+      if (this.isMultiplayer && clusterMeta.size > 0) {
+        ctx.save();
+        ctx.font = 'bold 11px Consolas, monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        for (const m of clusterMeta.values()) {
+          const cx = (m.minX + m.maxX) * 0.5;
+          const cy = Math.max(14, m.minY - 11);
+          const tw = ctx.measureText(m.name).width;
+          const pw = tw + 12;
+          const ph = 16;
+          ctx.fillStyle = 'rgba(8, 13, 21, 0.88)';
+          ctx.fillRect(cx - pw * 0.5, cy - ph * 0.5, pw, ph);
+          ctx.strokeStyle = m.color;
+          ctx.lineWidth = 1.25;
+          ctx.strokeRect(cx - pw * 0.5, cy - ph * 0.5, pw, ph);
+          ctx.fillStyle = m.color;
+          ctx.fillText(m.name, cx, cy + 0.5);
+        }
+        ctx.restore();
       }
     }
 
@@ -8956,10 +10330,12 @@
 
       if (this.movingStructure) {
         const s = this.movingStructure;
-        // Softly highlight all valid unoccupied green Safe Zone tiles
+        const effActor = this.getEffectiveActorId(this.localPlayerId);
+        // Softly highlight all valid unoccupied green Safe Zone tiles owned by local player
         for (const sz of this.safeZones.values()) {
           const sk = `${sz.col},${sz.row}`;
           if (this.structures.has(sk)) continue;
+          if (this.isMultiplayer && sz.ownerId && effActor && sz.ownerId !== effActor) continue;
           ctx.fillStyle = 'rgba(0, 229, 255, 0.12)';
           ctx.fillRect(sz.col * TILE_SIZE + 2, sz.row * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4);
           ctx.strokeStyle = 'rgba(0, 229, 255, 0.45)';
@@ -8971,7 +10347,9 @@
         const mr = this.mouseTile.row;
         if (!inBounds(mc, mr)) return;
         const key = `${mc},${mr}`;
-        const ok = this.grid[mr][mc] === 2 && this.safeZones.has(key) && !this.structures.has(key);
+        const destSz = this.safeZones.get(key);
+        const ok = this.grid[mr][mc] === 2 && !!destSz && !this.structures.has(key)
+          && (!this.isMultiplayer || !destSz.ownerId || !effActor || destSz.ownerId === effActor);
         const x = mc * TILE_SIZE;
         const y = mr * TILE_SIZE;
         const col = ok ? '0,229,255' : '255,51,51';
@@ -9096,17 +10474,20 @@
 
       const spec = STRUCTURE_SPECS[this.selectedBuildType];
       const key = `${mc},${mr}`;
+      const effActor = this.getEffectiveActorId(this.localPlayerId);
       let ok = false;
       if (this.selectedBuildType === 'safezone') {
-        ok = this.canBuildSafeZoneAt(mc, mr);
+        ok = this.canBuildSafeZoneAt(mc, mr, effActor);
       } else if (this.selectedBuildType === 'wall') {
-        ok = this.isValidBarricadeTile(mc, mr);
+        ok = this.isValidBarricadeTile(mc, mr, effActor);
       } else if (this.selectedBuildType === 'gate') {
-        ok = this.isValidGateTile(mc, mr);
+        ok = this.isValidGateTile(mc, mr, effActor);
       } else {
         // All buildings & towers except Barricades require an unoccupied green Safe Zone tile
-        ok = this.grid[mr][mc] === 2 && this.safeZones.has(key) && !this.structures.has(key)
-          && (this.selectedBuildType !== 'habitat' || this.countStructures('habitat') < this.getMaxHabitats());
+        const sz = this.safeZones.get(key);
+        const ownerOk = !this.isMultiplayer || !sz || !sz.ownerId || !effActor || sz.ownerId === effActor;
+        ok = this.grid[mr][mc] === 2 && !!sz && !this.structures.has(key) && ownerOk
+          && (this.selectedBuildType !== 'habitat' || this.countStructures('habitat', effActor) < this.getMaxHabitats());
       }
       const afford = this.scrap >= spec.baseCost;
       ok = ok && afford;

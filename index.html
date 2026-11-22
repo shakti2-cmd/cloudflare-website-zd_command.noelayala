@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Zombie Defense Command - Tactical Grid Survival (v0.22.0)</title>
+  <title>Zombie Defense Command - Tactical Grid Survival (v0.23.0)</title>
 
   <!-- PWA & Mobile Web App Meta -->
   <meta name="theme-color" content="#07090d">
@@ -30,7 +30,7 @@
     <header id="topHud">
       <div class="hud-brand">
         <span class="hud-logo">&#9763;</span>
-        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.22.0</small></span>
+        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.23.0</small></span>
       </div>
 
       <div class="hud-stats">
@@ -132,7 +132,7 @@
         <div class="modal-card start-card">
           <div class="start-icon">&#9763;</div>
           <h1 class="start-title">ZOMBIE DEFENSE COMMAND</h1>
-          <div class="start-version-badge">v0.22.0</div>
+          <div class="start-version-badge">v0.23.0</div>
           <p class="start-subtitle">Expand green Safe Zones within 3 tiles of Red Spawn Breaches and deploy Commandos to destroy them (towers defend against zombies only).</p>
 
           <div id="startMainSection">
@@ -172,6 +172,7 @@
 
             <div class="modal-actions" id="mainModalActions">
               <button id="btnStartMission" class="modal-btn primary-btn">&#9654; Start Mission</button>
+              <button id="btnStartMultiplayer" class="modal-btn secondary-btn mp-start-btn">&#127760; Multiplayer</button>
               <button id="btnStartTutorial" class="modal-btn secondary-btn tutorial-start-btn">&#9733; Tutorial</button>
               <button id="btnStartZombies" class="modal-btn secondary-btn zombies-modal-btn">&#9760; Zombies</button>
               <button id="btnHowToPlay" class="modal-btn secondary-btn">How to Play</button>
@@ -205,7 +206,7 @@
             <option value="tutorial">Tutorial: Basic Training</option>
           </select>
 
-          <div class="start-hint">v0.22.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; M mute</div>
+          <div class="start-hint">v0.23.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; M mute</div>
         </div>
       </div>
 
@@ -213,7 +214,7 @@
       <div id="howToPlayModal" class="modal-overlay hidden">
         <div class="modal-card help-card">
           <button id="btnCloseHowToPlay" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.22.0)</h2>
+          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.23.0)</h2>
           <div class="help-grid">
             <section>
               <h3>Single 3&times;3 Start &amp; Line-Drag Barricades</h3>
@@ -250,7 +251,7 @@
       <div id="zombieGuideModal" class="modal-overlay hidden">
         <div class="modal-card help-card zombie-guide-card">
           <button id="btnCloseZombieGuide" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.22.0)</h2>
+          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.23.0)</h2>
           <div id="bestiaryHardIndicator" class="bestiary-hard-indicator hidden">&#9888; HARD MODE ACTIVE: 3.0&times; ZOMBIE HP APPLIED</div>
           <p class="bestiary-note"><b class="c-orange">25% Random Brute-Breach Trait:</b> Any spawned Walker, Runner, Tank, or Wrecker has a 25% chance (100% on Demolisher) to smash straight toward Safe Zones, dealing a <b>fixed unscaled 12 damage</b> (<b>16 damage</b> for Demolishers) per strike against structures &amp; Safe Zones.</p>
           <div class="zombie-intel-list">
@@ -312,6 +313,120 @@
             <button id="btnRestart" class="modal-btn secondary-btn">Retry Sector</button>
             <button id="btnNextLevel" class="modal-btn primary-btn hidden">Next Sector &rarr;</button>
             <button id="btnMainMenu" class="modal-btn secondary-btn">Main Menu</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4-Player Co-Op Multiplayer Modals (v0.23.0) -->
+      <div id="mpRoleModal" class="modal-overlay hidden">
+        <div class="modal-card mp-card">
+          <h2 class="help-title mp-modal-title">&#127760; 4-PLAYER CO-OP MULTIPLAYER</h2>
+
+          <div class="mp-callsign-bar">
+            <label for="mpPlayerCallsign">CALLSIGN</label>
+            <input id="mpPlayerCallsign" class="mp-input" type="text" maxlength="18" autocomplete="off" placeholder="Commander-1234">
+          </div>
+
+          <!-- Role Picker -->
+          <div id="mpRolePicker" class="mp-section">
+            <div class="mp-role-grid">
+              <button id="btnMpOpenHost" type="button" class="pick-card mp-role-card">
+                <span class="pick-name c-cyan">HOST A ROOM</span>
+                <span class="pick-desc">Create an Open or Password room &amp; lead up to 4 commanders</span>
+              </button>
+              <button id="btnMpOpenJoin" type="button" class="pick-card mp-role-card">
+                <span class="pick-name c-green">JOIN A ROOM</span>
+                <span class="pick-desc">Browse live open/locked rooms or enter a Room Code</span>
+              </button>
+            </div>
+            <div class="modal-actions">
+              <button id="btnMpRoleBack" type="button" class="modal-btn secondary-btn">&larr; Back</button>
+            </div>
+          </div>
+
+          <!-- Host Create Room Form -->
+          <div id="mpHostPanel" class="mp-section hidden">
+            <div class="mp-form-group">
+              <label for="mpHostRoomName">ROOM NAME (REQUIRED)</label>
+              <input id="mpHostRoomName" class="mp-input" type="text" maxlength="28" autocomplete="off" placeholder="e.g. Bravo Squad Holdout">
+            </div>
+            <div class="mp-form-group">
+              <label for="mpHostPassword">PASSWORD (OPTIONAL)</label>
+              <input id="mpHostPassword" class="mp-input" type="text" maxlength="20" autocomplete="off" placeholder="Leave blank for an Open room">
+            </div>
+            <div class="option-label">THREAT LEVEL</div>
+            <div class="card-row" id="mpHostDiffCards">
+              <button type="button" class="pick-card diff-card tag-easy" data-mp-diff="easy">
+                <span class="pick-name">EASY</span>
+              </button>
+              <button type="button" class="pick-card diff-card tag-normal selected" data-mp-diff="normal">
+                <span class="pick-name">NORMAL</span>
+              </button>
+              <button type="button" class="pick-card diff-card tag-hard" data-mp-diff="hard">
+                <span class="pick-name">HARD</span>
+              </button>
+            </div>
+            <div id="mpHostError" class="start-validation-msg hidden" role="alert"></div>
+            <div class="modal-actions">
+              <button id="btnMpHostBack" type="button" class="modal-btn secondary-btn">&larr; Back</button>
+              <button id="btnMpCreateRoom" type="button" class="modal-btn primary-btn">&#9654; Create Room</button>
+            </div>
+          </div>
+
+          <!-- Join Room Browser -->
+          <div id="mpJoinPanel" class="mp-section hidden">
+            <div class="mp-browser-bar">
+              <span class="mp-browser-label">AVAILABLE WAITING ROOMS</span>
+              <button id="btnMpRefreshRooms" type="button" class="hud-btn">&#8635; Refresh</button>
+            </div>
+            <div id="mpRoomList" class="mp-room-list">
+              <div class="mp-room-empty">Scanning live rooms...</div>
+            </div>
+            <div id="mpJoinPasswordBox" class="mp-password-box hidden">
+              <div id="mpJoinPasswordTarget" class="mp-pw-target">Enter password for room:</div>
+              <div class="mp-pw-row">
+                <input id="mpJoinPasswordInput" class="mp-input" type="password" maxlength="20" autocomplete="off" placeholder="Room password">
+                <button id="btnMpConfirmPasswordJoin" type="button" class="modal-btn primary-btn">Join</button>
+                <button id="btnMpCancelPasswordJoin" type="button" class="modal-btn secondary-btn">Cancel</button>
+              </div>
+            </div>
+            <div class="mp-direct-join-row">
+              <input id="mpDirectRoomCode" class="mp-input" type="text" maxlength="24" autocomplete="off" placeholder="Or paste Room Code (zdc-...)">
+              <button id="btnMpDirectJoin" type="button" class="modal-btn secondary-btn">Join Code</button>
+            </div>
+            <div id="mpJoinError" class="start-validation-msg hidden" role="alert"></div>
+            <div class="modal-actions">
+              <button id="btnMpJoinBack" type="button" class="modal-btn secondary-btn">&larr; Back</button>
+            </div>
+          </div>
+
+          <!-- 4-Player Waiting Room Lobby -->
+          <div id="mpLobbyPanel" class="mp-section hidden">
+            <div class="mp-lobby-header">
+              <div class="mp-lobby-info">
+                <div id="mpLobbyRoomName" class="mp-lobby-room">Room Name</div>
+                <div id="mpLobbyRoomMeta" class="mp-lobby-meta">Threat: NORMAL &bull; Open Room</div>
+              </div>
+              <button id="btnMpCopyRoomInfo" type="button" class="hud-btn mp-copy-btn">&#128203; Copy Room Info</button>
+            </div>
+            <div id="mpPlayerSlots" class="mp-slots-grid"></div>
+            <div id="mpLobbyReadyHint" class="mp-ready-hint">All connected players must press Start / Ready to deploy.</div>
+            <div class="modal-actions">
+              <button id="btnMpLeaveRoom" type="button" class="modal-btn secondary-btn">Leave Room</button>
+              <button id="btnMpToggleReady" type="button" class="modal-btn primary-btn mp-ready-btn">&#9654; Start / Ready</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Host Disconnected Graceful Fallback Modal -->
+      <div id="mpHostDisconnectedModal" class="modal-overlay hidden">
+        <div class="modal-card end-card mp-disconnect-card">
+          <div class="modal-icon text-orange">&#9888;</div>
+          <h2>HOST DISCONNECTED</h2>
+          <p id="mpDisconnectReason">Host disconnected &mdash; room closed.</p>
+          <div class="modal-actions">
+            <button id="btnMpDisconnectMenu" type="button" class="modal-btn primary-btn">Return to Main Menu</button>
           </div>
         </div>
       </div>
@@ -468,12 +583,14 @@
         </div>
 
         <div id="deckHint">
-          <span class="hint-text">v0.22.0 &bull; Towers target zombies only &bull; Expand $10 Safe Zones &le;3 tiles of a Breach so Commandos destroy it! &bull; Engineers +20/+40/+70 HP/s</span>
+          <span class="hint-text">v0.23.0 &bull; Towers target zombies only &bull; Expand $10 Safe Zones &le;3 tiles of a Breach so Commandos destroy it! &bull; Engineers +20/+40/+70 HP/s</span>
         </div>
       </div>
     </footer>
   </div>
 
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="multiplayer.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

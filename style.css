@@ -1,4 +1,4 @@
-/* Zombie Defense Command v0.22.0 - tactical command-center theme (offline, zero layout shift) */
+/* Zombie Defense Command v0.23.0 - tactical command-center theme (offline, zero layout shift) */
 :root {
   --bg: #07090d;
   --panel: #0e131b;
@@ -292,6 +292,15 @@ select:hover, .hud-btn:hover { border-color: var(--color-cyan); background: #182
 .zombies-modal-btn:hover {
   border-color: var(--color-violet);
   box-shadow: 0 0 14px rgba(184, 51, 255, 0.5);
+}
+.mp-start-btn {
+  border-color: rgba(0, 229, 255, 0.65);
+  color: #ccf7ff;
+  background: linear-gradient(180deg, #0d2b3e, #091a28);
+}
+.mp-start-btn:hover {
+  border-color: var(--color-cyan);
+  box-shadow: 0 0 14px rgba(0, 229, 255, 0.5);
 }
 .start-hint { margin-top: 10px; font-size: 11px; color: var(--dim); font-family: var(--mono); }
 .start-version-badge {
@@ -1279,7 +1288,282 @@ body.is-mobile-touch .camera-controls {
   }
 }
 
+/* ---------- 4-Player Co-Op Multiplayer Modals & HUD Locks (v0.23.0) ---------- */
+.mp-card {
+  width: min(560px, 96vw);
+  border-top-color: var(--color-cyan);
+  text-align: left;
+  max-height: 90dvh;
+  overflow-y: auto;
+}
+.mp-modal-title {
+  color: var(--color-cyan);
+  margin-bottom: 12px;
+}
+.mp-callsign-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 7px 10px;
+  margin-bottom: 12px;
+}
+.mp-callsign-bar label,
+.mp-form-group label {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  color: var(--dim);
+  white-space: nowrap;
+}
+.mp-input {
+  width: 100%;
+  background: #0a0f18;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 7px 10px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.mp-input:focus {
+  border-color: var(--color-cyan);
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.25);
+}
+.mp-role-grid {
+  display: flex;
+  gap: 10px;
+}
+.mp-role-card {
+  padding: 14px 10px;
+  text-align: center;
+}
+.mp-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.mp-browser-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.mp-browser-label {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--dim);
+}
+.mp-room-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 205px;
+  overflow-y: auto;
+  background: #090d14;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 10px;
+}
+.mp-room-empty {
+  text-align: center;
+  font-size: 12px;
+  color: var(--dim);
+  padding: 18px 8px;
+}
+.mp-room-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 8px 10px;
+}
+.mp-room-main {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.mp-room-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mp-lock-badge {
+  font-size: 11px;
+  color: var(--color-orange);
+}
+.mp-room-meta {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--dim);
+  margin-top: 2px;
+}
+.mp-room-join-btn {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+.mp-password-box {
+  background: rgba(255, 154, 31, 0.08);
+  border: 1px solid rgba(255, 154, 31, 0.45);
+  border-radius: 7px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+}
+.mp-pw-target {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-orange);
+  margin-bottom: 6px;
+}
+.mp-pw-row,
+.mp-direct-join-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.mp-direct-join-row .modal-btn,
+.mp-pw-row .modal-btn {
+  padding: 7px 12px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.mp-lobby-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: rgba(0, 229, 255, 0.06);
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+}
+.mp-lobby-room {
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+}
+.mp-lobby-meta {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--color-cyan);
+  margin-top: 2px;
+}
+.mp-copy-btn.copied {
+  border-color: var(--color-green);
+  background: rgba(0, 224, 138, 0.18);
+  color: var(--color-green);
+}
+.mp-slots-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.mp-slot-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--slot-color, var(--dim));
+  border-radius: 7px;
+  padding: 9px 10px;
+}
+.mp-slot-card.is-empty {
+  opacity: 0.48;
+  border-style: dashed;
+}
+.mp-slot-info {
+  min-width: 0;
+}
+.mp-slot-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mp-slot-role {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--dim);
+}
+.mp-ready-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--dim);
+  white-space: nowrap;
+}
+.mp-ready-badge.is-ready {
+  background: rgba(0, 224, 138, 0.18);
+  border-color: var(--color-green);
+  color: var(--color-green);
+}
+.mp-ready-hint {
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--dim);
+  font-family: var(--mono);
+}
+.mp-ready-btn.is-ready {
+  background: linear-gradient(180deg, #00c48c, #078761);
+  border-color: var(--color-cyan);
+  box-shadow: 0 0 14px rgba(0, 224, 138, 0.55);
+}
+.mp-disconnect-card {
+  border-top-color: var(--color-orange);
+}
+.text-orange {
+  color: var(--color-orange);
+}
+
+/* Multiplayer simulation locks: disable Pause & lock Speed to 1.0x across Desktop & Mobile */
+body.is-multiplayer #btnPause,
+body.is-multiplayer #tabPause,
+body.is-multiplayer #btnSpeed,
+body.is-multiplayer #btnResetLevel,
+body.is-multiplayer #levelSelect,
+body.is-multiplayer #btnMobileReset {
+  display: none !important;
+}
+
 @media (max-width: 640px) {
+  .mp-role-grid {
+    flex-direction: column;
+  }
+  .mp-slots-grid {
+    grid-template-columns: 1fr;
+  }
+  .mp-lobby-header {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
   .tutorial-overlay {
     max-width: calc(100vw - 16px);
   }

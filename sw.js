@@ -1,9 +1,10 @@
 // Zombie Defense Command - Offline PWA Service Worker (Network-First with Cache Fallback)
-const CACHE_NAME = 'zdc-pwa-v0.22.0';
+const CACHE_NAME = 'zdc-pwa-v0.23.0';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './style.css',
+  './multiplayer.js',
   './game.js',
   './manifest.json',
   './icon.svg',
