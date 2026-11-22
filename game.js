@@ -8710,5 +8710,25 @@
 
   window.addEventListener('DOMContentLoaded', () => {
     window.zombieGame = new ZombieGame();
+
+    // Register Progressive Web App Service Worker (Network-First Offline Caching)
+    if ('serviceWorker' in navigator && (window.location.protocol === 'http:' || window.location.protocol === 'https:')) {
+      navigator.serviceWorker.register('./sw.js').then((registration) => {
+        // Automatically re-check for new versions periodically and on focus
+        registration.update();
+        window.addEventListener('focus', () => registration.update());
+      }).catch((err) => {
+        if (window.console && console.warn) console.warn('PWA Service Worker registration skipped:', err);
+      });
+
+      // Reload smoothly if a new service worker took control
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
+      });
+    }
   });
 })();

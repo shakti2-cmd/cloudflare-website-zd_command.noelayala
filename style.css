@@ -17,7 +17,11 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; }
+html, body {
+  height: 100%;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
 body {
   background: radial-gradient(ellipse at 50% 0%, #101827 0%, var(--bg) 70%);
   color: var(--text);
@@ -25,6 +29,8 @@ body {
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
 }
 .hidden { display: none !important; }
 
@@ -893,6 +899,12 @@ body.is-mobile-touch #inspectorSlot::-webkit-scrollbar {
 body.is-mobile-touch #topHud {
   justify-content: flex-start;
   gap: 6px;
+  padding-top: calc(4px + env(safe-area-inset-top, 0px));
+  padding-left: calc(8px + env(safe-area-inset-left, 0px));
+  padding-right: calc(8px + env(safe-area-inset-right, 0px));
+  height: calc(52px + env(safe-area-inset-top, 0px));
+  min-height: calc(52px + env(safe-area-inset-top, 0px));
+  max-height: calc(52px + env(safe-area-inset-top, 0px));
 }
 body.is-mobile-touch #topHud .hud-stats,
 body.is-mobile-touch #topHud .hud-controls {
@@ -906,7 +918,7 @@ body.is-mobile-touch #commandDeck {
   max-height: none;
   overflow: visible;
   z-index: 25;
-  padding: 4px 6px calc(4px + env(safe-area-inset-bottom, 0px));
+  padding: 4px calc(6px + env(safe-area-inset-right, 0px)) calc(4px + env(safe-area-inset-bottom, 0px)) calc(6px + env(safe-area-inset-left, 0px));
   gap: 0;
 }
 body.is-mobile-touch #buildPanel {
@@ -1041,7 +1053,7 @@ body.is-mobile-touch .camera-controls {
     height: auto;
     min-height: 0;
     max-height: none;
-    padding: 2px 6px calc(2px + env(safe-area-inset-bottom, 0px));
+    padding: 2px calc(6px + env(safe-area-inset-right, 0px)) calc(2px + env(safe-area-inset-bottom, 0px)) calc(6px + env(safe-area-inset-left, 0px));
   }
   body.is-mobile-touch #inspectorSlot {
     flex: none;

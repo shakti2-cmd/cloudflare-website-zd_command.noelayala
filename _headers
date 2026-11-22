@@ -1,0 +1,15 @@
+# Cloudflare Pages Headers for Zombie Defense Command PWA
+# Cache control: Revalidate service worker and web app manifest immediately on edge
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+  Content-Type: application/javascript; charset=utf-8
+
+/manifest.json
+  Cache-Control: no-cache, no-store, must-revalidate
+  Content-Type: application/manifest+json; charset=utf-8
+
+# Static Assets
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
