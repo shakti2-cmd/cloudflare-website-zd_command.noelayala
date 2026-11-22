@@ -662,3 +662,250 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--color-cyan
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* ---------- Mobile / Tactical Camera Controls Pill ---------- */
+.camera-controls {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 16;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: rgba(11, 16, 25, 0.88);
+  border: 1px solid var(--color-cyan);
+  border-radius: 999px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+}
+.cam-btn {
+  min-width: 34px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+}
+.cam-btn:hover { border-color: var(--color-cyan); }
+.cam-btn:active { transform: translateY(1px); }
+.cam-zoom-readout { color: var(--color-cyan); min-width: 46px; }
+.cam-base-btn { color: var(--color-green); border-color: rgba(0, 224, 138, 0.45); }
+
+/* ---------- Mobile & Touch Reactive Layout ---------- */
+body.is-mobile-touch #topHud,
+body.is-mobile-touch #buildPanel,
+body.is-mobile-touch #inspectorSlot {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+body.is-mobile-touch #topHud::-webkit-scrollbar,
+body.is-mobile-touch #buildPanel::-webkit-scrollbar,
+body.is-mobile-touch #inspectorSlot::-webkit-scrollbar {
+  display: none;
+}
+body.is-mobile-touch #topHud {
+  justify-content: flex-start;
+  gap: 6px;
+}
+body.is-mobile-touch #topHud .hud-stats,
+body.is-mobile-touch #topHud .hud-controls {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+body.is-mobile-touch #commandDeck {
+  padding: 4px 6px;
+}
+body.is-mobile-touch #buildPanel {
+  justify-content: flex-start;
+  padding: 0 4px;
+  gap: 6px;
+}
+body.is-mobile-touch .build-group {
+  flex: 0 0 auto;
+}
+body.is-mobile-touch .tool-btn {
+  flex: 0 0 62px;
+  min-width: 62px;
+  height: 44px;
+  touch-action: manipulation;
+}
+body.is-mobile-touch .tool-key {
+  display: none;
+}
+body.is-mobile-touch #inspectorSlot {
+  justify-content: flex-start;
+}
+body.is-mobile-touch #upgradePanel {
+  width: max-content;
+  min-width: 100%;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+body.is-mobile-touch .camera-controls {
+  right: 8px;
+  bottom: 8px;
+}
+
+@media (max-width: 1024px), (pointer: coarse) {
+  #topHud {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    justify-content: flex-start;
+    gap: 6px;
+    touch-action: pan-x;
+  }
+  #topHud::-webkit-scrollbar,
+  #buildPanel::-webkit-scrollbar,
+  #inspectorSlot::-webkit-scrollbar {
+    display: none;
+  }
+  #topHud .hud-stats,
+  #topHud .hud-controls {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+  #commandDeck {
+    padding: 4px 6px;
+  }
+  #buildPanel {
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    touch-action: pan-x;
+    padding: 0 4px;
+    gap: 6px;
+  }
+  .build-group {
+    flex: 0 0 auto;
+  }
+  .tool-btn {
+    flex: 0 0 62px;
+    min-width: 62px;
+    height: 44px;
+    touch-action: manipulation;
+  }
+  #inspectorSlot {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    touch-action: pan-x;
+    justify-content: flex-start;
+  }
+  #upgradePanel {
+    width: max-content;
+    min-width: 100%;
+    flex: 0 0 auto;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 640px) {
+  .tutorial-overlay {
+    max-width: calc(100vw - 16px);
+  }
+  .tutorial-title {
+    white-space: normal;
+    font-size: 11.5px;
+    line-height: 1.2;
+  }
+  .modal-card {
+    padding: 12px 14px;
+  }
+  #levelCards {
+    flex-wrap: wrap;
+  }
+  #levelCards .pick-card {
+    flex: 1 1 calc(50% - 6px);
+  }
+  .modal-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  #topHud {
+    flex: 0 0 40px;
+    height: 40px;
+    min-height: 40px;
+    max-height: 40px;
+    padding: 2px 8px;
+  }
+  .stat-badge {
+    height: 32px;
+    padding: 1px 5px;
+  }
+  select, .hud-btn, .zombies-intel-btn {
+    height: 28px;
+    padding: 2px 6px;
+    font-size: 10.5px;
+  }
+  #statusMessage {
+    flex: 0 0 20px;
+    height: 20px;
+    min-height: 20px;
+    max-height: 20px;
+    line-height: 20px;
+    font-size: 10.5px;
+  }
+  #commandDeck {
+    flex: 0 0 94px;
+    height: 94px;
+    min-height: 94px;
+    max-height: 94px;
+    padding: 2px 6px;
+    gap: 2px;
+  }
+  #buildPanel {
+    flex: 0 0 48px;
+    height: 48px;
+  }
+  .build-group {
+    height: 48px;
+    padding: 1px 4px 2px;
+    gap: 1px;
+  }
+  .build-group-label {
+    font-size: 7.5px;
+  }
+  .tool-btn {
+    height: 34px;
+    min-width: 56px;
+    flex: 0 0 56px;
+  }
+  .tool-icon { font-size: 12px; }
+  .tool-name { font-size: 9.5px; }
+  .tool-cost { font-size: 8.5px; }
+  #inspectorSlot, #upgradePanel, #deckHint {
+    flex: 0 0 40px;
+    height: 40px;
+    min-height: 40px;
+    max-height: 40px;
+  }
+  .action-btn {
+    height: 32px;
+    min-width: 60px;
+    font-size: 10px;
+  }
+  .train-select {
+    height: 30px;
+    font-size: 10px;
+  }
+}

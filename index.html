@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Zombie Defense Command - Tactical Grid Survival (v2.6.0)</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -70,6 +70,14 @@
     <!-- Battlefield -->
     <main id="viewportContainer">
       <canvas id="gameCanvas" width="1280" height="960"></canvas>
+
+      <!-- Mobile / Tactical Camera Controls Pill -->
+      <div id="cameraControls" class="camera-controls hidden" role="toolbar" aria-label="Tactical Camera Controls">
+        <button id="btnCamZoomOut" class="cam-btn" type="button" title="Zoom Out">&minus;</button>
+        <button id="btnCamReset" class="cam-btn cam-zoom-readout" type="button" title="Reset Camera to Full Map (1.0x)">1.0x</button>
+        <button id="btnCamZoomIn" class="cam-btn" type="button" title="Zoom In">+</button>
+        <button id="btnCamFocusBase" class="cam-btn cam-base-btn" type="button" title="Center Camera on Safe Zone Base">&#8982; Base</button>
+      </div>
 
       <!-- Non-blocking Centered Visual Tutorial Cue & Bouncing UI Spotlight Arrow (v2.6.0) -->
       <div id="tutorialOverlay" class="tutorial-overlay hidden" role="region" aria-label="Beginner Tutorial Coach">

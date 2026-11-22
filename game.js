@@ -969,12 +969,29 @@
 
       this.mousePos = { x: -100, y: -100 };
       this.mouseTile = { col: -1, row: -1 };
+      this.isMobileTouch = false;
+      this.camera = { zoom: 1, panX: 0, panY: 0, minZoom: 1, maxZoom: 2.8 };
+      this.touchState = {
+        active: false,
+        pinching: false,
+        panning: false,
+        moved: false,
+        startX: 0,
+        startY: 0,
+        lastX: 0,
+        lastY: 0,
+        startTime: 0,
+        prevPinchDist: 0,
+        prevPinchMidX: 0,
+        prevPinchMidY: 0
+      };
       this.lastTimestamp = 0;
       this.uiTimer = 0;
       this.timerText = '';
 
       this.bindDOM();
       this.bindEvents();
+      this.updateMobileMode(true);
       this.renderBestiaryPortraits();
 
       this.initLevel(0);
@@ -1116,6 +1133,14 @@
       this.upgradeCostLabel = $('upgradeCostLabel');
       this.btnSalvage = $('btnSalvage');
       this.salvageRefundLabel = $('salvageRefundLabel');
+
+      this.topHud = $('topHud');
+      this.inspectorSlot = $('inspectorSlot');
+      this.cameraControls = $('cameraControls');
+      this.btnCamZoomOut = $('btnCamZoomOut');
+      this.btnCamReset = $('btnCamReset');
+      this.btnCamZoomIn = $('btnCamZoomIn');
+      this.btnCamFocusBase = $('btnCamFocusBase');
     }
 
     bindEvents() {
@@ -1305,31 +1330,22 @@
       on(this.canvas, 'mousedown', (e) => {
         if (e.button !== 0 || !this.inPlay || this.modalBlocking) return;
         if (this.selectedBuildType !== 'safezone' && this.selectedBuildType !== 'wall') return;
-        const rect = this.canvas.getBoundingClientRect();
-        if (rect.width <= 0 || rect.height <= 0) return;
-        const scaleX = this.canvas.width / rect.width;
-        const scaleY = this.canvas.height / rect.height;
-        const mx = (e.clientX - rect.left) * scaleX;
-        const my = (e.clientY - rect.top) * scaleY;
-        const col = Math.floor(mx / TILE_SIZE);
-        const row = Math.floor(my / TILE_SIZE);
-        if (!inBounds(col, row)) return;
+        const pt = this.screenToWorld(e.clientX, e.clientY);
+        if (!pt || !inBounds(pt.col, pt.row)) return;
         if (this.selectedBuildType === 'safezone') {
-          this.safeZoneDrag = { startCol: col, startRow: row, curCol: col, curRow: row };
+          this.safeZoneDrag = { startCol: pt.col, startRow: pt.row, curCol: pt.col, curRow: pt.row };
         } else {
-          this.wallDrag = { startCol: col, startRow: row, curCol: col, curRow: row };
+          this.wallDrag = { startCol: pt.col, startRow: pt.row, curCol: pt.col, curRow: pt.row };
         }
       });
 
       on(this.canvas, 'mousemove', (e) => {
-        const rect = this.canvas.getBoundingClientRect();
-        if (rect.width <= 0 || rect.height <= 0) return;
-        const scaleX = this.canvas.width / rect.width;
-        const scaleY = this.canvas.height / rect.height;
-        this.mousePos.x = (e.clientX - rect.left) * scaleX;
-        this.mousePos.y = (e.clientY - rect.top) * scaleY;
-        this.mouseTile.col = Math.floor(this.mousePos.x / TILE_SIZE);
-        this.mouseTile.row = Math.floor(this.mousePos.y / TILE_SIZE);
+        const pt = this.screenToWorld(e.clientX, e.clientY);
+        if (!pt) return;
+        this.mousePos.x = pt.x;
+        this.mousePos.y = pt.y;
+        this.mouseTile.col = pt.col;
+        this.mouseTile.row = pt.row;
         if (this.safeZoneDrag) {
           this.safeZoneDrag.curCol = Math.max(0, Math.min(COLS - 1, this.mouseTile.col));
           this.safeZoneDrag.curRow = Math.max(0, Math.min(ROWS - 1, this.mouseTile.row));
@@ -1372,19 +1388,242 @@
           return;
         }
         this.sound.unlock();
-        const rect = this.canvas.getBoundingClientRect();
-        if (rect.width <= 0 || rect.height <= 0) return;
-        const scaleX = this.canvas.width / rect.width;
-        const scaleY = this.canvas.height / rect.height;
-        const mx = (e.clientX - rect.left) * scaleX;
-        const my = (e.clientY - rect.top) * scaleY;
-        this.handleCanvasClick(mx, my);
+        const pt = this.screenToWorld(e.clientX, e.clientY);
+        if (!pt) return;
+        this.handleCanvasClick(pt.x, pt.y);
       });
 
       on(this.canvas, 'contextmenu', (e) => {
         e.preventDefault();
         if (this.inPlay) this.clearSelection();
       });
+
+      // Unified touch panning, pinch-to-zoom, tap-to-act & drag-to-paint
+      if (this.canvas) {
+        const getTouchCanvasPoint = (touch) => {
+          const rect = this.canvas.getBoundingClientRect();
+          if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+          return {
+            x: (touch.clientX - rect.left) * (this.canvas.width / rect.width),
+            y: (touch.clientY - rect.top) * (this.canvas.height / rect.height),
+            scaleX: this.canvas.width / rect.width,
+            scaleY: this.canvas.height / rect.height
+          };
+        };
+
+        this.canvas.addEventListener('touchstart', (e) => {
+          if (!this.inPlay || this.modalBlocking) return;
+          e.preventDefault();
+          this.sound.unlock();
+          if (!this.isMobileTouch) {
+            this.isMobileTouch = true;
+            this.updateMobileMode();
+          }
+
+          if (e.touches.length >= 2) {
+            this.safeZoneDrag = null;
+            this.wallDrag = null;
+            this.touchState.active = true;
+            this.touchState.pinching = true;
+            this.touchState.panning = false;
+            this.touchState.moved = true;
+            this.suppressNextClick = true;
+            const p0 = getTouchCanvasPoint(e.touches[0]);
+            const p1 = getTouchCanvasPoint(e.touches[1]);
+            if (p0 && p1) {
+              this.touchState.prevPinchDist = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+              this.touchState.prevPinchMidX = (p0.x + p1.x) * 0.5;
+              this.touchState.prevPinchMidY = (p0.y + p1.y) * 0.5;
+            }
+            return;
+          }
+
+          if (e.touches.length === 1) {
+            const t0 = e.touches[0];
+            const pt = this.screenToWorld(t0.clientX, t0.clientY);
+            if (!pt) return;
+            this.mousePos.x = pt.x;
+            this.mousePos.y = pt.y;
+            this.mouseTile.col = pt.col;
+            this.mouseTile.row = pt.row;
+
+            this.touchState.active = true;
+            this.touchState.pinching = false;
+            this.touchState.panning = false;
+            this.touchState.moved = false;
+            this.touchState.startX = t0.clientX;
+            this.touchState.startY = t0.clientY;
+            this.touchState.lastX = t0.clientX;
+            this.touchState.lastY = t0.clientY;
+            this.touchState.startTime = performance.now();
+
+            if ((this.selectedBuildType === 'safezone' || this.selectedBuildType === 'wall') && inBounds(pt.col, pt.row)) {
+              if (this.selectedBuildType === 'safezone') {
+                this.safeZoneDrag = { startCol: pt.col, startRow: pt.row, curCol: pt.col, curRow: pt.row };
+              } else {
+                this.wallDrag = { startCol: pt.col, startRow: pt.row, curCol: pt.col, curRow: pt.row };
+              }
+            }
+          }
+        }, { passive: false });
+
+        this.canvas.addEventListener('touchmove', (e) => {
+          if (!this.inPlay || this.modalBlocking || !this.touchState.active) return;
+          e.preventDefault();
+
+          if (e.touches.length >= 2) {
+            this.safeZoneDrag = null;
+            this.wallDrag = null;
+            this.touchState.pinching = true;
+            this.touchState.moved = true;
+            const p0 = getTouchCanvasPoint(e.touches[0]);
+            const p1 = getTouchCanvasPoint(e.touches[1]);
+            if (p0 && p1) {
+              const dist = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+              const midX = (p0.x + p1.x) * 0.5;
+              const midY = (p0.y + p1.y) * 0.5;
+              if (this.touchState.prevPinchDist > 8) {
+                const factor = dist / this.touchState.prevPinchDist;
+                this.setCameraZoom(this.camera.zoom * factor, midX, midY);
+              }
+              this.camera.panX += midX - this.touchState.prevPinchMidX;
+              this.camera.panY += midY - this.touchState.prevPinchMidY;
+              this.clampCamera();
+              this.touchState.prevPinchDist = dist;
+              this.touchState.prevPinchMidX = midX;
+              this.touchState.prevPinchMidY = midY;
+            }
+            return;
+          }
+
+          if (e.touches.length === 1 && !this.touchState.pinching) {
+            const t0 = e.touches[0];
+            const pt = this.screenToWorld(t0.clientX, t0.clientY);
+            if (pt) {
+              this.mousePos.x = pt.x;
+              this.mousePos.y = pt.y;
+              this.mouseTile.col = pt.col;
+              this.mouseTile.row = pt.row;
+            }
+
+            if (this.safeZoneDrag && pt) {
+              this.touchState.moved = true;
+              this.safeZoneDrag.curCol = Math.max(0, Math.min(COLS - 1, pt.col));
+              this.safeZoneDrag.curRow = Math.max(0, Math.min(ROWS - 1, pt.row));
+              return;
+            }
+            if (this.wallDrag && pt) {
+              this.touchState.moved = true;
+              this.wallDrag.curCol = Math.max(0, Math.min(COLS - 1, pt.col));
+              this.wallDrag.curRow = Math.max(0, Math.min(ROWS - 1, pt.row));
+              return;
+            }
+
+            const distFromStart = Math.hypot(t0.clientX - this.touchState.startX, t0.clientY - this.touchState.startY);
+            if (distFromStart > 10) {
+              this.touchState.panning = true;
+              this.touchState.moved = true;
+            }
+            if (this.touchState.panning && this.camera.zoom > 1.001) {
+              const rect = this.canvas.getBoundingClientRect();
+              if (rect.width > 0 && rect.height > 0) {
+                const dx = (t0.clientX - this.touchState.lastX) * (WIDTH / rect.width);
+                const dy = (t0.clientY - this.touchState.lastY) * (HEIGHT / rect.height);
+                this.camera.panX += dx;
+                this.camera.panY += dy;
+                this.clampCamera();
+              }
+            }
+            this.touchState.lastX = t0.clientX;
+            this.touchState.lastY = t0.clientY;
+          }
+        }, { passive: false });
+
+        const finishTouch = (e) => {
+          if (!this.touchState.active) return;
+          e.preventDefault();
+
+          if (e.touches && e.touches.length === 1 && this.touchState.pinching) {
+            this.touchState.pinching = false;
+            this.touchState.panning = false;
+            this.touchState.moved = true;
+            this.touchState.lastX = e.touches[0].clientX;
+            this.touchState.lastY = e.touches[0].clientY;
+            return;
+          }
+
+          if (!e.touches || e.touches.length === 0) {
+            if (this.safeZoneDrag) {
+              const drag = this.safeZoneDrag;
+              this.safeZoneDrag = null;
+              this.suppressNextClick = true;
+              if (this.inPlay && !this.modalBlocking && this.selectedBuildType === 'safezone') {
+                this.executeSafeZoneDragPurchase(drag.startCol, drag.startRow, drag.curCol, drag.curRow);
+              }
+            } else if (this.wallDrag) {
+              const drag = this.wallDrag;
+              this.wallDrag = null;
+              this.suppressNextClick = true;
+              if (this.inPlay && !this.modalBlocking && this.selectedBuildType === 'wall') {
+                this.executeWallLineDragPurchase(drag.startCol, drag.startRow, drag.curCol, drag.curRow);
+              }
+            } else if (!this.touchState.moved && !this.touchState.pinching && !this.touchState.panning) {
+              const changed = e.changedTouches && e.changedTouches[0];
+              if (changed && this.inPlay && !this.modalBlocking) {
+                const pt = this.screenToWorld(changed.clientX, changed.clientY);
+                if (pt) {
+                  this.suppressNextClick = true;
+                  this.handleCanvasClick(pt.x, pt.y);
+                }
+              }
+            }
+            this.touchState.active = false;
+            this.touchState.pinching = false;
+            this.touchState.panning = false;
+            this.touchState.moved = false;
+          }
+        };
+
+        this.canvas.addEventListener('touchend', finishTouch, { passive: false });
+        this.canvas.addEventListener('touchcancel', () => {
+          this.safeZoneDrag = null;
+          this.wallDrag = null;
+          this.touchState.active = false;
+          this.touchState.pinching = false;
+          this.touchState.panning = false;
+          this.touchState.moved = false;
+        }, { passive: false });
+
+        this.canvas.addEventListener('wheel', (e) => {
+          if (!this.inPlay || this.modalBlocking) return;
+          if (!e.ctrlKey && !this.isMobileTouch && this.camera.zoom <= 1.001) return;
+          e.preventDefault();
+          const rect = this.canvas.getBoundingClientRect();
+          if (rect.width <= 0 || rect.height <= 0) return;
+          const cx = (e.clientX - rect.left) * (this.canvas.width / rect.width);
+          const cy = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+          const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+          this.setCameraZoom(this.camera.zoom * factor, cx, cy);
+        }, { passive: false });
+      }
+
+      on(this.btnCamZoomIn, 'click', () => this.setCameraZoom(this.camera.zoom + 0.35));
+      on(this.btnCamZoomOut, 'click', () => this.setCameraZoom(this.camera.zoom - 0.35));
+      on(this.btnCamReset, 'click', () => this.setCameraZoom(1.0));
+      on(this.btnCamFocusBase, 'click', () => this.focusCameraOnSafeZones(Math.max(1.6, this.camera.zoom)));
+
+      const handleLayoutChange = () => this.updateMobileMode();
+      window.addEventListener('resize', handleLayoutChange);
+      if (window.matchMedia) {
+        const mq = window.matchMedia('(max-width: 1024px), (pointer: coarse)');
+        if (typeof mq.addEventListener === 'function') mq.addEventListener('change', handleLayoutChange);
+        else if (typeof mq.addListener === 'function') mq.addListener(handleLayoutChange);
+      }
+
+      const onStripScroll = () => this.refreshTutorialArrowPosition();
+      on(this.topHud, 'scroll', onStripScroll);
+      on(this.buildPanel, 'scroll', onStripScroll);
+      on(this.inspectorSlot, 'scroll', onStripScroll);
 
       // Keyboard shortcuts
       window.addEventListener('keydown', (e) => {
@@ -1427,6 +1666,95 @@
           this.togglePause();
         }
       });
+    }
+
+    updateMobileMode() {
+      const mq = window.matchMedia && window.matchMedia('(max-width: 1024px), (pointer: coarse)').matches;
+      this.isMobileTouch = Boolean(mq || (navigator.maxTouchPoints > 0 && window.innerWidth <= 1024));
+      if (document.body) {
+        document.body.classList.toggle('is-mobile-touch', this.isMobileTouch);
+        document.body.classList.toggle(
+          'is-mobile-landscape',
+          this.isMobileTouch && window.innerWidth > window.innerHeight && window.innerHeight <= 520
+        );
+      }
+      this.clampCamera();
+      this.refreshTutorialArrowPosition();
+    }
+
+    screenToWorld(clientX, clientY) {
+      if (!this.canvas) return null;
+      const rect = this.canvas.getBoundingClientRect();
+      if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+      const canvasX = (clientX - rect.left) * (this.canvas.width / rect.width);
+      const canvasY = (clientY - rect.top) * (this.canvas.height / rect.height);
+      const worldX = (canvasX - this.camera.panX) / this.camera.zoom;
+      const worldY = (canvasY - this.camera.panY) / this.camera.zoom;
+      return {
+        x: worldX,
+        y: worldY,
+        col: Math.floor(worldX / TILE_SIZE),
+        row: Math.floor(worldY / TILE_SIZE),
+        canvasX,
+        canvasY
+      };
+    }
+
+    clampCamera() {
+      this.camera.zoom = Math.max(this.camera.minZoom, Math.min(this.camera.maxZoom, this.camera.zoom));
+      if (this.camera.zoom <= 1.001) {
+        this.camera.zoom = 1;
+        this.camera.panX = 0;
+        this.camera.panY = 0;
+      } else {
+        const minPanX = WIDTH * (1 - this.camera.zoom);
+        const minPanY = HEIGHT * (1 - this.camera.zoom);
+        this.camera.panX = Math.max(minPanX, Math.min(0, this.camera.panX));
+        this.camera.panY = Math.max(minPanY, Math.min(0, this.camera.panY));
+      }
+      if (this.btnCamReset) {
+        this.btnCamReset.innerText = `${this.camera.zoom.toFixed(1)}x`;
+      }
+      if (this.cameraControls) {
+        if (this.isMobileTouch || this.camera.zoom > 1.001) {
+          showEl(this.cameraControls, 'flex');
+        } else {
+          hideEl(this.cameraControls);
+        }
+      }
+    }
+
+    setCameraZoom(nextZoom, focusCanvasX = WIDTH * 0.5, focusCanvasY = HEIGHT * 0.5) {
+      const clampedZoom = Math.max(this.camera.minZoom, Math.min(this.camera.maxZoom, nextZoom));
+      const worldFocusX = (focusCanvasX - this.camera.panX) / this.camera.zoom;
+      const worldFocusY = (focusCanvasY - this.camera.panY) / this.camera.zoom;
+      this.camera.zoom = clampedZoom;
+      this.camera.panX = focusCanvasX - worldFocusX * clampedZoom;
+      this.camera.panY = focusCanvasY - worldFocusY * clampedZoom;
+      this.clampCamera();
+    }
+
+    centerCameraOnWorld(worldX, worldY, targetZoom = null) {
+      if (targetZoom !== null) {
+        this.camera.zoom = Math.max(this.camera.minZoom, Math.min(this.camera.maxZoom, targetZoom));
+      }
+      this.camera.panX = WIDTH * 0.5 - worldX * this.camera.zoom;
+      this.camera.panY = HEIGHT * 0.5 - worldY * this.camera.zoom;
+      this.clampCamera();
+    }
+
+    focusCameraOnSafeZones(targetZoom = 1.6) {
+      let sx = 0;
+      let sy = 0;
+      let count = 0;
+      for (const sz of this.safeZones.values()) {
+        sx += sz.x;
+        sy += sz.y;
+        count++;
+      }
+      const wx = count > 0 ? sx / count : WIDTH * 0.5;
+      const wy = count > 0 ? sy / count : HEIGHT * 0.5;
+      this.centerCameraOnWorld(wx, wy, targetZoom);
     }
 
     syncStartCards() {
@@ -1981,6 +2309,11 @@
       } else {
         this.showStatus(`Sector ${this.currentLevel + 1} loaded (${rolledClusters}x 3x3 Safe Zone). Destroy all Red Spawn Breaches!`);
       }
+      if (this.isMobileTouch && window.innerWidth < 720) {
+        this.focusCameraOnSafeZones(1.45);
+      } else {
+        this.setCameraZoom(1.0);
+      }
     }
 
     startTutorial() {
@@ -2014,28 +2347,40 @@
         if (prev) prev.classList.remove('tutorial-pulse');
       }
       this.tutorialPulseElId = elId || null;
-      const arrowEl = this.tutorialUiArrow;
+      this.tutorialArrowLabel = arrowLabel || 'CLICK';
       if (this.tutorialPulseElId) {
         const next = document.getElementById(this.tutorialPulseElId);
         if (next && !next.classList.contains('hidden')) {
           next.classList.add('tutorial-pulse');
-          if (arrowEl && this.isTutorialMode && this.inPlay && typeof next.getBoundingClientRect === 'function') {
-            const rect = next.getBoundingClientRect();
-            if (rect && (rect.width > 0 || rect.height > 0)) {
-              const cx = rect.left + rect.width * 0.5;
-              const pointUp = rect.top < 90;
-              arrowEl.classList.toggle('arrow-up', pointUp);
-              arrowEl.style.left = `${Math.round(cx)}px`;
-              arrowEl.style.top = pointUp ? `${Math.round(rect.bottom + 6)}px` : `${Math.round(rect.top - 42)}px`;
-              if (this.tutorialUiArrowText) this.tutorialUiArrowText.innerText = arrowLabel || 'CLICK';
-              if (this.tutorialUiArrowGlyph) this.tutorialUiArrowGlyph.innerHTML = pointUp ? '&#9650;' : '&#9660;';
-              showEl(arrowEl, 'flex');
-              return;
-            }
+          if (this.isMobileTouch && typeof next.scrollIntoView === 'function') {
+            next.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' });
           }
         }
       }
-      if (arrowEl) hideEl(arrowEl);
+      this.refreshTutorialArrowPosition();
+    }
+
+    refreshTutorialArrowPosition() {
+      const arrowEl = this.tutorialUiArrow;
+      if (!arrowEl) return;
+      if (this.tutorialPulseElId && this.isTutorialMode && this.inPlay) {
+        const next = document.getElementById(this.tutorialPulseElId);
+        if (next && !next.classList.contains('hidden') && typeof next.getBoundingClientRect === 'function') {
+          const rect = next.getBoundingClientRect();
+          if (rect && (rect.width > 0 || rect.height > 0)) {
+            const cx = rect.left + rect.width * 0.5;
+            const pointUp = rect.top < 90;
+            arrowEl.classList.toggle('arrow-up', pointUp);
+            arrowEl.style.left = `${Math.round(cx)}px`;
+            arrowEl.style.top = pointUp ? `${Math.round(rect.bottom + 6)}px` : `${Math.round(rect.top - 42)}px`;
+            if (this.tutorialUiArrowText) this.tutorialUiArrowText.innerText = this.tutorialArrowLabel || 'CLICK';
+            if (this.tutorialUiArrowGlyph) this.tutorialUiArrowGlyph.innerHTML = pointUp ? '&#9650;' : '&#9660;';
+            showEl(arrowEl, 'flex');
+            return;
+          }
+        }
+      }
+      hideEl(arrowEl);
     }
 
     getTutorialStepMeta() {
@@ -2958,9 +3303,12 @@
         }
       }
 
+      const unitPickRadius = this.isMobileTouch ? Math.max(18, 28 / this.camera.zoom) : 18;
+      const civPickRadius = this.isMobileTouch ? Math.max(16, 26 / this.camera.zoom) : 16;
+
       // Check Engineer under cursor (click already-selected unit to unselect)
       let bestEng = null;
-      let bestED = 18;
+      let bestED = unitPickRadius;
       for (const eng of this.engineers) {
         const d = Math.hypot(eng.x - mx, eng.y - my);
         if (d <= bestED) {
@@ -2981,7 +3329,7 @@
 
       // Check Rescued Soldier under cursor
       let bestSoldier = null;
-      let bestSD = 18;
+      let bestSD = unitPickRadius;
       for (const s of this.soldiers) {
         const d = Math.hypot(s.x - mx, s.y - my);
         if (d <= bestSD) {
@@ -3002,7 +3350,7 @@
 
       // Check Civilian under cursor
       let bestCiv = null;
-      let bestCD = 16;
+      let bestCD = civPickRadius;
       for (const civ of this.civilians) {
         const d = Math.hypot(civ.x - mx, civ.y - my);
         if (d <= bestCD) {
@@ -5278,14 +5626,18 @@
         return;
       }
 
-      if (fromHotkey && s.level >= 2) {
+      if ((fromHotkey || this.isMobileTouch) && s.level >= 2) {
         const now = performance.now();
         if (this.salvageConfirmId !== s.id || now >= this.salvageConfirmUntil) {
           this.salvageConfirmId = s.id;
           this.salvageConfirmUntil = now + 2000;
           this.sound.playClick();
           this.renderUpgradePanel(s);
-          this.showStatus(`Press [S] again within 2.0s to confirm salvaging Lv${s.level} ${STRUCTURE_SPECS[s.type].name}!`);
+          this.showStatus(
+            this.isMobileTouch
+              ? `Tap Salvage again within 2.0s to confirm salvaging Lv${s.level} ${STRUCTURE_SPECS[s.type].name}!`
+              : `Press [S] again within 2.0s to confirm salvaging Lv${s.level} ${STRUCTURE_SPECS[s.type].name}!`
+          );
           return;
         }
       }
@@ -7134,12 +7486,13 @@
       this.fillEndModal('SECTOR OVERRUN', reason, '&#9760;', 'var(--color-red)', this.isEndlessMode);
     }
 
-    // --- RENDERING (Zero camera/scale mutations; strict 1280x960 coordinate space) ---
+    // --- RENDERING (1280x960 logical world with 2D mobile pan/zoom camera transform) ---
     render(now) {
       const ctx = this.ctx;
       const t = (now || performance.now()) / 1000;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, WIDTH, HEIGHT);
+      ctx.setTransform(this.camera.zoom, 0, 0, this.camera.zoom, this.camera.panX, this.camera.panY);
       ctx.textAlign = 'left';
       ctx.textBaseline = 'alphabetic';
 
@@ -7955,8 +8308,9 @@
         }
 
         const label = `+${plan.affordableTiles.length} Safe Zone${plan.affordableTiles.length === 1 ? '' : 's'} ($${plan.totalCost})`;
+        const labelOffsetY = this.isMobileTouch ? Math.round(42 / this.camera.zoom) : 16;
         const lx = Math.max(80, Math.min(WIDTH - 80, this.mousePos.x));
-        const ly = Math.max(20, this.mousePos.y - 16);
+        const ly = Math.max(20, this.mousePos.y - labelOffsetY);
         ctx.font = 'bold 12px Consolas, monospace';
         ctx.textAlign = 'center';
         ctx.fillStyle = '#000000';
@@ -7997,8 +8351,9 @@
         }
 
         const label = `+${plan.validAffordable.length} Barricade${plan.validAffordable.length === 1 ? '' : 's'} ($${plan.totalCost})`;
+        const labelOffsetY = this.isMobileTouch ? Math.round(42 / this.camera.zoom) : 16;
         const lx = Math.max(90, Math.min(WIDTH - 90, this.mousePos.x));
-        const ly = Math.max(20, this.mousePos.y - 16);
+        const ly = Math.max(20, this.mousePos.y - labelOffsetY);
         ctx.font = 'bold 12px Consolas, monospace';
         ctx.textAlign = 'center';
         ctx.fillStyle = '#000000';
