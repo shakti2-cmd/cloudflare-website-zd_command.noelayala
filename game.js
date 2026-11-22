@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.23.2 (Fix Multiplayer Launch Crash + 5s-to-0s Start Countdown)
+ * Version: v0.23.3 (Fix Mobile Bottom Tab Bar Viewport Lock + Strict Per-Player Multiplayer Ownership)
  */
 
 (function () {
@@ -1969,6 +1969,10 @@
 
       const handleLayoutChange = () => this.updateMobileMode();
       window.addEventListener('resize', handleLayoutChange);
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', handleLayoutChange);
+        window.visualViewport.addEventListener('scroll', handleLayoutChange);
+      }
       if (window.matchMedia) {
         const mq = window.matchMedia('(max-width: 1024px), (pointer: coarse)');
         if (typeof mq.addEventListener === 'function') mq.addEventListener('change', handleLayoutChange);
@@ -6742,7 +6746,24 @@
       this.releaseGarrisonedUnits(bunker, wasDestroyed);
     }
 
+    canControlEntity(entity, actorId = null) {
+      if (!this.isMultiplayer || !entity) return true;
+      const effActor = this.getEffectiveActorId(actorId || this.localPlayerId);
+      if (!entity.ownerId || !effActor) return true;
+      return entity.ownerId === effActor;
+    }
+
+    denyOwnership(entity, label = 'unit/structure') {
+      const owner = entity && entity.ownerName ? entity.ownerName : 'another player';
+      this.showStatus(`Belongs to ${owner} — cannot control ally ${label}.`);
+      this.sound.playHit();
+    }
+
     selectSoldier(soldier) {
+      if (!this.canControlEntity(soldier)) {
+        this.denyOwnership(soldier, 'unit');
+        return;
+      }
       if (this.activeMobileCategory) this.closeMobileSubDrawer();
       this.selectedSoldier = soldier;
       this.selectedCivilian = null;
@@ -6761,6 +6782,10 @@
     }
 
     selectEngineer(engineer) {
+      if (!this.canControlEntity(engineer)) {
+        this.denyOwnership(engineer, 'engineer');
+        return;
+      }
       if (this.activeMobileCategory) this.closeMobileSubDrawer();
       this.selectedEngineer = engineer;
       this.selectedSoldier = null;
@@ -6917,6 +6942,10 @@
 
     // --- STRUCTURE, SAFE ZONE, SOLDIER & ENGINEER INSPECTOR ---
     selectStructure(struct) {
+      if (!this.canControlEntity(struct)) {
+        this.denyOwnership(struct, struct.type === 'safezone' ? 'Safe Zone' : 'structure');
+        return;
+      }
       if (this.activeMobileCategory) this.closeMobileSubDrawer();
       if (this.upgradePanel) this.upgradePanel.classList.remove('details-expanded');
       if (this.movingStructure && this.movingStructure !== struct) this.movingStructure = null;
@@ -7554,6 +7583,10 @@
     attemptMoveStructure(struct, col, row, actorId = null) {
       if (!struct || !inBounds(col, row)) return;
       const effActor = this.getEffectiveActorId(actorId || struct.ownerId);
+      if (this.isMultiplayer && struct.ownerId && effActor && struct.ownerId !== effActor) {
+        this.denyOwnership(struct, 'structure');
+        return;
+      }
       const newKey = `${col},${row}`;
       const oldKey = `${struct.col},${struct.row}`;
       const p = tileCenter(col, row);

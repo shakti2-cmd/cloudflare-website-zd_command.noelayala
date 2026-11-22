@@ -1,4 +1,4 @@
-/* Zombie Defense Command v0.23.2 - tactical command-center theme (offline, zero layout shift) */
+/* Zombie Defense Command v0.23.3 - tactical command-center theme (offline, zero layout shift) */
 :root {
   --bg: #07090d;
   --panel: #0e131b;
@@ -22,6 +22,13 @@ html, body {
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
 }
+html,
+body {
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
 body {
   background: radial-gradient(ellipse at 50% 0%, #101827 0%, var(--bg) 70%);
   color: var(--text);
@@ -39,6 +46,8 @@ body {
   flex-direction: column;
   height: 100vh;
   height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
   width: 100%;
   min-width: 0;
 }
@@ -1138,6 +1147,7 @@ body.is-mobile-touch #btnHudHelp {
 }
 body.is-mobile-touch #commandDeck {
   flex: 0 0 auto;
+  flex-shrink: 0;
   height: auto;
   min-height: 0;
   max-height: none;
@@ -1288,7 +1298,7 @@ body.is-mobile-touch .camera-controls {
   }
 }
 
-/* ---------- 4-Player Co-Op Multiplayer Modals & HUD Locks (v0.23.2) ---------- */
+/* ---------- 4-Player Co-Op Multiplayer Modals & HUD Locks (v0.23.3) ---------- */
 .mp-card {
   width: min(560px, 96vw);
   border-top-color: var(--color-cyan);
