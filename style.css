@@ -1,4 +1,4 @@
-/* Zombie Defense Command v0.23.3 - tactical command-center theme (offline, zero layout shift) */
+/* Zombie Defense Command v0.24.0 - tactical command-center theme (offline, zero layout shift) */
 :root {
   --bg: #07090d;
   --panel: #0e131b;
@@ -1298,7 +1298,7 @@ body.is-mobile-touch .camera-controls {
   }
 }
 
-/* ---------- 4-Player Co-Op Multiplayer Modals & HUD Locks (v0.23.3) ---------- */
+/* ---------- 4-Player Co-Op Multiplayer Modals & HUD Locks (v0.24.0) ---------- */
 .mp-card {
   width: min(560px, 96vw);
   border-top-color: var(--color-cyan);
@@ -1601,6 +1601,70 @@ body.is-mobile-touch .camera-controls {
 }
 .text-orange {
   color: var(--color-orange);
+}
+.mp-reconnect-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border-radius: 6px;
+  background: rgba(0, 229, 255, 0.08);
+  border: 1px solid rgba(0, 229, 255, 0.45);
+}
+.mp-reconnect-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mp-reconnect-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--color-cyan);
+}
+.mp-reconnect-info {
+  font-size: 12px;
+  color: var(--text);
+}
+.mp-pause-card {
+  border-top-color: var(--color-orange);
+}
+.mp-pause-banner {
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  border-radius: 6px;
+  background: rgba(255, 165, 0, 0.12);
+  border: 1px solid rgba(255, 165, 0, 0.45);
+  color: #ffd27d;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: center;
+}
+.mp-reconnect-req-box {
+  padding: 8px 12px;
+  margin: 8px 0;
+  border-radius: 6px;
+  background: rgba(0, 224, 138, 0.14);
+  border: 1px solid rgba(0, 224, 138, 0.55);
+  text-align: center;
+}
+.mp-reconnect-req-text {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-green);
+}
+.ally-readonly-badge {
+  color: var(--color-cyan);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+}
+#upgradePanel.is-ally-readonly .inspector-actions {
+  opacity: 0.4;
+  pointer-events: none;
 }
 
 /* Multiplayer simulation locks: disable Pause & lock Speed to 1.0x across Desktop & Mobile */

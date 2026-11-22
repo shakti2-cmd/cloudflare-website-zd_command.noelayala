@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.23.3 (Fix Mobile Bottom Tab Bar Viewport Lock + Strict Per-Player Multiplayer Ownership)
+ * Version: v0.24.0 (Mobile Jitter/Orientation Lock Fix, Multiplayer Disconnect Pause, Host Migration, Reconnect Flow & Player Color Rings)
  */
 
 (function () {
@@ -988,6 +988,7 @@
       this.mpHostDiff = 'normal';
       this.mpPendingJoinRoom = null;
       this.mpSyncAccum = 0;
+      this.mpPauseActive = false;
       this.mp = typeof window.MultiplayerManager !== 'undefined'
         ? new window.MultiplayerManager({
             onRoomsUpdated: (rooms) => this.renderMpRoomList(rooms),
@@ -996,6 +997,10 @@
             onMatchStart: (config) => this.initMultiplayerMatch(config),
             onStateSnapshot: (snap) => this.applyMpState(snap),
             onRemoteAction: (senderId, action) => this.handleRemoteAction(senderId, action),
+            onPauseStateChanged: (payload) => this.onMpPauseStateChanged(payload),
+            onHostMigrated: (info) => this.onMpHostMigrated(info),
+            onPlayerAbandoned: (abandoned, active) => this.transferDisconnectedPlayerAssets(abandoned, active),
+            onPlayerReconnected: (info) => this.onMpPlayerReconnected(info),
             onHostDisconnected: (reason) => this.onMpHostDisconnected(reason),
             onError: (msg) => this.handleMpError(msg)
           })
@@ -1246,6 +1251,19 @@
       this.mpHostDisconnectedModal = $('mpHostDisconnectedModal');
       this.mpDisconnectReason = $('mpDisconnectReason');
       this.btnMpDisconnectMenu = $('btnMpDisconnectMenu');
+      this.mpReconnectBanner = $('mpReconnectBanner');
+      this.mpReconnectInfo = $('mpReconnectInfo');
+      this.btnMpReconnectMatch = $('btnMpReconnectMatch');
+      this.mpReconnectError = $('mpReconnectError');
+      this.mpPauseModal = $('mpPauseModal');
+      this.mpPauseTitle = $('mpPauseTitle');
+      this.mpPauseBanner = $('mpPauseBanner');
+      this.mpPausePlayersList = $('mpPausePlayersList');
+      this.mpReconnectRequestBox = $('mpReconnectRequestBox');
+      this.mpReconnectRequestText = $('mpReconnectRequestText');
+      this.mpPauseHint = $('mpPauseHint');
+      this.btnMpPauseLeave = $('btnMpPauseLeave');
+      this.btnMpPauseReady = $('btnMpPauseReady');
     }
 
     bindEvents() {
@@ -1515,6 +1533,24 @@
       });
       on(this.btnMpDisconnectMenu, 'click', () => {
         hideEl(this.mpHostDisconnectedModal);
+        this.returnToStartMenu();
+      });
+      on(this.btnMpReconnectMatch, 'click', () => {
+        if (!this.mp) return;
+        if (this.mpReconnectError) this.mpReconnectError.classList.add('hidden');
+        const cs = this.mpPlayerCallsign ? this.mpPlayerCallsign.value : this.mp.callsign;
+        this.mp.reconnectToSavedMatch(cs);
+        this.sound.playClick();
+      });
+      on(this.btnMpPauseReady, 'click', () => {
+        if (this.mp) this.mp.togglePauseReady();
+        this.sound.playClick();
+      });
+      on(this.btnMpPauseLeave, 'click', () => {
+        if (this.mp) this.mp.leaveRoom(false);
+        this.mpPauseActive = false;
+        this.isPaused = false;
+        hideEl(this.mpPauseModal);
         this.returnToStartMenu();
       });
 
@@ -1901,6 +1937,8 @@
             this.touchState.pinching = false;
             this.touchState.panning = false;
             this.touchState.moved = true;
+            this.touchState.startX = e.touches[0].clientX;
+            this.touchState.startY = e.touches[0].clientY;
             this.touchState.lastX = e.touches[0].clientX;
             this.touchState.lastY = e.touches[0].clientY;
             return;
@@ -1967,11 +2005,16 @@
       on(this.btnCamReset, 'click', () => this.setCameraZoom(1.0));
       on(this.btnCamFocusBase, 'click', () => this.focusCameraOnSafeZones(Math.max(1.6, this.camera.zoom)));
 
-      const handleLayoutChange = () => this.updateMobileMode();
+      const handleLayoutChange = () => {
+        if (this._layoutRaf) return;
+        this._layoutRaf = requestAnimationFrame(() => {
+          this._layoutRaf = 0;
+          this.updateMobileMode();
+        });
+      };
       window.addEventListener('resize', handleLayoutChange);
       if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', handleLayoutChange);
-        window.visualViewport.addEventListener('scroll', handleLayoutChange);
       }
       if (window.matchMedia) {
         const mq = window.matchMedia('(max-width: 1024px), (pointer: coarse)');
@@ -2050,7 +2093,7 @@
           const dpr = Math.min(window.devicePixelRatio || 1, 2);
           const targetW = Math.max(1, Math.round(rect.width * dpr));
           const targetH = Math.max(1, Math.round(rect.height * dpr));
-          if (this.canvas.width !== targetW || this.canvas.height !== targetH) {
+          if (Math.abs(this.canvas.width - targetW) >= 2 || Math.abs(this.canvas.height - targetH) >= 2) {
             this.canvas.width = targetW;
             this.canvas.height = targetH;
           }
@@ -2436,7 +2479,21 @@
       if (this.mpHostError) this.mpHostError.classList.add('hidden');
       if (this.mpJoinError) this.mpJoinError.classList.add('hidden');
       if (this.mpLobbyError) this.mpLobbyError.classList.add('hidden');
+      if (this.mpReconnectError) this.mpReconnectError.classList.add('hidden');
       if (this.mpCountdownBanner) this.mpCountdownBanner.classList.add('hidden');
+
+      const savedSess = this.mp ? this.mp.getSavedSession() : null;
+      if (this.mpReconnectBanner) {
+        const showRec = !!(savedSess && (view === 'role' || view === 'join'));
+        if (showRec) {
+          showEl(this.mpReconnectBanner, 'flex');
+          if (this.mpReconnectInfo) {
+            this.mpReconnectInfo.textContent = `${savedSess.roomName || savedSess.roomId} • Commander: ${savedSess.callsign}`;
+          }
+        } else {
+          hideEl(this.mpReconnectBanner);
+        }
+      }
 
       if (view === 'host') {
         showEl(this.mpHostPanel, 'block');
@@ -2473,6 +2530,9 @@
       } else if (this.mpLobbyPanel && !this.mpLobbyPanel.classList.contains('hidden') && this.mpLobbyError) {
         this.mpLobbyError.textContent = msg;
         this.mpLobbyError.classList.remove('hidden');
+      } else if (this.mpReconnectBanner && !this.mpReconnectBanner.classList.contains('hidden') && this.mpReconnectError) {
+        this.mpReconnectError.textContent = msg;
+        this.mpReconnectError.classList.remove('hidden');
       } else {
         this.showStatus(msg);
       }
@@ -2687,16 +2747,248 @@
     onMpHostDisconnected(reason = 'Host disconnected — room closed.') {
       this.isMultiplayer = false;
       this.isMpHost = false;
+      this.mpPauseActive = false;
+      this.isPaused = false;
       this.waveState = STATE.START_MENU;
       if (document.body) document.body.classList.remove('is-multiplayer');
       this.clearSelection();
       hideEl(this.mpRoleModal);
+      hideEl(this.mpPauseModal);
       hideEl(this.gameOverOverlay);
       if (this.mpDisconnectReason) {
         this.mpDisconnectReason.textContent = reason || 'Host disconnected — room closed.';
       }
       showEl(this.mpHostDisconnectedModal, 'flex');
       this.sound.playBarricadeBreak();
+    }
+
+    getPlayerColor(playerId) {
+      if (!playerId) return null;
+      const p = (this.mpPlayers || []).find((pl) => pl.id === playerId);
+      return p && p.color ? p.color : null;
+    }
+
+    remapPlayerOwnership(oldId, newId, playerObj = null) {
+      if (!oldId || !newId || oldId === newId) return;
+      const color = playerObj && playerObj.color;
+      const name = playerObj && playerObj.callsign;
+      const slot = playerObj && playerObj.slot !== undefined ? playerObj.slot : undefined;
+      if (this.playerWallets && this.playerWallets[oldId] !== undefined) {
+        this.playerWallets[newId] = (this.playerWallets[newId] || 0) + this.playerWallets[oldId];
+        delete this.playerWallets[oldId];
+      }
+      for (const sz of this.safeZones.values()) {
+        if (sz.ownerId === oldId) {
+          sz.ownerId = newId;
+          if (color) sz.ownerColor = color;
+          if (name) sz.ownerName = name;
+          if (slot !== undefined) sz.ownerSlot = slot;
+        }
+      }
+      for (const st of this.structures.values()) {
+        if (st.ownerId === oldId) {
+          st.ownerId = newId;
+          if (color) st.ownerColor = color;
+          if (name) st.ownerName = name;
+          if (slot !== undefined) st.ownerSlot = slot;
+        }
+      }
+      for (const sol of this.soldiers) {
+        if (sol.ownerId === oldId) {
+          sol.ownerId = newId;
+          if (color) sol.ownerColor = color;
+          if (name) sol.ownerName = name;
+        }
+      }
+      for (const eng of this.engineers) {
+        if (eng.ownerId === oldId) {
+          eng.ownerId = newId;
+          if (color) eng.ownerColor = color;
+          if (name) eng.ownerName = name;
+        }
+      }
+      if (this.localPlayerId === oldId) {
+        this.localPlayerId = newId;
+      }
+    }
+
+    onMpHostMigrated(info) {
+      if (!info) return;
+      this.isMpHost = !!info.promoted;
+      this.mpPlayers = (info.players || []).map((p) => ({ ...p }));
+      if (info.oldLocalId && info.newLocalId) {
+        this.remapPlayerOwnership(info.oldLocalId, info.newLocalId);
+      }
+      if (info.pauseState) {
+        this.onMpPauseStateChanged({
+          pauseState: info.pauseState,
+          players: this.mpPlayers
+        });
+      }
+      this.showStatus(
+        this.isMpHost
+          ? 'Host dropped — You were promoted to Match Host! Match paused until all active players are Ready.'
+          : 'Host dropped — Connected to migrated Host! Match paused until all active players are Ready.'
+      );
+      this.sound.playWaveWarning();
+    }
+
+    onMpPlayerReconnected({ oldId, newId, player }) {
+      if (oldId && newId) {
+        this.remapPlayerOwnership(oldId, newId, player);
+      }
+      if (player) {
+        const idx = this.mpPlayers.findIndex((p) => p.id === oldId || p.id === newId);
+        if (idx >= 0) this.mpPlayers[idx] = { ...player };
+        else this.mpPlayers.push({ ...player });
+      }
+      this.showStatus(`${player ? player.callsign : 'Commander'} reconnected and reclaimed their squad!`);
+      this.sound.playClick();
+      return this.serializeMpState();
+    }
+
+    transferDisconnectedPlayerAssets(abandonedList = [], activePlayers = []) {
+      if (!this.isMpHost || !abandonedList.length || !activePlayers.length) return;
+      const targets = activePlayers.map((p) => ({ ...p }));
+      let totalScrapSplit = 0;
+
+      for (const dropped of abandonedList) {
+        const oldId = dropped.id;
+        const oldWallet = Math.max(0, Math.floor(Number(this.playerWallets[oldId] || 0)));
+        if (oldWallet > 0) {
+          const share = Math.floor(oldWallet / targets.length);
+          const rem = oldWallet % targets.length;
+          targets.forEach((tp, idx) => {
+            this.playerWallets[tp.id] = Number(this.playerWallets[tp.id] || 0) + share + (idx === 0 ? rem : 0);
+          });
+          totalScrapSplit += oldWallet;
+          delete this.playerWallets[oldId];
+        }
+
+        let rr = 0;
+        const assignToNext = (entity, isUnit = false) => {
+          const recipient = targets[rr % targets.length];
+          rr++;
+          entity.ownerId = recipient.id;
+          entity.ownerSlot = recipient.slot;
+          entity.ownerColor = recipient.color;
+          entity.ownerName = recipient.callsign;
+          if (isUnit) entity.color = recipient.color;
+        };
+
+        for (const sz of this.safeZones.values()) {
+          if (sz.ownerId === oldId) assignToNext(sz, false);
+        }
+        for (const st of this.structures.values()) {
+          if (st.ownerId === oldId) assignToNext(st, false);
+        }
+        for (const sol of this.soldiers) {
+          if (sol.ownerId === oldId) assignToNext(sol, true);
+        }
+        for (const eng of this.engineers) {
+          if (eng.ownerId === oldId) assignToNext(eng, true);
+        }
+      }
+
+      if (this.localPlayerId && this.playerWallets[this.localPlayerId] !== undefined) {
+        this.scrap = this.playerWallets[this.localPlayerId];
+      }
+      const names = abandonedList.map((d) => d.callsign).join(', ');
+      this.showStatus(`${names} left the match — territory, units & $${totalScrapSplit} Scrap divided among active commanders.`);
+      this.updateHUD();
+      if (this.mp) this.mp.broadcastState(this.serializeMpState());
+    }
+
+    onMpPauseStateChanged(payload) {
+      if (!payload) return;
+      const ps = payload.pauseState || null;
+      if (Array.isArray(payload.players)) {
+        this.mpPlayers = payload.players.map((p) => ({ ...p }));
+      }
+      const active = !!(ps && ps.active);
+      this.mpPauseActive = active;
+      this.setPaused(active, true);
+
+      if (!active) {
+        hideEl(this.mpPauseModal);
+        if (this.inPlay) this.showStatus('All commanders Ready — Combat resumed!');
+        return;
+      }
+
+      hideEl(this.mpRoleModal);
+      showEl(this.mpPauseModal, 'flex');
+
+      const readyIds = Array.isArray(ps.readyIds) ? ps.readyIds : [];
+      const pending = ps.pendingReconnect || null;
+      const isPendingGuest = ps.reason === 'reconnect_pending_guest';
+
+      if (this.mpPauseTitle) {
+        this.mpPauseTitle.innerHTML = pending
+          ? '&#128260; RECONNECT APPROVAL'
+          : (ps.reason === 'host_migration' ? '&#9889; HOST MIGRATED' : '&#9208; MATCH PAUSED');
+      }
+
+      if (this.mpPauseBanner) {
+        if (isPendingGuest) {
+          this.mpPauseBanner.textContent = 'Connected! Waiting for all active commanders to approve your return...';
+        } else if (ps.reason === 'host_migration') {
+          this.mpPauseBanner.textContent = `Original Host (${ps.disconnectedCallsign || 'Host'}) disconnected. Host migrated — Press Ready to resume or await reconnect.`;
+        } else if (pending) {
+          this.mpPauseBanner.textContent = `${pending.callsign} verified their Commander Callsign and requests to rejoin their squad!`;
+        } else {
+          this.mpPauseBanner.textContent = `${ps.disconnectedCallsign || 'A commander'} disconnected. Wait for rejoin or press Ready to split their assets & resume.`;
+        }
+      }
+
+      if (this.mpReconnectRequestBox && this.mpReconnectRequestText) {
+        if (pending && !isPendingGuest) {
+          this.mpReconnectRequestBox.classList.remove('hidden');
+          this.mpReconnectRequestText.textContent = `Approve ${pending.callsign} to restore their Safe Zones, Structures, Units & Scrap?`;
+        } else {
+          this.mpReconnectRequestBox.classList.add('hidden');
+        }
+      }
+
+      if (this.mpPausePlayersList) {
+        this.mpPausePlayersList.innerHTML = '';
+        for (const p of this.mpPlayers) {
+          const isReady = readyIds.includes(p.id);
+          const card = document.createElement('div');
+          card.className = 'mp-slot-card';
+          card.style.setProperty('--slot-color', p.color || '#00E5FF');
+          const top = document.createElement('div');
+          top.className = 'mp-slot-top';
+          const nameEl = document.createElement('span');
+          nameEl.className = 'mp-slot-name';
+          nameEl.textContent = p.callsign + (p.id === this.localPlayerId ? ' (You)' : '');
+          const badge = document.createElement('span');
+          badge.className = `mp-slot-badge ${isReady ? 'is-ready' : ''}`;
+          badge.textContent = isReady ? (pending ? 'APPROVED' : 'READY') : (p.isHost ? 'HOST • WAIT' : 'WAIT');
+          top.appendChild(nameEl);
+          top.appendChild(badge);
+          card.appendChild(top);
+          this.mpPausePlayersList.appendChild(card);
+        }
+      }
+
+      const amIReady = readyIds.includes(this.localPlayerId);
+      const readyCount = this.mpPlayers.filter((p) => readyIds.includes(p.id)).length;
+      if (this.btnMpPauseReady) {
+        if (isPendingGuest) {
+          hideEl(this.btnMpPauseReady);
+        } else {
+          showEl(this.btnMpPauseReady, 'inline-flex');
+          this.btnMpPauseReady.classList.toggle('is-ready', amIReady);
+          this.btnMpPauseReady.textContent = amIReady
+            ? '✓ Ready (Waiting...)'
+            : (pending ? 'Approve & Ready' : 'Ready to Resume');
+        }
+      }
+      if (this.mpPauseHint) {
+        this.mpPauseHint.textContent = isPendingGuest
+          ? 'Stay on this screen until all active players approve.'
+          : `${readyCount}/${this.mpPlayers.length} Ready — All active players must press ${pending ? 'Approve & Ready' : 'Ready'} to continue.`;
+      }
     }
 
     // --- MULTIPLAYER WALLETS & TERRITORY OWNERSHIP ---
@@ -2775,6 +3067,7 @@
 
       this.gameSpeed = 1;
       if (this.btnSpeed) this.btnSpeed.innerText = 'Speed: 1x';
+      this.mpPauseActive = false;
       this.isPaused = false;
 
       if (document.body) {
@@ -2783,6 +3076,7 @@
       }
       hideEl(this.startScreenOverlay);
       hideEl(this.mpRoleModal);
+      hideEl(this.mpPauseModal);
       hideEl(this.mpHostDisconnectedModal);
       hideEl(this.gameOverOverlay);
 
@@ -3136,13 +3430,15 @@
           x: Math.round(s.x), y: Math.round(s.y), hp: s.hp, maxHp: s.maxHp,
           range: s.range, dmg: s.dmg, rate: s.rate, kills: s.kills || 0,
           angle: s.angle || 0, name: s.name || '', color: s.color || '#38E8FF',
-          homeHubId: s.homeHubId || null, ownerId: s.ownerId || null
+          homeHubId: s.homeHubId || null, ownerId: s.ownerId || null,
+          ownerColor: s.ownerColor || null, ownerName: s.ownerName || null
         })),
         engineers: this.engineers.map((e) => ({
           id: e.id, level: e.level, x: Math.round(e.x), y: Math.round(e.y),
           hp: e.hp, maxHp: e.maxHp, speed: e.speed, repairRate: e.repairRate,
           repairedTotal: e.repairedTotal || 0, name: e.name || '', color: e.color || '#FFD23F',
-          homeHubId: e.homeHubId || null, ownerId: e.ownerId || null
+          homeHubId: e.homeHubId || null, ownerId: e.ownerId || null,
+          ownerColor: e.ownerColor || null, ownerName: e.ownerName || null
         })),
         zombies: this.zombies.map((z) => ({
           id: z.id, type: z.type, x: Math.round(z.x), y: Math.round(z.y),
@@ -4788,9 +5084,9 @@
       this.updateBuildPanelUI();
     }
 
-    setPaused(p) {
-      if (this.isMultiplayer) {
-        this.isPaused = false;
+    setPaused(p, allowMp = false) {
+      if (this.isMultiplayer && !allowMp) {
+        this.isPaused = !!this.mpPauseActive;
         return;
       }
       this.isPaused = !!p;
@@ -6942,10 +7238,6 @@
 
     // --- STRUCTURE, SAFE ZONE, SOLDIER & ENGINEER INSPECTOR ---
     selectStructure(struct) {
-      if (!this.canControlEntity(struct)) {
-        this.denyOwnership(struct, struct.type === 'safezone' ? 'Safe Zone' : 'structure');
-        return;
-      }
       if (this.activeMobileCategory) this.closeMobileSubDrawer();
       if (this.upgradePanel) this.upgradePanel.classList.remove('details-expanded');
       if (this.movingStructure && this.movingStructure !== struct) this.movingStructure = null;
@@ -6957,6 +7249,16 @@
       this.updateBuildPanelUI();
       this.sound.playClick();
       this.renderUpgradePanel(struct);
+      if (!this.canControlEntity(struct)) {
+        const spec = STRUCTURE_SPECS[struct.type];
+        const cur = spec && spec.levels ? spec.levels[Math.min(struct.level - 1, spec.levels.length - 1)] : null;
+        const label = (cur && cur.name) || (spec && spec.name) || struct.type;
+        const isTurret = struct.type === 'sentry' || struct.type === 'cryo' || struct.type === 'sniper';
+        const killsTxt = (isTurret && struct.kills !== undefined) ? ` • Kills: ${struct.kills}` : '';
+        this.showStatus(
+          `Ally ${label} Lv${struct.level} (Owner: ${struct.ownerName || 'Ally'}) — HP ${Math.ceil(struct.hp)}/${struct.maxHp}${killsTxt} [View-Only]`
+        );
+      }
     }
 
     renderUpgradePanel(struct) {
@@ -6976,17 +7278,23 @@
       const refund = Math.floor(struct.invested * 0.6);
 
       showEl(this.upgradePanel, 'flex');
+      const isAllyReadOnly = !!(this.isMultiplayer && struct.ownerId && struct.ownerId !== this.localPlayerId);
+      this.upgradePanel.classList.toggle('is-ally-readonly', isAllyReadOnly);
       if (this.inspectIcon) this.inspectIcon.innerHTML = STRUCT_ICONS[struct.type] || '&#9646;';
       if (this.inspectName) this.inspectName.innerText = cur.name || spec.name;
       if (this.inspectTier) {
         if (this.isMobileTouch) {
-          if (struct.type === 'safezone') {
+          if (isAllyReadOnly) {
+            this.inspectTier.innerText = `Ally: ${struct.ownerName || 'Player'} [View]`;
+          } else if (struct.type === 'safezone') {
             this.inspectTier.innerText = '';
           } else {
             this.inspectTier.innerText = `Lv${struct.level}/${maxLv}`;
           }
         } else {
-          this.inspectTier.innerText = `Lv${struct.level}/${maxLv} \u2022 Tile (${struct.col}, ${struct.row})`;
+          this.inspectTier.innerText = isAllyReadOnly
+            ? `Lv${struct.level}/${maxLv} \u2022 Ally: ${struct.ownerName || 'Player'} [View-Only]`
+            : `Lv${struct.level}/${maxLv} \u2022 Tile (${struct.col}, ${struct.row})`;
         }
       }
       if (this.inspectHpText) this.inspectHpText.innerText = `${Math.ceil(struct.hp)} / ${struct.maxHp}`;
@@ -7237,7 +7545,7 @@
 
     renderSoldierInspector(soldier) {
       if (!this.upgradePanel || !soldier) return;
-      this.upgradePanel.classList.remove('details-expanded');
+      this.upgradePanel.classList.remove('details-expanded', 'is-ally-readonly');
       this.salvageConfirmId = null;
       this.salvageConfirmUntil = 0;
       this.selectedSoldier = soldier;
@@ -7291,7 +7599,7 @@
 
     renderEngineerInspector(engineer) {
       if (!this.upgradePanel || !engineer) return;
-      this.upgradePanel.classList.remove('details-expanded');
+      this.upgradePanel.classList.remove('details-expanded', 'is-ally-readonly');
       this.salvageConfirmId = null;
       this.salvageConfirmUntil = 0;
       this.selectedEngineer = engineer;
@@ -7675,6 +7983,9 @@
       }
 
       const parts = [];
+      if (this.isMultiplayer && entity.ownerId && entity.ownerId !== this.localPlayerId) {
+        parts.push(`Ally (${entity.ownerName || 'Player'})`);
+      }
       if (entity.type === 'barracks') {
         parts.push(`Barracks Kills: ${this.totalCommandoKills || 0}`);
       } else if (entity.type === 'engineering') {
@@ -7880,8 +8191,8 @@
       this.lastTimestamp = timestamp;
 
       const effectiveSpeed = this.isMultiplayer ? 1 : this.gameSpeed;
-      const simActive = this.inPlay && (this.isMultiplayer ? this.isMpHost : (!this.isPaused && !this.modalBlocking));
-      const dt = simActive ? Math.min(rawDt, 0.1) * effectiveSpeed : 0;
+      const simActive = this.inPlay && !this.isPaused && (this.isMultiplayer ? this.isMpHost : !this.modalBlocking);
+      const dt = simActive ? Math.min(rawDt, 0.05) * effectiveSpeed : 0;
 
       try {
         if (dt > 0) this.update(dt);
@@ -9543,6 +9854,7 @@
     onVictory() {
       this.waveState = STATE.VICTORY;
       this.clearSelection();
+      if (this.isMultiplayer && this.mp) this.mp.clearActiveSession();
       this.sound.playRescue();
 
       if (this.isTutorialMode) {
@@ -9587,6 +9899,7 @@
     onDefeat(reason) {
       this.waveState = STATE.GAMEOVER;
       this.clearSelection();
+      if (this.isMultiplayer && this.mp) this.mp.clearActiveSession();
       this.sound.playBarricadeBreak();
       this.showStatus(`MISSION FAILED: ${reason}`);
       this.fillEndModal('SECTOR OVERRUN', reason, '&#9760;', 'var(--color-red)', this.isEndlessMode);
@@ -9597,9 +9910,10 @@
       const ctx = this.ctx;
       const t = (now || performance.now()) / 1000;
       const s = this.getCameraScale();
+      ctx.imageSmoothingEnabled = false;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, this.canvas ? this.canvas.width : WIDTH, this.canvas ? this.canvas.height : HEIGHT);
-      ctx.setTransform(s, 0, 0, s, this.camera.panX, this.camera.panY);
+      ctx.setTransform(s, 0, 0, s, Math.round(this.camera.panX), Math.round(this.camera.panY));
       ctx.textAlign = 'left';
       ctx.textBaseline = 'alphabetic';
 
@@ -10138,6 +10452,31 @@
         ctx.fillText(`${Math.ceil(s.moveCooldown)}s`, x + TILE_SIZE / 2, y + TILE_SIZE / 2 + 1);
         ctx.textAlign = 'left';
       }
+
+      if (this.isMultiplayer && s.ownerId) {
+        const ownerColor = s.ownerColor || this.getPlayerColor(s.ownerId);
+        if (ownerColor) {
+          ctx.save();
+          if (s.type === 'sentry' || s.type === 'cryo' || s.type === 'sniper' || s.type === 'barracks' || s.type === 'engineering' || s.type === 'habitat') {
+            ctx.strokeStyle = ownerColor;
+            ctx.globalAlpha = 0.55;
+            ctx.lineWidth = 1.6;
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, 16, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          // Subtle slot-colored top-right corner accent pip
+          ctx.globalAlpha = 0.9;
+          ctx.fillStyle = ownerColor;
+          ctx.beginPath();
+          ctx.moveTo(x + TILE_SIZE - 9, y + 3);
+          ctx.lineTo(x + TILE_SIZE - 3, y + 3);
+          ctx.lineTo(x + TILE_SIZE - 3, y + 9);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+      }
     }
 
     renderPulseRings(ctx) {
@@ -10204,6 +10543,20 @@
       for (const sol of this.soldiers) {
         const selected = this.selectedSoldier === sol;
         const spec = SOLDIER_SPECS[sol.level - 1];
+
+        if (this.isMultiplayer) {
+          const ownerColor = sol.ownerColor || this.getPlayerColor(sol.ownerId);
+          if (ownerColor) {
+            ctx.save();
+            ctx.strokeStyle = ownerColor;
+            ctx.globalAlpha = 0.65;
+            ctx.lineWidth = 1.8;
+            ctx.beginPath();
+            ctx.arc(sol.x, sol.y, sol.radius + 3.5, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
 
         if (selected) {
           ctx.fillStyle = 'rgba(56, 232, 255, 0.05)';
@@ -10278,6 +10631,20 @@
       for (const eng of this.engineers) {
         const selected = this.selectedEngineer === eng;
         const spec = ENGINEER_SPECS[eng.level - 1];
+
+        if (this.isMultiplayer) {
+          const ownerColor = eng.ownerColor || this.getPlayerColor(eng.ownerId);
+          if (ownerColor) {
+            ctx.save();
+            ctx.strokeStyle = ownerColor;
+            ctx.globalAlpha = 0.65;
+            ctx.lineWidth = 1.8;
+            ctx.beginPath();
+            ctx.arc(eng.x, eng.y, eng.radius + 3.5, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
 
         if (selected) {
           if (eng.path.length > 0) {
