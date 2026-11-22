@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Zombie Defense Command - Tactical Grid Survival (v2.6.0)</title>
+  <title>Zombie Defense Command - Tactical Grid Survival (v0.21.0)</title>
 
   <!-- PWA & Mobile Web App Meta -->
   <meta name="theme-color" content="#07090d">
@@ -30,7 +30,7 @@
     <header id="topHud">
       <div class="hud-brand">
         <span class="hud-logo">&#9763;</span>
-        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v2.6</small></span>
+        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.21.0</small></span>
       </div>
 
       <div class="hud-stats">
@@ -132,7 +132,7 @@
         <div class="modal-card start-card">
           <div class="start-icon">&#9763;</div>
           <h1 class="start-title">ZOMBIE DEFENSE COMMAND</h1>
-          <div class="start-version-badge">v2.6.0</div>
+          <div class="start-version-badge">v0.21.0</div>
           <p class="start-subtitle">Expand green Safe Zones within 3 tiles of Red Spawn Breaches and deploy Commandos to destroy them (towers defend against zombies only).</p>
 
           <div id="startMainSection">
@@ -141,7 +141,7 @@
               <button type="button" class="pick-card diff-card tag-easy" data-diff="easy">
                 <span class="pick-name">EASY</span>
               </button>
-              <button type="button" class="pick-card diff-card tag-normal selected" data-diff="normal">
+              <button type="button" class="pick-card diff-card tag-normal" data-diff="normal">
                 <span class="pick-name">NORMAL</span>
               </button>
               <button type="button" class="pick-card diff-card tag-hard" data-diff="hard">
@@ -149,14 +149,15 @@
               </button>
             </div>
             <select id="difficultySelect" class="sync-select" aria-label="Difficulty">
+              <option value="" disabled selected>Select Threat Level</option>
               <option value="easy">Easy - 160 Scrap, 0.75x zombies, 3.0s incubation</option>
-              <option value="normal" selected>Normal - 100 Scrap, 1.0x zombies, 2.0s incubation</option>
+              <option value="normal">Normal - 100 Scrap, 1.0x zombies, 2.0s incubation</option>
               <option value="hard">Hard - 75 Scrap, 1.35x zombies, 1.2s incubation</option>
             </select>
 
             <div class="option-label">MISSION MODE</div>
             <div class="card-row" id="modeCards">
-              <button type="button" class="pick-card mode-card selected" data-mode="campaign">
+              <button type="button" class="pick-card mode-card" data-mode="campaign">
                 <span class="pick-name">CAMPAIGN</span>
               </button>
               <button type="button" class="pick-card mode-card tag-random" data-mode="random">
@@ -168,7 +169,7 @@
             </div>
 
             <div class="modal-actions" id="mainModalActions">
-              <button id="btnStartMission" class="modal-btn primary-btn">&#9654; Start Mission</button>
+              <button id="btnStartMission" class="modal-btn primary-btn" disabled>&#9654; Start Mission</button>
               <button id="btnStartTutorial" class="modal-btn secondary-btn tutorial-start-btn">&#9733; Tutorial</button>
               <button id="btnStartZombies" class="modal-btn secondary-btn zombies-modal-btn">&#9760; Zombies</button>
               <button id="btnHowToPlay" class="modal-btn secondary-btn">How to Play</button>
@@ -179,19 +180,20 @@
           <div id="campaignSectorPanel" class="campaign-subpanel hidden">
             <div class="option-label sub-label">SELECT CAMPAIGN SECTOR</div>
             <div class="card-row" id="levelCards">
-              <button type="button" class="pick-card level-card selected" data-level="1"><span class="pick-name">SECTOR 1</span><span class="pick-desc">Courtyard</span></button>
+              <button type="button" class="pick-card level-card" data-level="1"><span class="pick-name">SECTOR 1</span><span class="pick-desc">Courtyard</span></button>
               <button type="button" class="pick-card level-card" data-level="2"><span class="pick-name">SECTOR 2</span><span class="pick-desc">Choke Alley</span></button>
               <button type="button" class="pick-card level-card" data-level="3"><span class="pick-name">SECTOR 3</span><span class="pick-desc">Twin Fronts</span></button>
               <button type="button" class="pick-card level-card" data-level="4"><span class="pick-name">SECTOR 4</span><span class="pick-desc">Citadel</span></button>
             </div>
             <div class="modal-actions campaign-actions">
               <button id="btnCampaignBack" type="button" class="modal-btn secondary-btn">&#8592; Back</button>
-              <button id="btnStartCampaignSector" type="button" class="modal-btn primary-btn">&#9654; Start Mission</button>
+              <button id="btnStartCampaignSector" type="button" class="modal-btn primary-btn" disabled>&#9654; Start Mission</button>
             </div>
           </div>
 
           <select id="startLevelSelect" class="sync-select" aria-label="Starting sector">
-            <option value="1" selected>Sector 1: Courtyard</option>
+            <option value="" disabled selected>Select Sector</option>
+            <option value="1">Sector 1: Courtyard</option>
             <option value="2">Sector 2: Choke Alley</option>
             <option value="3">Sector 3: Twin Fronts</option>
             <option value="4">Sector 4: Citadel</option>
@@ -200,7 +202,7 @@
             <option value="tutorial">Tutorial: Basic Training</option>
           </select>
 
-          <div class="start-hint">v2.6.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; M mute</div>
+          <div class="start-hint">v0.21.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; M mute</div>
         </div>
       </div>
 
@@ -208,7 +210,7 @@
       <div id="howToPlayModal" class="modal-overlay hidden">
         <div class="modal-card help-card">
           <button id="btnCloseHowToPlay" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v2.6.0)</h2>
+          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.21.0)</h2>
           <div class="help-grid">
             <section>
               <h3>Single 3&times;3 Start &amp; Line-Drag Barricades</h3>
@@ -245,7 +247,7 @@
       <div id="zombieGuideModal" class="modal-overlay hidden">
         <div class="modal-card help-card zombie-guide-card">
           <button id="btnCloseZombieGuide" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v2.6.0)</h2>
+          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.21.0)</h2>
           <p class="bestiary-note"><b class="c-orange">25% Random Brute-Breach Trait:</b> Any spawned Walker, Runner, Tank, or Wrecker has a 25% chance (100% on Demolisher) to smash straight toward Safe Zones, dealing a <b>fixed unscaled 12 damage</b> (<b>16 damage</b> for Demolishers) per strike against structures &amp; Safe Zones.</p>
           <div class="zombie-intel-list">
             <div class="zombie-intel-row">
@@ -463,7 +465,7 @@
         </div>
 
         <div id="deckHint">
-          <span class="hint-text">v2.6.0 &bull; Towers target zombies only &bull; Expand $10 Safe Zones &le;3 tiles of a Breach so Commandos destroy it! &bull; Engineers +20/+40/+70 HP/s</span>
+          <span class="hint-text">v0.21.0 &bull; Towers target zombies only &bull; Expand $10 Safe Zones &le;3 tiles of a Breach so Commandos destroy it! &bull; Engineers +20/+40/+70 HP/s</span>
         </div>
       </div>
     </footer>

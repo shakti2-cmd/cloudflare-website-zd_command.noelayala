@@ -1,4 +1,4 @@
-/* Zombie Defense Command v2.6.0 - tactical command-center theme (offline, zero layout shift) */
+/* Zombie Defense Command v0.21.0 - tactical command-center theme (offline, zero layout shift) */
 :root {
   --bg: #07090d;
   --panel: #0e131b;
@@ -1139,20 +1139,36 @@ body.is-mobile-touch #upgradePanel {
   min-width: 0;
   max-width: 100%;
   flex: 0 1 auto;
-  gap: 6px;
+  gap: 4px;
   pointer-events: auto;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
 }
+body.is-mobile-touch #upgradePanel .inspector-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  width: auto;
+  flex-wrap: nowrap;
+}
 body.is-mobile-touch .action-btn {
-  min-width: 52px;
+  min-width: 48px;
+  max-width: 68px;
   height: 42px;
-  padding: 2px 6px;
+  padding: 2px 4px;
   font-size: 10px;
+  flex: 1 1 auto;
 }
 body.is-mobile-touch .train-btn {
   width: auto;
-  min-width: 86px;
-  flex: 0 0 auto;
+  min-width: 48px;
+  max-width: 68px;
+  flex: 1 1 auto;
+}
+body.is-mobile-touch .action-btn span:first-child {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 body.is-mobile-touch .camera-controls {
   right: 8px;
