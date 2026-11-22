@@ -1159,6 +1159,16 @@
       this.subGroupBuildings = $('subGroupBuildings');
       this.subGroupTowers = $('subGroupTowers');
       this.activeMobileCategory = null;
+
+      this.btnInspectDetails = $('btnInspectDetails');
+      this.mobileWaveTimerLabel = $('mobileWaveTimerLabel');
+      this.btnMobileSettings = $('btnMobileSettings');
+      this.mobileSettingsMenu = $('mobileSettingsMenu');
+      this.btnMobileZombies = $('btnMobileZombies');
+      this.btnMobileReset = $('btnMobileReset');
+      this.btnMobileAudio = $('btnMobileAudio');
+      this.btnMobileHelp = $('btnMobileHelp');
+      this.btnMobileMenu = $('btnMobileMenu');
     }
 
     bindEvents() {
@@ -1377,11 +1387,75 @@
       }
 
       // Inspector buttons
+      on(this.btnInspectDetails, 'click', () => {
+        if (this.upgradePanel) {
+          this.upgradePanel.classList.toggle('details-expanded');
+          this.sound.playClick();
+        }
+      });
       on(this.btnTrainUnit, 'click', () => this.trainFromSelectedBuilding(this.selectedStructure));
       on(this.btnCancelTrain, 'click', () => this.cancelLastQueuedTraining(this.selectedStructure));
       on(this.btnRelease, 'click', () => this.releaseGarrisonedUnits(this.selectedStructure));
       on(this.btnUpgrade, 'click', () => this.upgradeSelectedEntity());
       on(this.btnSalvage, 'click', () => this.salvageSelectedStructure(false));
+
+      // Mobile settings popover menu
+      on(this.btnMobileSettings, 'click', (e) => {
+        e.stopPropagation();
+        if (this.mobileSettingsMenu) {
+          const isHidden = this.mobileSettingsMenu.classList.contains('hidden');
+          if (isHidden) {
+            this.closeMobileSubDrawer();
+            this.mobileSettingsMenu.classList.remove('hidden');
+            if (this.btnMobileSettings) this.btnMobileSettings.setAttribute('aria-expanded', 'true');
+          } else {
+            this.mobileSettingsMenu.classList.add('hidden');
+            if (this.btnMobileSettings) this.btnMobileSettings.setAttribute('aria-expanded', 'false');
+          }
+          this.sound.playClick();
+        }
+      });
+
+      on(this.btnMobileZombies, 'click', () => {
+        if (this.mobileSettingsMenu) this.mobileSettingsMenu.classList.add('hidden');
+        if (this.btnMobileSettings) this.btnMobileSettings.setAttribute('aria-expanded', 'false');
+        if (this.zombieGuideOpen) {
+          this.closeZombieGuide();
+        } else {
+          this.openZombieGuide();
+        }
+      });
+
+      on(this.btnMobileReset, 'click', () => {
+        if (this.mobileSettingsMenu) this.mobileSettingsMenu.classList.add('hidden');
+        if (this.btnMobileSettings) this.btnMobileSettings.setAttribute('aria-expanded', 'false');
+        this.resetCurrentLevel();
+      });
+
+      on(this.btnMobileAudio, 'click', () => {
+        this.toggleMute();
+      });
+
+      on(this.btnMobileHelp, 'click', () => {
+        if (this.mobileSettingsMenu) this.mobileSettingsMenu.classList.add('hidden');
+        if (this.btnMobileSettings) this.btnMobileSettings.setAttribute('aria-expanded', 'false');
+        this.openHowToPlay();
+      });
+
+      on(this.btnMobileMenu, 'click', () => {
+        if (this.mobileSettingsMenu) this.mobileSettingsMenu.classList.add('hidden');
+        if (this.btnMobileSettings) this.btnMobileSettings.setAttribute('aria-expanded', 'false');
+        this.returnToStartMenu();
+      });
+
+      document.addEventListener('click', (e) => {
+        if (this.mobileSettingsMenu && !this.mobileSettingsMenu.classList.contains('hidden')) {
+          if (!this.mobileSettingsMenu.contains(e.target) && e.target !== this.btnMobileSettings && !this.btnMobileSettings.contains(e.target)) {
+            this.mobileSettingsMenu.classList.add('hidden');
+            if (this.btnMobileSettings) this.btnMobileSettings.setAttribute('aria-expanded', 'false');
+          }
+        }
+      });
 
       // Canvas mouse coordinates, drag-to-paint Safe Zones, line-drag Barricades & clicks
       on(this.canvas, 'mousedown', (e) => {
@@ -1577,6 +1651,12 @@
               this.touchState.moved = true;
               this.wallDrag.curCol = Math.max(0, Math.min(COLS - 1, pt.col));
               this.wallDrag.curRow = Math.max(0, Math.min(ROWS - 1, pt.row));
+              return;
+            }
+
+            if (this.selectedStructure) {
+              this.touchState.lastX = t0.clientX;
+              this.touchState.lastY = t0.clientY;
               return;
             }
 
@@ -2047,6 +2127,9 @@
       if (this.btnMute) {
         this.btnMute.innerHTML = this.sound.muted ? '&#128263;' : '&#128266;';
         this.btnMute.classList.toggle('muted', this.sound.muted);
+      }
+      if (this.btnMobileAudio) {
+        this.btnMobileAudio.innerHTML = this.sound.muted ? '&#128263; Audio: Muted' : '&#128266; Audio: On';
       }
     }
 
@@ -3844,6 +3927,10 @@
       this.addFloatingText(`-$${plan.totalCost}`, lastX, lastY - 12, '#00E08A');
       this.updateHUD();
       this.showStatus(`Painted ${plan.affordableTiles.length} Safe Zone tile${plan.affordableTiles.length > 1 ? 's' : ''} (-$${plan.totalCost}).`);
+      if (this.isMobileTouch) {
+        this.selectedBuildType = null;
+        this.updateBuildPanelUI();
+      }
     }
 
     getWallLineDragPlan(startCol, startRow, curCol, curRow) {
@@ -3939,6 +4026,10 @@
       this.addFloatingText(`-$${plan.totalCost}`, lastX, lastY - 12, '#00FFFF');
       this.updateHUD();
       this.showStatus(`Built ${plan.validAffordable.length} Barricade${plan.validAffordable.length > 1 ? 's' : ''} (-$${plan.totalCost}).`);
+      if (this.isMobileTouch) {
+        this.selectedBuildType = null;
+        this.updateBuildPanelUI();
+      }
     }
 
     attemptBuild(type, col, row) {
@@ -4088,6 +4179,10 @@
       this.addParticles(p.x, p.y, '#00FFFF', 8, 45);
       this.updateHUD();
       this.showStatus(`Constructed ${spec.name} (Lv1).`);
+      if (this.isMobileTouch) {
+        this.selectedBuildType = null;
+        this.updateBuildPanelUI();
+      }
     }
 
     // --- CIVILIAN, BARRACKS (COMMANDO), ENGINEERING (ENGINEER), HABITAT (CIVILIAN) & TERRITORY AI ---
@@ -5443,6 +5538,7 @@
     // --- STRUCTURE, SAFE ZONE, SOLDIER & ENGINEER INSPECTOR ---
     selectStructure(struct) {
       if (this.activeMobileCategory) this.closeMobileSubDrawer();
+      if (this.upgradePanel) this.upgradePanel.classList.remove('details-expanded');
       this.selectedStructure = struct;
       this.selectedBuildType = null;
       this.selectedCivilian = null;
@@ -5703,6 +5799,7 @@
 
     renderSoldierInspector(soldier) {
       if (!this.upgradePanel || !soldier) return;
+      this.upgradePanel.classList.remove('details-expanded');
       this.salvageConfirmId = null;
       this.salvageConfirmUntil = 0;
       this.selectedSoldier = soldier;
@@ -5752,6 +5849,7 @@
 
     renderEngineerInspector(engineer) {
       if (!this.upgradePanel || !engineer) return;
+      this.upgradePanel.classList.remove('details-expanded');
       this.salvageConfirmId = null;
       this.salvageConfirmUntil = 0;
       this.selectedEngineer = engineer;
@@ -5961,6 +6059,7 @@
       this.salvageConfirmId = null;
       this.salvageConfirmUntil = 0;
       if (this.btnSalvage) this.btnSalvage.classList.remove('confirming');
+      if (this.upgradePanel) this.upgradePanel.classList.remove('details-expanded');
       hideEl(this.upgradePanel);
     }
 
@@ -6056,6 +6155,9 @@
       }
       if (this.mobileWaveBonusLabel) {
         this.mobileWaveBonusLabel.innerText = bonusLabel;
+      }
+      if (this.mobileWaveTimerLabel) {
+        this.mobileWaveTimerLabel.innerText = t;
       }
     }
 

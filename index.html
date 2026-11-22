@@ -78,6 +78,15 @@
         <button id="btnSpeed" class="hud-btn" title="Toggle simulation speed">Speed: 1x</button>
         <button id="btnMute" class="hud-btn icon-only-btn" title="Mute / unmute audio (M)" aria-label="Mute / unmute audio">&#128266;</button>
         <button id="btnHudHelp" class="hud-btn icon-only-btn" title="How to play (pauses the game)" aria-label="How to play">?</button>
+        <button id="btnMobileSettings" class="hud-btn mobile-settings-btn" title="Settings" aria-label="Settings" aria-haspopup="true" aria-expanded="false">&#9881;</button>
+        <div id="mobileSettingsMenu" class="mobile-settings-menu hidden" role="menu" aria-label="Mobile Settings">
+          <div class="mobile-settings-header">TACTICAL SETTINGS</div>
+          <button id="btnMobileZombies" class="mobile-settings-item" role="menuitem">&#9763; Zombie Bestiary</button>
+          <button id="btnMobileReset" class="mobile-settings-item" role="menuitem">&#8635; Restart Sector</button>
+          <button id="btnMobileAudio" class="mobile-settings-item" role="menuitem">&#128266; Audio: On</button>
+          <button id="btnMobileHelp" class="mobile-settings-item" role="menuitem">? How To Play</button>
+          <button id="btnMobileMenu" class="mobile-settings-item" role="menuitem">&#9776; Main Menu</button>
+        </div>
       </div>
     </header>
 
@@ -351,7 +360,7 @@
       <!-- Mobile 6-Tab Navigation Bar (Active on mobile/touch only; desktop keeps #buildPanel) -->
       <nav id="mobileTabBar" class="mobile-tab-bar" role="tablist" aria-label="Tactical Command Tabs">
         <button id="tabNextWave" class="mobile-tab-btn tab-next-wave" data-tab="nextwave" type="button" role="tab" title="Launch Next Wave">
-          <span class="tab-icon">&#9654;</span><span class="tab-label">Next Wave</span><span id="mobileWaveBonusLabel" class="tab-cost">+$30</span>
+          <span class="tab-icon">&#9654;</span><span class="tab-label">Next Wave</span><span id="mobileWaveBonusLabel" class="tab-cost">+$30</span><span id="mobileWaveTimerLabel" class="tab-timer">T-20s</span>
         </button>
         <button id="tabPause" class="mobile-tab-btn" data-tab="pause" type="button" role="tab" title="Pause / Resume Game">
           <span id="tabPauseIcon" class="tab-icon">&#10074;&#10074;</span><span id="tabPauseLabel" class="tab-label">Pause</span>
@@ -442,6 +451,7 @@
             </div>
           </div>
           <div class="inspector-actions">
+            <button id="btnInspectDetails" class="action-btn details-btn" title="Toggle Stats Details"><span>Details</span></button>
             <select id="unitTrainSelect" class="train-select hidden" title="Select specialist unit to train from garrisoned Lv1 Recruits">
               <option value="engineer" selected>Engineer (4.0s Auto-Repair)</option>
             </select>
