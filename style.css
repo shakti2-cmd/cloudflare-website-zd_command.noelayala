@@ -534,6 +534,18 @@ kbd { font-family: var(--mono); font-size: 11px; background: #1b2638; border: 1p
   border-color: rgba(255, 154, 31, 0.35);
 }
 .upgrade-btn:hover:not(:disabled) { border-color: var(--color-cyan); }
+.move-btn:hover:not(:disabled) { border-color: var(--color-cyan); }
+.move-btn.moving-active {
+  border-color: var(--color-cyan);
+  background: #10324a;
+  color: var(--color-cyan);
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.45);
+}
+.move-btn.on-cooldown {
+  border-color: rgba(255, 154, 31, 0.55);
+  color: var(--color-orange);
+  background: rgba(255, 154, 31, 0.1);
+}
 .salvage-btn:hover:not(:disabled) { border-color: var(--color-orange); }
 .salvage-btn.confirming {
   border-color: var(--color-red);
@@ -1115,6 +1127,11 @@ body.is-mobile-touch .details-btn {
   display: none !important;
 }
 body.is-mobile-touch #upgradePanel .inspector-body {
+  display: none !important;
+}
+body.is-mobile-touch #inspectRepairStatus,
+body.is-mobile-touch #unitTrainSelect,
+body.is-mobile-touch #btnRelease {
   display: none !important;
 }
 body.is-mobile-touch #upgradePanel {

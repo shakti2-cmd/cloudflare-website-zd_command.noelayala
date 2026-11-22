@@ -914,6 +914,8 @@
 
       this.scrap = 100;
       this.score = 0;
+      this.totalCommandoKills = 0;
+      this.movingStructure = null;
       this.savedCount = 0;
       this.infectedCount = 0;
       this.civTotal = 0;
@@ -1116,6 +1118,8 @@
       this.btnRelease = $('btnRelease');
       this.releaseCountLabel = $('releaseCountLabel');
       this.inspectRepairStatus = $('inspectRepairStatus');
+      this.btnMoveStructure = $('btnMoveStructure');
+      this.moveCostLabel = $('moveCostLabel');
       this.btnUpgrade = $('btnUpgrade');
       this.upgradeCostLabel = $('upgradeCostLabel');
       this.btnSalvage = $('btnSalvage');
@@ -1389,6 +1393,7 @@
       on(this.btnTrainUnit, 'click', () => this.trainFromSelectedBuilding(this.selectedStructure));
       on(this.btnCancelTrain, 'click', () => this.cancelLastQueuedTraining(this.selectedStructure));
       on(this.btnRelease, 'click', () => this.releaseGarrisonedUnits(this.selectedStructure));
+      on(this.btnMoveStructure, 'click', () => this.toggleMoveSelectedStructure());
       on(this.btnUpgrade, 'click', () => this.upgradeSelectedEntity());
       on(this.btnSalvage, 'click', () => this.salvageSelectedStructure(false));
 
@@ -1441,14 +1446,20 @@
         this.returnToStartMenu();
       });
 
-      document.addEventListener('click', (e) => {
+      const closeMobileSettingsOnOutside = (e) => {
         if (this.mobileSettingsMenu && !this.mobileSettingsMenu.classList.contains('hidden')) {
-          if (!this.mobileSettingsMenu.contains(e.target) && e.target !== this.btnMobileSettings && !this.btnMobileSettings.contains(e.target)) {
+          if (
+            !this.mobileSettingsMenu.contains(e.target) &&
+            e.target !== this.btnMobileSettings &&
+            (!this.btnMobileSettings || !this.btnMobileSettings.contains(e.target))
+          ) {
             this.mobileSettingsMenu.classList.add('hidden');
             if (this.btnMobileSettings) this.btnMobileSettings.setAttribute('aria-expanded', 'false');
           }
         }
-      });
+      };
+      document.addEventListener('pointerdown', closeMobileSettingsOnOutside, true);
+      document.addEventListener('click', closeMobileSettingsOnOutside, true);
 
       // Canvas mouse coordinates, drag-to-paint Safe Zones, line-drag Barricades & clicks
       on(this.canvas, 'mousedown', (e) => {
@@ -2262,6 +2273,14 @@
       return this.isValidBarricadeTile(col, row);
     }
 
+    isValidGateTile(col, row) {
+      if (!inBounds(col, row)) return false;
+      const key = `${col},${row}`;
+      const existing = this.structures.get(key);
+      if (existing) return existing.type === 'wall';
+      return this.isValidBarricadeTile(col, row);
+    }
+
     countStructures(type) {
       let count = 0;
       for (const s of this.structures.values()) {
@@ -2421,6 +2440,8 @@
       const preset = DIFFICULTY_PRESETS[this.difficulty] || DIFFICULTY_PRESETS.normal;
       this.scrap = this.isTutorialMode ? 260 : preset.startingScrap;
       this.score = 0;
+      this.totalCommandoKills = 0;
+      this.movingStructure = null;
       this.savedCount = 0;
       this.infectedCount = 0;
       this.baseIntegrity = 100;
@@ -3419,6 +3440,7 @@
         }
         this.sound.playClick();
       } else if (STRUCTURE_SPECS[type]) {
+        this.movingStructure = null;
         this.safeZoneDrag = null;
         this.wallDrag = null;
         if (this.selectedBuildType === type) {
@@ -3435,6 +3457,8 @@
           const spec = STRUCTURE_SPECS[type];
           const adjHint = type === 'wall'
             ? ' Click or line-drag on a Safe Zone OR within 3 tiles of a green Safe Zone.'
+            : type === 'gate'
+            ? ' Place on an existing Barricade, Safe Zone, or within 3 tiles of a green Safe Zone.'
             : type === 'safezone'
             ? ' Click or Drag-to-Paint connected tiles ($10 each, non-upgradable).'
             : ' Must be placed directly on top of a green Safe Zone tile.';
@@ -3557,6 +3581,7 @@
     clearSelection() {
       this.selectModeActive = false;
       this.selectedBuildType = null;
+      this.movingStructure = null;
       this.safeZoneDrag = null;
       this.wallDrag = null;
       this.selectedCivilian = null;
@@ -3591,11 +3616,22 @@
       const row = Math.floor(my / TILE_SIZE);
       if (!inBounds(col, row)) return;
 
+      if (this.movingStructure) {
+        const mk = `${this.movingStructure.col},${this.movingStructure.row}`;
+        if (this.structures.get(mk) !== this.movingStructure) {
+          this.movingStructure = null;
+        } else {
+          this.attemptMoveStructure(this.movingStructure, col, row);
+          return;
+        }
+      }
+
       if (this.selectedBuildType) {
         const bKey = `${col},${row}`;
         if (
           this.isMobileTouch &&
           this.selectedBuildType !== 'wall' &&
+          this.selectedBuildType !== 'gate' &&
           this.selectedBuildType !== 'safezone' &&
           ((this.grid[row][col] === 0 && !this.safeZones.has(bKey) && !this.structures.has(bKey)) || this.grid[row][col] === 1)
         ) {
@@ -4067,6 +4103,22 @@
           this.sound.playHit();
           return;
         }
+      } else if (type === 'gate') {
+        if (!this.isValidGateTile(col, row)) {
+          const existing = this.structures.get(key);
+          if (existing && existing.type !== 'wall') {
+            this.showStatus('Gate can only replace a Barricade or be placed on an unoccupied tile.');
+            this.addFloatingText('Tile Occupied!', p.x, p.y - 12, '#FF3333');
+          } else if (this.grid[row][col] !== 0 && this.grid[row][col] !== 2) {
+            this.showStatus('Invalid tile: cannot build Gate on rock or Spawn Breach.');
+            this.addFloatingText('Invalid Tile', p.x, p.y - 12, '#FF3333');
+          } else {
+            this.showStatus('Gate must be on a Barricade, Safe Zone, or within 3 tiles of a Safe Zone!');
+            this.addFloatingText('Max 3 Tiles From Safe Zone!', p.x, p.y - 12, '#FF3333');
+          }
+          this.sound.playHit();
+          return;
+        }
       } else {
         // Universal Safe-Zone-Only Rule for ALL other buildings & towers
         if (this.grid[row][col] !== 2 || !this.safeZones.has(key)) {
@@ -4151,11 +4203,27 @@
         if (type === 'habitat') {
           struct.spawnedCivs = 0;
         }
+        const replacedWall = type === 'gate' && this.structures.get(key)?.type === 'wall';
         this.structures.set(key, struct);
         if (type === 'wall' && !this.safeZones.has(key)) this.grid[row][col] = 4;
+        if (type === 'gate' && this.grid[row][col] === 4) {
+          this.grid[row][col] = this.safeZones.has(key) ? 2 : 0;
+        }
         if (this.isTutorialMode && (type === 'habitat' || type === 'engineering' || type === 'barracks')) {
           this.selectStructure(struct);
           this.updateTutorial();
+        }
+        if (replacedWall) {
+          this.sound.playClick();
+          this.addFloatingText(`-$${spec.baseCost}`, p.x, p.y - 10, '#00FFFF');
+          this.addParticles(p.x, p.y, '#00FFFF', 8, 45);
+          this.updateHUD();
+          this.showStatus(`Replaced Barricade with ${spec.name} (Lv1).`);
+          if (this.isMobileTouch) {
+            this.selectedBuildType = null;
+            this.updateBuildPanelUI();
+          }
+          return;
         }
       }
 
@@ -5440,6 +5508,7 @@
     selectStructure(struct) {
       if (this.activeMobileCategory) this.closeMobileSubDrawer();
       if (this.upgradePanel) this.upgradePanel.classList.remove('details-expanded');
+      if (this.movingStructure && this.movingStructure !== struct) this.movingStructure = null;
       this.selectedStructure = struct;
       this.selectedBuildType = null;
       this.selectedCivilian = null;
@@ -5469,7 +5538,13 @@
       showEl(this.upgradePanel, 'flex');
       if (this.inspectIcon) this.inspectIcon.innerHTML = STRUCT_ICONS[struct.type] || '&#9646;';
       if (this.inspectName) this.inspectName.innerText = cur.name || spec.name;
-      if (this.inspectTier) this.inspectTier.innerText = `Lv${struct.level}/${maxLv} \u2022 Tile (${struct.col}, ${struct.row})`;
+      if (this.inspectTier) {
+        const isTowerOrBld = struct.type === 'sentry' || struct.type === 'cryo' || struct.type === 'sniper'
+          || struct.type === 'barracks' || struct.type === 'engineering' || struct.type === 'habitat';
+        this.inspectTier.innerText = (this.isMobileTouch && isTowerOrBld)
+          ? `Lv${struct.level}/${maxLv}`
+          : `Lv${struct.level}/${maxLv} \u2022 Tile (${struct.col}, ${struct.row})`;
+      }
       if (this.inspectHpText) this.inspectHpText.innerText = `${Math.ceil(struct.hp)} / ${struct.maxHp}`;
       if (this.inspectHpBar) {
         this.inspectHpBar.style.width = `${Math.max(0, Math.min(100, (struct.hp / struct.maxHp) * 100))}%`;
@@ -5663,6 +5738,32 @@
         showEl(this.inspectRepairStatus, 'inline-flex');
       }
 
+      if (this.btnMoveStructure) {
+        if (this.isMovableStructure(struct)) {
+          showEl(this.btnMoveStructure, 'flex');
+          const moveCost = struct.invested || spec.baseCost;
+          const onMoveCd = (struct.moveCooldown || 0) > 0;
+          const isMovingThis = this.movingStructure === struct;
+          const moveBtnLabel = this.btnMoveStructure.querySelector('span:first-child');
+          if (onMoveCd) {
+            if (moveBtnLabel) moveBtnLabel.innerText = 'Building';
+            if (this.moveCostLabel) this.moveCostLabel.innerText = `${Math.ceil(struct.moveCooldown)}s`;
+            this.btnMoveStructure.disabled = true;
+            this.btnMoveStructure.classList.add('on-cooldown');
+            this.btnMoveStructure.classList.remove('moving-active');
+          } else {
+            if (moveBtnLabel) moveBtnLabel.innerText = isMovingThis ? 'Cancel' : 'Move';
+            if (this.moveCostLabel) this.moveCostLabel.innerText = `$${moveCost}`;
+            this.btnMoveStructure.disabled = !isMovingThis && this.scrap < moveCost;
+            this.btnMoveStructure.classList.toggle('moving-active', isMovingThis);
+            this.btnMoveStructure.classList.remove('on-cooldown');
+          }
+        } else {
+          hideEl(this.btnMoveStructure);
+          this.btnMoveStructure.classList.remove('moving-active', 'on-cooldown');
+        }
+      }
+
       const upgradeBtnLabel = this.btnUpgrade ? this.btnUpgrade.querySelector('span:first-child') : null;
       if (struct.type === 'safezone') {
         if (upgradeBtnLabel) upgradeBtnLabel.innerText = 'N/A';
@@ -5723,6 +5824,8 @@
       hideEl(this.btnCancelTrain);
       hideEl(this.btnRelease);
       hideEl(this.inspectRepairStatus);
+      hideEl(this.btnMoveStructure);
+      if (this.btnMoveStructure) this.btnMoveStructure.classList.remove('moving-active', 'on-cooldown');
       const upgradeBtnLabel = this.btnUpgrade ? this.btnUpgrade.querySelector('span:first-child') : null;
       if (upgradeBtnLabel) upgradeBtnLabel.innerText = this.isMobileTouch ? 'Upgrade' : 'Upgrade [W]';
       const salvageBtnLabel = this.btnSalvage ? this.btnSalvage.querySelector('span:first-child') : null;
@@ -5775,6 +5878,8 @@
       hideEl(this.btnCancelTrain);
       hideEl(this.btnRelease);
       hideEl(this.inspectRepairStatus);
+      hideEl(this.btnMoveStructure);
+      if (this.btnMoveStructure) this.btnMoveStructure.classList.remove('moving-active', 'on-cooldown');
       const upgradeBtnLabel = this.btnUpgrade ? this.btnUpgrade.querySelector('span:first-child') : null;
       if (upgradeBtnLabel) upgradeBtnLabel.innerText = this.isMobileTouch ? 'Upgrade' : 'Upgrade [W]';
       const salvageBtnLabel = this.btnSalvage ? this.btnSalvage.querySelector('span:first-child') : null;
@@ -5954,12 +6059,113 @@
       this.selectedStructure = null;
       this.selectedSoldier = null;
       this.selectedEngineer = null;
+      this.movingStructure = null;
       this.salvageConfirmId = null;
       this.salvageConfirmUntil = 0;
       if (this.btnSalvage) this.btnSalvage.classList.remove('confirming');
+      if (this.btnMoveStructure) this.btnMoveStructure.classList.remove('moving-active', 'on-cooldown');
       if (this.upgradePanel) this.upgradePanel.classList.remove('details-expanded');
       hideEl(this.upgradePanel);
       if (this.mobileFloatingDetails) this.mobileFloatingDetails.classList.add('hidden');
+    }
+
+    isMovableStructure(struct) {
+      if (!struct) return false;
+      return struct.type === 'barracks' || struct.type === 'engineering' || struct.type === 'habitat'
+        || struct.type === 'sentry' || struct.type === 'cryo' || struct.type === 'sniper';
+    }
+
+    toggleMoveSelectedStructure() {
+      const s = this.selectedStructure;
+      if (!s || !this.inPlay || !this.isMovableStructure(s)) return;
+      if (this.movingStructure === s) {
+        this.movingStructure = null;
+        this.renderUpgradePanel(s);
+        this.showStatus('Relocation canceled.');
+        this.sound.playClick();
+        return;
+      }
+      if ((s.moveCooldown || 0) > 0) {
+        this.showStatus(`${STRUCTURE_SPECS[s.type].name} is under construction (${Math.ceil(s.moveCooldown)}s left).`);
+        this.sound.playHit();
+        return;
+      }
+      const cost = s.invested || STRUCTURE_SPECS[s.type].baseCost;
+      if (this.scrap < cost) {
+        this.showStatus(`Insufficient Scrap: relocating costs $${cost}.`);
+        this.addFloatingText('Insufficient Scrap', s.x, s.y - 12, '#FF3333');
+        this.sound.playHit();
+        return;
+      }
+      this.movingStructure = s;
+      this.selectedBuildType = null;
+      this.updateBuildPanelUI();
+      this.renderUpgradePanel(s);
+      this.showStatus(`Relocating ${STRUCTURE_SPECS[s.type].name} ($${cost}): select an unoccupied green Safe Zone tile.`);
+      this.sound.playClick();
+    }
+
+    attemptMoveStructure(struct, col, row) {
+      if (!struct || !inBounds(col, row)) return;
+      const newKey = `${col},${row}`;
+      const oldKey = `${struct.col},${struct.row}`;
+      const p = tileCenter(col, row);
+
+      if (newKey === oldKey) {
+        this.movingStructure = null;
+        this.renderUpgradePanel(struct);
+        this.showStatus('Relocation canceled.');
+        this.sound.playClick();
+        return;
+      }
+      if (this.grid[row][col] !== 2 || !this.safeZones.has(newKey) || this.structures.has(newKey)) {
+        this.showStatus('Relocation requires an unoccupied green Safe Zone tile.');
+        this.addFloatingText('Valid Safe Zone Only!', p.x, p.y - 12, '#FF3333');
+        this.sound.playHit();
+        return;
+      }
+      const cost = struct.invested || STRUCTURE_SPECS[struct.type].baseCost;
+      if (this.scrap < cost) {
+        this.movingStructure = null;
+        this.renderUpgradePanel(struct);
+        this.showStatus(`Insufficient Scrap: relocating costs $${cost}.`);
+        this.addFloatingText('Insufficient Scrap', p.x, p.y - 12, '#FF3333');
+        this.sound.playHit();
+        return;
+      }
+
+      this.scrap -= cost;
+      this.structures.delete(oldKey);
+      struct.col = col;
+      struct.row = row;
+      struct.x = p.x;
+      struct.y = p.y;
+      struct.moveCooldown = 10;
+      struct.moveDuration = 10;
+      this.structures.set(newKey, struct);
+
+      if (struct.occupants) {
+        for (const u of struct.occupants) {
+          u.x = p.x;
+          u.y = p.y;
+        }
+      }
+      if (struct.activeTrainers) {
+        for (const tr of struct.activeTrainers) {
+          if (tr.unit) {
+            tr.unit.x = p.x;
+            tr.unit.y = p.y;
+          }
+        }
+      }
+
+      this.movingStructure = null;
+      this.sound.playUpgrade();
+      this.addFloatingText(`-$${cost} Building (10s)`, p.x, p.y - 14, '#00E5FF');
+      this.addParticles(p.x, p.y, '#00E5FF', 12, 55);
+      this.updateHUD();
+      this.renderUpgradePanel(struct);
+      this.showStatus(`${STRUCTURE_SPECS[struct.type].name} relocated! Under construction for 10s.`);
     }
 
     updateMobileFloatingDetails(entity) {
@@ -5970,44 +6176,91 @@
       }
 
       const parts = [];
-      if (entity.hp !== undefined && entity.maxHp !== undefined) {
-        parts.push(`HP: ${Math.ceil(entity.hp)}/${entity.maxHp}`);
-      }
-
-      if (entity.type) {
-        if (entity.type === 'safezone') {
-          const auraPct = Math.round((this.getSafeZoneDmgMult() - 1) * 100);
-          parts.push(`Aura: +${auraPct}% DMG`);
-          parts.push(`Safe Zones: ${this.safeZones.size}`);
-        } else {
-          const spec = STRUCTURE_SPECS[entity.type];
-          if (spec && spec.levels) {
-            const cur = spec.levels[entity.level - 1];
-            if (cur) {
-              if (cur.range) parts.push(`Rng: ${cur.range}px`);
-              if (cur.dmg) {
-                const mult = this.getSafeZoneDmgMult();
-                parts.push(`Dmg: ${Math.round(cur.dmg * mult)}`);
-              } else if (entity.type === 'cryo' && cur.slow) {
-                parts.push(`Slow: ${Math.round(cur.slow * 100)}%`);
-              }
-              if (entity.kills !== undefined) parts.push(`Kills: ${entity.kills}`);
-
-              const key = `${entity.col},${entity.row}`;
-              const canAutoRepair = entity.type === 'safezone'
-                || this.safeZones.has(key)
-                || (entity.type === 'wall' && this.isBarricadeConnectedToSafeZone(entity.col, entity.row));
-              parts.push(canAutoRepair ? 'Auto-Repair: ON' : 'Auto-Repair: OFF');
+      if (entity.type === 'barracks') {
+        parts.push(`Barracks Kills: ${this.totalCommandoKills || 0}`);
+      } else if (entity.type === 'engineering') {
+        let totalEng = this.engineers.length;
+        for (const st of this.structures.values()) {
+          if (st.occupants) {
+            for (const u of st.occupants) {
+              if (u.unitType === 'engineer') totalEng++;
             }
           }
         }
-      } else if (entity.isCommando !== undefined || entity.kills !== undefined) {
-        if (entity.range) parts.push(`Rng: ${entity.range}px`);
-        if (entity.dmg) parts.push(`Dmg: ${entity.dmg}`);
-        if (entity.kills !== undefined) parts.push(`Kills: ${entity.kills}`);
-      } else if (entity.repairRate !== undefined) {
-        parts.push(`Weld: +${entity.repairRate} HP/s`);
-        if (entity.repairedTotal !== undefined) parts.push(`Repaired: ${Math.floor(entity.repairedTotal)} HP`);
+        parts.push(`Engineers: ${totalEng}`);
+      } else if (entity.type === 'habitat') {
+        let totalSol = this.soldiers.length;
+        let totalEng = this.engineers.length;
+        let totalTowers = 0;
+        for (const st of this.structures.values()) {
+          if (st.type === 'sentry' || st.type === 'cryo' || st.type === 'sniper') totalTowers++;
+          if (st.occupants) {
+            for (const u of st.occupants) {
+              if (u.unitType === 'engineer') totalEng++;
+              else totalSol++;
+            }
+          }
+        }
+        parts.push(`Soldiers: ${totalSol}`);
+        parts.push(`Engineers: ${totalEng}`);
+        parts.push(`Civilians: ${this.civilians.length}`);
+        parts.push(`Towers: ${totalTowers}`);
+      } else if (entity.type === 'sentry' || entity.type === 'cryo' || entity.type === 'sniper') {
+        if (entity.hp !== undefined && entity.maxHp !== undefined) {
+          parts.push(`HP: ${Math.ceil(entity.hp)}/${entity.maxHp}`);
+        }
+        const spec = STRUCTURE_SPECS[entity.type];
+        const cur = spec && spec.levels ? spec.levels[entity.level - 1] : null;
+        if (cur) {
+          if (cur.range) {
+            const tiles = Math.round(cur.range / 40);
+            parts.push(`Rng: ${tiles} ${tiles === 1 ? 'tile' : 'tiles'}`);
+          }
+          if (cur.dmg) {
+            const mult = this.getSafeZoneDmgMult();
+            parts.push(`Dmg: ${Math.round(cur.dmg * mult)}`);
+          } else if (entity.type === 'cryo' && cur.slow) {
+            parts.push(`Slow: ${Math.round(cur.slow * 100)}%`);
+          }
+          if (entity.kills !== undefined) parts.push(`Kills: ${entity.kills}`);
+        }
+      } else {
+        if (entity.hp !== undefined && entity.maxHp !== undefined) {
+          parts.push(`HP: ${Math.ceil(entity.hp)}/${entity.maxHp}`);
+        }
+
+        if (entity.type) {
+          if (entity.type === 'safezone') {
+            const auraPct = Math.round((this.getSafeZoneDmgMult() - 1) * 100);
+            parts.push(`Aura: +${auraPct}% DMG`);
+            parts.push(`Safe Zones: ${this.safeZones.size}`);
+          } else {
+            const spec = STRUCTURE_SPECS[entity.type];
+            if (spec && spec.levels) {
+              const cur = spec.levels[entity.level - 1];
+              if (cur) {
+                if (cur.range) parts.push(`Rng: ${cur.range}px`);
+                if (cur.dmg) {
+                  const mult = this.getSafeZoneDmgMult();
+                  parts.push(`Dmg: ${Math.round(cur.dmg * mult)}`);
+                }
+                if (entity.kills !== undefined) parts.push(`Kills: ${entity.kills}`);
+
+                const key = `${entity.col},${entity.row}`;
+                const canAutoRepair = this.safeZones.has(key)
+                  || (entity.type === 'wall' && this.isBarricadeConnectedToSafeZone(entity.col, entity.row));
+                parts.push(canAutoRepair ? 'Auto-Repair: ON' : 'Auto-Repair: OFF');
+              }
+            }
+          }
+        } else if (entity.isCommando !== undefined || entity.kills !== undefined) {
+          if (entity.range) parts.push(`Rng: ${entity.range}px`);
+          if (entity.dmg) parts.push(`Dmg: ${entity.dmg}`);
+          if (entity.kills !== undefined) parts.push(`Kills: ${entity.kills}`);
+        } else if (entity.repairRate !== undefined) {
+          parts.push(`Weld: +${entity.repairRate} HP/s`);
+          if (entity.repairedTotal !== undefined) parts.push(`Repaired: ${Math.floor(entity.repairedTotal)} HP`);
+        }
       }
 
       if (parts.length > 0) {
@@ -6648,7 +6901,10 @@
               maxLife: 0.1
             });
             fireTarget.hp -= hitDmg;
-            if (fireTarget.hp <= 0) sol.kills = (sol.kills || 0) + 1;
+            if (fireTarget.hp <= 0) {
+              sol.kills = (sol.kills || 0) + 1;
+              if (sol.isCommando) this.totalCommandoKills = (this.totalCommandoKills || 0) + 1;
+            }
             this.addParticles(fireTarget.x, fireTarget.y, '#38E8FF', 3, 28);
           } else if (sol.isCommando) {
             const breach = this.findSpawnBreachInRange(sol.x, sol.y, sol.range);
@@ -6932,6 +7188,7 @@
 
     destroyStructure(st) {
       if (!st) return;
+      if (this.movingStructure === st) this.movingStructure = null;
       if ((st.type === 'barracks' || st.type === 'engineering') && st.occupants && st.occupants.length > 0) {
         this.releaseGarrisonedUnits(st, true);
       } else {
@@ -7340,6 +7597,16 @@
 
       for (const struct of this.structures.values()) {
         if (struct.flash > 0) struct.flash -= dt;
+        if (struct.moveCooldown > 0) {
+          struct.moveCooldown = Math.max(0, struct.moveCooldown - dt);
+          if (struct.moveCooldown <= 0) {
+            struct.moveCooldown = 0;
+            this.addFloatingText('Online!', struct.x, struct.y - 12, '#00E08A');
+            this.addParticles(struct.x, struct.y, '#00E08A', 8, 40);
+            if (this.selectedStructure === struct) this.renderUpgradePanel(struct);
+          }
+          continue;
+        }
         if (struct.type === 'wall' || struct.type === 'gate') continue;
 
         // Safe-Zone Barracks: heals occupants (+6 HP/s), fires out (aura-scaled), processes 4 parallel activeTrainers & auto-dispatches queued orders
@@ -7399,6 +7666,7 @@
                 if (fireTarget.hp <= 0) {
                   sol.kills = (sol.kills || 0) + 1;
                   struct.kills = (struct.kills || 0) + 1;
+                  if (sol.isCommando) this.totalCommandoKills = (this.totalCommandoKills || 0) + 1;
                 }
                 this.addParticles(fireTarget.x, fireTarget.y, sol.isCommando ? '#00E5FF' : '#38E8FF', 3, 28);
               }
@@ -8240,6 +8508,59 @@
         ctx.fillStyle = ratio > 0.4 ? '#00E08A' : '#FF3B3B';
         ctx.fillRect(x + 4, y + 2, (TILE_SIZE - 8) * ratio, 4);
       }
+
+      if (s.moveCooldown > 0) {
+        const dur = s.moveDuration || 10;
+        const progress = Math.max(0, Math.min(1, 1 - s.moveCooldown / dur));
+        const pulse = 0.55 + 0.45 * Math.sin(t * 7);
+
+        // Blueprint translucent cover
+        ctx.fillStyle = `rgba(7, 16, 26, ${0.52 + 0.1 * pulse})`;
+        ctx.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+
+        // Animated dashed amber/cyan scaffold border
+        ctx.save();
+        ctx.strokeStyle = pulse > 0.7 ? '#00E5FF' : '#FF9A1F';
+        ctx.lineWidth = 1.8;
+        ctx.setLineDash([4, 3]);
+        ctx.lineDashOffset = -t * 18;
+        ctx.strokeRect(x + 3, y + 3, TILE_SIZE - 6, TILE_SIZE - 6);
+        ctx.restore();
+
+        // Pulsing hazard corners
+        ctx.strokeStyle = `rgba(255, 154, 31, ${0.6 + 0.4 * pulse})`;
+        ctx.lineWidth = 2;
+        const cLen = 6;
+        const corners = [
+          [x + 2, y + 2, 1, 1],
+          [x + TILE_SIZE - 2, y + 2, -1, 1],
+          [x + 2, y + TILE_SIZE - 2, 1, -1],
+          [x + TILE_SIZE - 2, y + TILE_SIZE - 2, -1, -1]
+        ];
+        for (const [cx, cy, dx, dy] of corners) {
+          ctx.beginPath();
+          ctx.moveTo(cx + dx * cLen, cy);
+          ctx.lineTo(cx, cy);
+          ctx.lineTo(cx, cy + dy * cLen);
+          ctx.stroke();
+        }
+        ctx.lineWidth = 1;
+
+        // Construction progress bar
+        ctx.fillStyle = 'rgba(0,0,0,0.8)';
+        ctx.fillRect(x + 4, y + TILE_SIZE - 9, TILE_SIZE - 8, 5);
+        ctx.fillStyle = '#00E5FF';
+        ctx.fillRect(x + 4, y + TILE_SIZE - 9, (TILE_SIZE - 8) * progress, 5);
+
+        // Countdown text
+        ctx.font = 'bold 10px Consolas, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#000000';
+        ctx.fillText(`${Math.ceil(s.moveCooldown)}s`, x + TILE_SIZE / 2 + 1, y + TILE_SIZE / 2 + 2);
+        ctx.fillStyle = '#FFD23F';
+        ctx.fillText(`${Math.ceil(s.moveCooldown)}s`, x + TILE_SIZE / 2, y + TILE_SIZE / 2 + 1);
+        ctx.textAlign = 'left';
+      }
     }
 
     renderPulseRings(ctx) {
@@ -8523,7 +8844,51 @@
     }
 
     renderBuildPreview(ctx) {
-      if (!this.selectedBuildType || !this.inPlay || this.modalBlocking) return;
+      if (!this.inPlay || this.modalBlocking) return;
+
+      if (this.movingStructure) {
+        const s = this.movingStructure;
+        // Softly highlight all valid unoccupied green Safe Zone tiles
+        for (const sz of this.safeZones.values()) {
+          const sk = `${sz.col},${sz.row}`;
+          if (this.structures.has(sk)) continue;
+          ctx.fillStyle = 'rgba(0, 229, 255, 0.12)';
+          ctx.fillRect(sz.col * TILE_SIZE + 2, sz.row * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+          ctx.strokeStyle = 'rgba(0, 229, 255, 0.45)';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(sz.col * TILE_SIZE + 2, sz.row * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+        }
+
+        const mc = this.mouseTile.col;
+        const mr = this.mouseTile.row;
+        if (!inBounds(mc, mr)) return;
+        const key = `${mc},${mr}`;
+        const ok = this.grid[mr][mc] === 2 && this.safeZones.has(key) && !this.structures.has(key);
+        const x = mc * TILE_SIZE;
+        const y = mr * TILE_SIZE;
+        const col = ok ? '0,229,255' : '255,51,51';
+        ctx.fillStyle = `rgba(${col}, 0.28)`;
+        ctx.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+        ctx.strokeStyle = `rgba(${col}, 0.95)`;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+        ctx.lineWidth = 1;
+
+        const spec = STRUCTURE_SPECS[s.type];
+        const lv = spec && spec.levels ? spec.levels[Math.min(s.level - 1, spec.levels.length - 1)] : null;
+        if (lv && lv.range) {
+          const center = tileCenter(mc, mr);
+          ctx.strokeStyle = `rgba(${col}, 0.45)`;
+          ctx.setLineDash([5, 5]);
+          ctx.beginPath();
+          ctx.arc(center.x, center.y, lv.range, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        return;
+      }
+
+      if (!this.selectedBuildType) return;
       if (this.selectedBuildType === 'safezone' && this.safeZoneDrag) {
         const plan = this.getSafeZoneDragPlan(
           this.safeZoneDrag.startCol,
@@ -8625,6 +8990,8 @@
         ok = this.canBuildSafeZoneAt(mc, mr);
       } else if (this.selectedBuildType === 'wall') {
         ok = this.isValidBarricadeTile(mc, mr);
+      } else if (this.selectedBuildType === 'gate') {
+        ok = this.isValidGateTile(mc, mr);
       } else {
         // All buildings & towers except Barricades require an unoccupied green Safe Zone tile
         ok = this.grid[mr][mc] === 2 && this.safeZones.has(key) && !this.structures.has(key)
