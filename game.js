@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.23.1 (Waiting Room Launch Flow Fix, Host Start Game Button & Guest Ready Sync)
+ * Version: v0.23.2 (Fix Multiplayer Launch Crash + 5s-to-0s Start Countdown)
  */
 
 (function () {
@@ -992,6 +992,7 @@
         ? new window.MultiplayerManager({
             onRoomsUpdated: (rooms) => this.renderMpRoomList(rooms),
             onLobbyUpdated: (lobby) => this.renderMpLobby(lobby),
+            onCountdownTick: (sec) => this.renderMpCountdown(sec),
             onMatchStart: (config) => this.initMultiplayerMatch(config),
             onStateSnapshot: (snap) => this.applyMpState(snap),
             onRemoteAction: (senderId, action) => this.handleRemoteAction(senderId, action),
@@ -1235,7 +1236,10 @@
       this.mpLobbyRoomMeta = $('mpLobbyRoomMeta');
       this.btnMpCopyRoomInfo = $('btnMpCopyRoomInfo');
       this.mpPlayerSlots = $('mpPlayerSlots');
+      this.mpCountdownBanner = $('mpCountdownBanner');
+      this.mpCountdownValue = $('mpCountdownValue');
       this.mpLobbyReadyHint = $('mpLobbyReadyHint');
+      this.mpLobbyError = $('mpLobbyError');
       this.btnMpLeaveRoom = $('btnMpLeaveRoom');
       this.btnMpToggleReady = $('btnMpToggleReady');
       this.btnMpHostStart = $('btnMpHostStart');
@@ -2427,6 +2431,8 @@
       hideEl(this.mpLobbyPanel);
       if (this.mpHostError) this.mpHostError.classList.add('hidden');
       if (this.mpJoinError) this.mpJoinError.classList.add('hidden');
+      if (this.mpLobbyError) this.mpLobbyError.classList.add('hidden');
+      if (this.mpCountdownBanner) this.mpCountdownBanner.classList.add('hidden');
 
       if (view === 'host') {
         showEl(this.mpHostPanel, 'block');
@@ -2460,6 +2466,9 @@
       } else if (this.mpJoinPanel && !this.mpJoinPanel.classList.contains('hidden') && this.mpJoinError) {
         this.mpJoinError.textContent = msg;
         this.mpJoinError.classList.remove('hidden');
+      } else if (this.mpLobbyPanel && !this.mpLobbyPanel.classList.contains('hidden') && this.mpLobbyError) {
+        this.mpLobbyError.textContent = msg;
+        this.mpLobbyError.classList.remove('hidden');
       } else {
         this.showStatus(msg);
       }
@@ -2611,6 +2620,31 @@
           this.mpLobbyReadyHint.textContent = `All ${totalPlayers} players Ready! Waiting for Host to press Start Game...`;
         }
       }
+      if (this.mp && !this.mp.isCountingDown) {
+        this.renderMpCountdown(null);
+      }
+    }
+
+    renderMpCountdown(seconds) {
+      const active = typeof seconds === 'number' && !Number.isNaN(seconds);
+      if (this.mpCountdownBanner) {
+        this.mpCountdownBanner.classList.toggle('hidden', !active);
+      }
+      if (this.mpCountdownValue && active) {
+        this.mpCountdownValue.textContent = String(Math.max(0, seconds));
+      }
+      if (this.btnMpToggleReady) {
+        this.btnMpToggleReady.disabled = active;
+      }
+      if (this.btnMpHostStart && active) {
+        this.btnMpHostStart.disabled = true;
+      }
+      if (active && this.mpLobbyReadyHint) {
+        this.mpLobbyReadyHint.textContent = seconds > 0
+          ? `Match launching in ${seconds}s...`
+          : 'Deploying squad now!';
+        this.sound.playClick();
+      }
     }
 
     copyMpRoomInfo() {
@@ -2733,7 +2767,6 @@
       this.isTutorialMode = false;
       this.isPostDefenseMode = false;
       this.isRandomMode = false;
-      this.isEndlessMode = false;
       this.currentLevel = 0;
 
       this.gameSpeed = 1;

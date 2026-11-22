@@ -1,5 +1,5 @@
 /**
- * Zombie Defense Command - 4-Player Co-Op Multiplayer Manager (v0.23.1)
+ * Zombie Defense Command - 4-Player Co-Op Multiplayer Manager (v0.23.2)
  * $0 Zero-Config WebRTC P2P Mesh (PeerJS) + Public Live Room Directory (ntfy.sh & BroadcastChannel)
  * Pure Vanilla JavaScript - 100% Static Client Deployment (Cloudflare Free Tier Safe)
  */
@@ -31,6 +31,7 @@
       this.cb = {
         onRoomsUpdated: callbacks.onRoomsUpdated || (() => {}),
         onLobbyUpdated: callbacks.onLobbyUpdated || (() => {}),
+        onCountdownTick: callbacks.onCountdownTick || (() => {}),
         onMatchStart: callbacks.onMatchStart || (() => {}),
         onStateSnapshot: callbacks.onStateSnapshot || (() => {}),
         onRemoteAction: callbacks.onRemoteAction || (() => {}),
@@ -50,6 +51,7 @@
       this.conns = new Map(); // peerId -> DataConnection (host only)
       this.hostConn = null; // guest only
       this.inMatch = false;
+      this.isCountingDown = false;
       this.intentionalLeave = false;
 
       // Live directory state
@@ -58,6 +60,8 @@
       this.dirBc = null;
       this.pruneTimer = null;
       this.announceTimer = null;
+      this.countdownTimer = null;
+      this.countdownLaunchTimer = null;
       this.heartbeatTimer = null;
       this.watchdogTimer = null;
       this.lastHostHeartbeat = 0;
@@ -296,6 +300,15 @@
         clearInterval(this.watchdogTimer);
         this.watchdogTimer = null;
       }
+      if (this.countdownTimer) {
+        clearInterval(this.countdownTimer);
+        this.countdownTimer = null;
+      }
+      if (this.countdownLaunchTimer) {
+        clearTimeout(this.countdownLaunchTimer);
+        this.countdownLaunchTimer = null;
+      }
+      this.isCountingDown = false;
     }
 
     destroyPeerResources() {
@@ -453,7 +466,7 @@
 
       if (msg.type === 'ready_toggle') {
         const p = this.players.find((pl) => pl.id === conn.peer || (msg && pl.id === msg.playerId));
-        if (!p || this.inMatch) return;
+        if (!p || this.inMatch || this.isCountingDown) return;
         p.ready = !p.ready;
         this.broadcastLobbyUpdate();
         return;
@@ -472,6 +485,9 @@
       this.players = this.players.filter((p) => p.id !== peerId);
       if (this.players.length !== before) {
         if (!this.inMatch) {
+          if (this.isCountingDown && this.players.length < 2) {
+            this.cancelCountdown(true);
+          }
           this.broadcastLobbyUpdate();
           this.publishRoom('waiting');
         } else {
@@ -498,8 +514,27 @@
       this.cb.onLobbyUpdated(lobby);
     }
 
+    cancelCountdown(notify = true) {
+      if (this.countdownTimer) {
+        clearInterval(this.countdownTimer);
+        this.countdownTimer = null;
+      }
+      if (this.countdownLaunchTimer) {
+        clearTimeout(this.countdownLaunchTimer);
+        this.countdownLaunchTimer = null;
+      }
+      const wasCounting = this.isCountingDown;
+      this.isCountingDown = false;
+      if (notify && wasCounting) {
+        if (this.role === 'host') {
+          this.broadcastRaw({ type: 'match_countdown_cancel' });
+        }
+        this.cb.onCountdownTick(null);
+      }
+    }
+
     hostStartMatch() {
-      if (this.role !== 'host' || this.inMatch) return false;
+      if (this.role !== 'host' || this.inMatch || this.isCountingDown) return false;
       if (this.players.length < 2) {
         this.cb.onError('At least 2 players are required to start a Multiplayer match.');
         return false;
@@ -509,6 +544,42 @@
         return false;
       }
 
+      this.isCountingDown = true;
+      let sec = 5;
+      this.broadcastRaw({ type: 'match_countdown', seconds: sec });
+      this.cb.onCountdownTick(sec);
+
+      this.countdownTimer = setInterval(() => {
+        if (this.role !== 'host' || this.inMatch || !this.isCountingDown) {
+          this.cancelCountdown(false);
+          return;
+        }
+        sec -= 1;
+        if (sec > 0) {
+          this.broadcastRaw({ type: 'match_countdown', seconds: sec });
+          this.cb.onCountdownTick(sec);
+        } else {
+          clearInterval(this.countdownTimer);
+          this.countdownTimer = null;
+          this.broadcastRaw({ type: 'match_countdown', seconds: 0 });
+          this.cb.onCountdownTick(0);
+          this.countdownLaunchTimer = setTimeout(() => {
+            this.countdownLaunchTimer = null;
+            this.launchMatchNow();
+          }, 350);
+        }
+      }, 1000);
+      return true;
+    }
+
+    launchMatchNow() {
+      if (this.role !== 'host' || this.inMatch) return false;
+      if (this.players.length < 2) {
+        this.cancelCountdown(true);
+        this.cb.onError('At least 2 players are required to start a Multiplayer match.');
+        return false;
+      }
+      this.isCountingDown = false;
       this.inMatch = true;
       this.publishRoom('playing');
       const config = {
@@ -519,6 +590,7 @@
         seed: Date.now()
       };
       this.broadcastRaw({ type: 'match_start', config });
+      this.cb.onCountdownTick(null);
       this.cb.onMatchStart(config);
       return true;
     }
@@ -616,7 +688,21 @@
             return;
           }
 
+          if (msg.type === 'match_countdown') {
+            this.isCountingDown = true;
+            this.cb.onCountdownTick(msg.seconds);
+            return;
+          }
+
+          if (msg.type === 'match_countdown_cancel') {
+            this.isCountingDown = false;
+            this.cb.onCountdownTick(null);
+            return;
+          }
+
           if (msg.type === 'match_start' && msg.config) {
+            this.isCountingDown = false;
+            this.cb.onCountdownTick(null);
             this.inMatch = true;
             this.players = (msg.config.players || []).map((p) => ({ ...p }));
             this.difficulty = msg.config.difficulty || this.difficulty;
@@ -695,7 +781,7 @@
 
     // --- SHARED ACTIONS ---
     toggleReady() {
-      if (this.inMatch) return;
+      if (this.inMatch || this.isCountingDown) return;
       if (this.role === 'host') {
         const me = this.players.find((p) => p.id === this.localId);
         if (!me) return;
