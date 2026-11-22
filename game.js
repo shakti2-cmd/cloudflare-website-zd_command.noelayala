@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.21.0 (20% Relocation Penalty, Rebalanced Soldier/Commando Strength, Clean Coverage Rings & Streamlined Main Menu)
+ * Version: v0.22.0 (Mobile Fast Unselect, Validated Main Menu, Gate Line-Drag, 3x Hard HP & Compact Actions)
  */
 
 (function () {
@@ -52,7 +52,7 @@
     hard: {
       name: 'Hard',
       startingScrap: 75,
-      zombieHpMult: 1.35,
+      zombieHpMult: 3.0,
       zombieSpeedMult: 1.35,
       infectionWindow: 1.2
     }
@@ -1073,9 +1073,16 @@
       this.startScreenOverlay = $('startScreenOverlay');
       this.difficultySelect = $('difficultySelect');
       this.startLevelSelect = $('startLevelSelect');
+      this.startMainSection = $('startMainSection');
       this.campaignSectorPanel = $('campaignSectorPanel');
+      this.startValidationMsg = $('startValidationMsg');
+      this.campaignValidationMsg = $('campaignValidationMsg');
+      this.difficultyCards = $('difficultyCards');
+      this.modeCards = $('modeCards');
+      this.levelCards = $('levelCards');
       this.btnStartMission = $('btnStartMission') || $('btnDeployMission');
       this.btnDeployMission = this.btnStartMission;
+      this.btnStartCampaignSector = $('btnStartCampaignSector');
       this.btnStartTutorial = $('btnStartTutorial');
       this.btnStartZombies = $('btnStartZombies');
       this.btnHowToPlay = $('btnHowToPlay');
@@ -1096,6 +1103,7 @@
       this.btnDismissHelp = $('btnDismissHelp');
 
       this.zombieGuideModal = $('zombieGuideModal');
+      this.bestiaryHardIndicator = $('bestiaryHardIndicator');
       this.btnCloseZombieGuide = $('btnCloseZombieGuide');
       this.btnDismissZombieGuide = $('btnDismissZombieGuide');
 
@@ -1471,16 +1479,16 @@
       document.addEventListener('pointerdown', closeMobileSettingsOnOutside, true);
       document.addEventListener('click', closeMobileSettingsOnOutside, true);
 
-      // Canvas mouse coordinates, drag-to-paint Safe Zones, line-drag Barricades & clicks
+      // Canvas mouse coordinates, drag-to-paint Safe Zones, line-drag Barricades & Gates & clicks
       on(this.canvas, 'mousedown', (e) => {
         if (e.button !== 0 || !this.inPlay || this.modalBlocking) return;
-        if (this.selectedBuildType !== 'safezone' && this.selectedBuildType !== 'wall') return;
+        if (this.selectedBuildType !== 'safezone' && this.selectedBuildType !== 'wall' && this.selectedBuildType !== 'gate') return;
         const pt = this.screenToWorld(e.clientX, e.clientY);
         if (!pt || !inBounds(pt.col, pt.row)) return;
         if (this.selectedBuildType === 'safezone') {
           this.safeZoneDrag = { startCol: pt.col, startRow: pt.row, curCol: pt.col, curRow: pt.row };
         } else {
-          this.wallDrag = { startCol: pt.col, startRow: pt.row, curCol: pt.col, curRow: pt.row };
+          this.wallDrag = { startCol: pt.col, startRow: pt.row, curCol: pt.col, curRow: pt.row, type: this.selectedBuildType };
         }
       });
 
@@ -1516,8 +1524,9 @@
           const drag = this.wallDrag;
           this.wallDrag = null;
           this.suppressNextClick = true;
-          if (this.inPlay && !this.modalBlocking && this.selectedBuildType === 'wall') {
-            this.executeWallLineDragPurchase(drag.startCol, drag.startRow, drag.curCol, drag.curRow);
+          const bType = drag.type || this.selectedBuildType;
+          if (this.inPlay && !this.modalBlocking && (bType === 'wall' || bType === 'gate')) {
+            this.executeWallLineDragPurchase(drag.startCol, drag.startRow, drag.curCol, drag.curRow, bType);
           }
         }
       });
@@ -1606,11 +1615,11 @@
             this.touchState.lastY = t0.clientY;
             this.touchState.startTime = performance.now();
 
-            if ((this.selectedBuildType === 'safezone' || this.selectedBuildType === 'wall') && inBounds(pt.col, pt.row)) {
+            if ((this.selectedBuildType === 'safezone' || this.selectedBuildType === 'wall' || this.selectedBuildType === 'gate') && inBounds(pt.col, pt.row)) {
               if (this.selectedBuildType === 'safezone') {
                 this.safeZoneDrag = { startCol: pt.col, startRow: pt.row, curCol: pt.col, curRow: pt.row };
               } else {
-                this.wallDrag = { startCol: pt.col, startRow: pt.row, curCol: pt.col, curRow: pt.row };
+                this.wallDrag = { startCol: pt.col, startRow: pt.row, curCol: pt.col, curRow: pt.row, type: this.selectedBuildType };
               }
             }
           }
@@ -1713,8 +1722,9 @@
               const drag = this.wallDrag;
               this.wallDrag = null;
               this.suppressNextClick = true;
-              if (this.inPlay && !this.modalBlocking && this.selectedBuildType === 'wall') {
-                this.executeWallLineDragPurchase(drag.startCol, drag.startRow, drag.curCol, drag.curRow);
+              const bType = drag.type || this.selectedBuildType;
+              if (this.inPlay && !this.modalBlocking && (bType === 'wall' || bType === 'gate')) {
+                this.executeWallLineDragPurchase(drag.startCol, drag.startRow, drag.curCol, drag.curRow, bType);
               }
             } else if (!this.touchState.moved && !this.touchState.pinching && !this.touchState.panning) {
               const changed = e.changedTouches && e.changedTouches[0];
@@ -1989,9 +1999,14 @@
       });
 
       const readyToDeploy = !!diff && !!mode && (mode !== 'campaign' || !!lvl);
-      if (this.btnStartMission) this.btnStartMission.disabled = !readyToDeploy;
-      if (this.btnDeployMission) this.btnDeployMission.disabled = !readyToDeploy;
-      if (this.btnStartCampaignSector) this.btnStartCampaignSector.disabled = !readyToDeploy;
+      if (readyToDeploy) {
+        if (this.startValidationMsg) this.startValidationMsg.classList.add('hidden');
+        if (this.campaignValidationMsg) this.campaignValidationMsg.classList.add('hidden');
+      }
+      // Keep Start Mission buttons clickable so clicks trigger validation prompts
+      if (this.btnStartMission) this.btnStartMission.disabled = false;
+      if (this.btnDeployMission) this.btnDeployMission.disabled = false;
+      if (this.btnStartCampaignSector) this.btnStartCampaignSector.disabled = false;
     }
 
     // --- LIVE CANVAS PORTRAITS IN ZOMBIE BESTIARY (#zombieGuideModal) ---
@@ -2057,6 +2072,10 @@
         this.setPaused(true);
         this.zombieGuidePausedGame = true;
       }
+      const isHard = (this.selectedDifficulty === 'hard') || (this.difficulty === 'hard');
+      if (this.bestiaryHardIndicator) {
+        this.bestiaryHardIndicator.classList.toggle('hidden', !isHard);
+      }
       this.renderBestiaryPortraits();
       showEl(this.zombieGuideModal, 'flex');
       if (this.btnHudZombies) this.btnHudZombies.classList.add('active');
@@ -2077,16 +2096,56 @@
     }
 
     deployFromStartScreen() {
-      if (!this.selectedDifficulty || !this.startMenuMode) {
-        this.showStatus('Please select a Threat Level and Mission Mode first!');
+      const missingDiff = !this.selectedDifficulty;
+      const missingMode = !this.startMenuMode;
+      const missingLevel = this.startMenuMode === 'campaign' && !this.selectedCampaignLevel;
+
+      if (missingDiff || missingMode || missingLevel) {
+        let msg = '';
+        if (missingDiff && missingMode) {
+          msg = 'SELECT THREAT LEVEL & MISSION MODE TO DEPLOY';
+        } else if (missingDiff) {
+          msg = 'SELECT THREAT LEVEL TO DEPLOY';
+        } else if (missingMode) {
+          msg = 'SELECT MISSION MODE TO DEPLOY';
+        } else if (missingLevel) {
+          msg = 'SELECT A CAMPAIGN SECTOR TO DEPLOY';
+        }
+
+        const inCampaignPanel = this.campaignSectorPanel && !this.campaignSectorPanel.classList.contains('hidden');
+        const activeMsgEl = inCampaignPanel ? (this.campaignValidationMsg || this.startValidationMsg) : this.startValidationMsg;
+
+        if (activeMsgEl) {
+          activeMsgEl.textContent = msg;
+          activeMsgEl.classList.remove('hidden');
+        }
+
+        if (missingDiff && this.difficultyCards) {
+          this.difficultyCards.classList.remove('pulse-required');
+          void this.difficultyCards.offsetWidth;
+          this.difficultyCards.classList.add('pulse-required');
+          setTimeout(() => this.difficultyCards?.classList.remove('pulse-required'), 1500);
+        }
+        if (missingMode && this.modeCards) {
+          this.modeCards.classList.remove('pulse-required');
+          void this.modeCards.offsetWidth;
+          this.modeCards.classList.add('pulse-required');
+          setTimeout(() => this.modeCards?.classList.remove('pulse-required'), 1500);
+        }
+        if (missingLevel && this.levelCards) {
+          this.levelCards.classList.remove('pulse-required');
+          void this.levelCards.offsetWidth;
+          this.levelCards.classList.add('pulse-required');
+          setTimeout(() => this.levelCards?.classList.remove('pulse-required'), 1500);
+        }
+
+        this.showStatus(msg);
         this.sound.playHit();
         return;
       }
-      if (this.startMenuMode === 'campaign' && !this.selectedCampaignLevel) {
-        this.showStatus('Please select a Campaign Sector!');
-        this.sound.playHit();
-        return;
-      }
+
+      if (this.startValidationMsg) this.startValidationMsg.classList.add('hidden');
+      if (this.campaignValidationMsg) this.campaignValidationMsg.classList.add('hidden');
       this.sound.unlock();
       const diffVal = this.selectedDifficulty;
       this.difficulty = DIFFICULTY_PRESETS[diffVal] ? diffVal : 'normal';
@@ -2137,6 +2196,8 @@
       this.selectedDifficulty = null;
       this.startMenuMode = null;
       this.selectedCampaignLevel = null;
+      if (this.startValidationMsg) this.startValidationMsg.classList.add('hidden');
+      if (this.campaignValidationMsg) this.campaignValidationMsg.classList.add('hidden');
       hideEl(this.gameOverOverlay);
       if (this.startMainSection) showEl(this.startMainSection, 'block');
       if (this.campaignSectorPanel) hideEl(this.campaignSectorPanel);
@@ -3682,6 +3743,10 @@
             return;
           }
           this.commandSoldierToBarracks(this.selectedSoldier, clickedStruct);
+          if (this.isMobileTouch) {
+            this.selectedSoldier = null;
+            this.closeUpgradePanel();
+          }
           return;
         }
         if (clickedStruct.type === 'engineering') {
@@ -3692,6 +3757,10 @@
             return;
           }
           this.commandSoldierToEngineering(this.selectedSoldier, clickedStruct);
+          if (this.isMobileTouch) {
+            this.selectedSoldier = null;
+            this.closeUpgradePanel();
+          }
           return;
         }
       }
@@ -3699,6 +3768,10 @@
       // Engineer selected -> clicking Engineering puts Engineer on standby inside (+6 HP/s)
       if (this.selectedEngineer && clickedStruct && clickedStruct.type === 'engineering') {
         this.commandEngineerToEngineering(this.selectedEngineer, clickedStruct);
+        if (this.isMobileTouch) {
+          this.selectedEngineer = null;
+          this.closeUpgradePanel();
+        }
         return;
       }
 
@@ -3784,6 +3857,10 @@
         if (this.commandCivilianMove(this.selectedCivilian, col, row)) {
           if (this.selectedCivilian.path.length > 0) this.selectedCivilian.manualMoveOrder = true;
         }
+        if (this.isMobileTouch) {
+          this.selectedCivilian = null;
+          this.closeUpgradePanel();
+        }
         return;
       }
 
@@ -3791,12 +3868,20 @@
       if (this.selectedEngineer) {
         if (clickedStruct && clickedStruct.type !== 'safezone' && !(clickedStruct.type === 'gate' && clickedStruct.hp >= clickedStruct.maxHp)) {
           this.commandEngineerToTarget(this.selectedEngineer, clickedStruct);
+          if (this.isMobileTouch) {
+            this.selectedEngineer = null;
+            this.closeUpgradePanel();
+          }
           return;
         }
         this.selectedEngineer.targetEngineering = null;
         this.selectedEngineer.manualOrder = true;
         if (this.commandUnitMove(this.selectedEngineer, col, row, 'Engineer', true)) {
           if (this.selectedEngineer.path.length > 0) this.selectedEngineer.manualMoveOrder = true;
+        }
+        if (this.isMobileTouch) {
+          this.selectedEngineer = null;
+          this.closeUpgradePanel();
         }
         return;
       }
@@ -3813,6 +3898,10 @@
         this.selectedSoldier.manualOrder = true;
         if (this.commandUnitMove(this.selectedSoldier, col, row, this.selectedSoldier.isCommando ? 'Commando' : 'Soldier', !!this.selectedSoldier.isCommando)) {
           if (this.selectedSoldier.path.length > 0) this.selectedSoldier.manualMoveOrder = true;
+        }
+        if (this.isMobileTouch) {
+          this.selectedSoldier = null;
+          this.closeUpgradePanel();
         }
         return;
       }
@@ -3978,7 +4067,7 @@
       }
     }
 
-    getWallLineDragPlan(startCol, startRow, curCol, curRow) {
+    getWallLineDragPlan(startCol, startRow, curCol, curRow, type = 'wall') {
       const sc = Math.max(0, Math.min(COLS - 1, startCol));
       const sr = Math.max(0, Math.min(ROWS - 1, startRow));
       const cc = Math.max(0, Math.min(COLS - 1, curCol));
@@ -3995,14 +4084,15 @@
           coords.push([sc, r]);
         }
       }
-      const unitCost = STRUCTURE_SPECS.wall.baseCost;
+      const unitCost = STRUCTURE_SPECS[type]?.baseCost || (type === 'gate' ? 100 : 10);
       let affordQuota = Math.floor(this.scrap / unitCost);
       const validAffordable = [];
       const validUnaffordable = [];
       const invalidTiles = [];
       for (let i = 0; i < coords.length; i++) {
         const [c, r] = coords[i];
-        if (this.isValidBarricadeTile(c, r)) {
+        const isValid = type === 'gate' ? this.isValidGateTile(c, r) : this.isValidBarricadeTile(c, r);
+        if (isValid) {
           if (validAffordable.length < affordQuota) {
             validAffordable.push([c, r]);
           } else {
@@ -4017,39 +4107,47 @@
         validAffordable,
         validUnaffordable,
         invalidTiles,
-        totalCost: validAffordable.length * unitCost
+        totalCost: validAffordable.length * unitCost,
+        unitCost
       };
     }
 
-    executeWallLineDragPurchase(startCol, startRow, curCol, curRow) {
-      const plan = this.getWallLineDragPlan(startCol, startRow, curCol, curRow);
+    executeWallLineDragPurchase(startCol, startRow, curCol, curRow, type = 'wall') {
+      const plan = this.getWallLineDragPlan(startCol, startRow, curCol, curRow, type);
+      const spec = STRUCTURE_SPECS[type] || STRUCTURE_SPECS.wall;
       if (plan.validAffordable.length === 0) {
         const p = tileCenter(curCol, curRow);
         if (plan.validUnaffordable.length > 0) {
-          this.showStatus(`Insufficient Scrap: Barricade costs $${STRUCTURE_SPECS.wall.baseCost}.`);
+          this.showStatus(`Insufficient Scrap: ${spec.name} costs $${spec.baseCost}.`);
           this.addFloatingText('Insufficient Scrap', p.x, p.y - 12, '#FF3333');
         } else {
-          this.showStatus('Barricades must be placed on Safe Zones or empty tiles within 3 tiles of a Safe Zone!');
+          const msg = type === 'gate'
+            ? 'Gates must be on Barricades, Safe Zones, or within 3 tiles of a Safe Zone!'
+            : 'Barricades must be placed on Safe Zones or empty tiles within 3 tiles of a Safe Zone!';
+          this.showStatus(msg);
           this.addFloatingText('Max 3 Tiles From Safe Zone!', p.x, p.y - 12, '#FF3333');
         }
         this.sound.playHit();
         return;
       }
 
-      const spec = STRUCTURE_SPECS.wall;
       const lv = spec.levels[0];
       this.scrap -= plan.totalCost;
       let lastX = 0;
       let lastY = 0;
+      let replacedCount = 0;
       for (let i = 0; i < plan.validAffordable.length; i++) {
         const [c, r] = plan.validAffordable[i];
         const key = `${c},${r}`;
         const p = tileCenter(c, r);
         lastX = p.x;
         lastY = p.y;
+        if (type === 'gate' && this.structures.get(key)?.type === 'wall') {
+          replacedCount++;
+        }
         this.structures.set(key, {
           id: Math.random().toString(36).slice(2, 11),
-          type: 'wall',
+          type,
           level: 1,
           hp: lv.hp,
           maxHp: lv.hp,
@@ -4064,13 +4162,20 @@
           angle: -Math.PI / 2,
           flash: 0
         });
-        if (!this.safeZones.has(key)) this.grid[r][c] = 4;
-        this.addParticles(p.x, p.y, '#00FFFF', 6, 40);
+        if (type === 'wall' && !this.safeZones.has(key)) {
+          this.grid[r][c] = 4;
+        } else if (type === 'gate' && this.grid[r][c] === 4) {
+          this.grid[r][c] = this.safeZones.has(key) ? 2 : 0;
+        }
+        this.addParticles(p.x, p.y, type === 'gate' ? '#FFD23F' : '#00FFFF', 6, 40);
       }
       this.sound.playClick();
       this.addFloatingText(`-$${plan.totalCost}`, lastX, lastY - 12, '#00FFFF');
       this.updateHUD();
-      this.showStatus(`Built ${plan.validAffordable.length} Barricade${plan.validAffordable.length > 1 ? 's' : ''} (-$${plan.totalCost}).`);
+      const name = spec.name;
+      const count = plan.validAffordable.length;
+      const desc = replacedCount > 0 ? ` (${replacedCount} replaced Barricades)` : '';
+      this.showStatus(`Built ${count} ${name}${count > 1 ? 's' : ''}${desc} (-$${plan.totalCost}).`);
       if (this.isMobileTouch) {
         this.selectedBuildType = null;
         this.updateBuildPanelUI();
@@ -5614,21 +5719,13 @@
         if (this.btnTrainUnit) {
           showEl(this.btnTrainUnit, 'flex');
           this.btnTrainUnit.disabled = committed >= maxRoster || this.getTotalQueuedTrainOrders() >= 10 || this.scrap < trainCost;
-          if (trainBtnLabel) trainBtnLabel.innerText = committed >= maxRoster ? 'Roster Full' : (this.isMobileTouch ? 'Train' : 'Train Commando');
+          const qTag = trainQueue.length > 0 ? ` (Q:${trainQueue.length})` : '';
+          if (trainBtnLabel) trainBtnLabel.innerText = committed >= maxRoster ? 'Roster Full' : ((this.isMobileTouch ? 'Train' : 'Train Commando') + qTag);
         }
         if (this.trainCostLabel) {
           this.trainCostLabel.innerText = committed >= maxRoster ? `${rosterCount}/${maxRoster}` : `$${trainCost}`;
         }
-        if (this.btnCancelTrain) {
-          showEl(this.btnCancelTrain, 'flex');
-          this.btnCancelTrain.classList.toggle('slot-hidden', trainQueue.length === 0);
-          this.btnCancelTrain.disabled = trainQueue.length === 0;
-          if (this.cancelTrainLabel) {
-            this.cancelTrainLabel.innerText = trainQueue.length > 0
-              ? `+$${trainQueue[trainQueue.length - 1].cost || trainCost}`
-              : '+$0';
-          }
-        }
+        if (this.btnCancelTrain) hideEl(this.btnCancelTrain);
         if (this.btnRelease) {
           showEl(this.btnRelease, 'flex');
           this.btnRelease.disabled = occ === 0;
@@ -5668,21 +5765,13 @@
         if (this.btnTrainUnit) {
           showEl(this.btnTrainUnit, 'flex');
           this.btnTrainUnit.disabled = committed >= maxRoster || this.getTotalQueuedTrainOrders() >= 10 || this.scrap < trainCost;
-          if (trainBtnLabel) trainBtnLabel.innerText = committed >= maxRoster ? 'Roster Full' : (this.isMobileTouch ? 'Train' : 'Train Engineer');
+          const qTag = trainQueue.length > 0 ? ` (Q:${trainQueue.length})` : '';
+          if (trainBtnLabel) trainBtnLabel.innerText = committed >= maxRoster ? 'Roster Full' : ((this.isMobileTouch ? 'Train' : 'Train Engineer') + qTag);
         }
         if (this.trainCostLabel) {
           this.trainCostLabel.innerText = committed >= maxRoster ? `${rosterCount}/${maxRoster}` : `$${trainCost}`;
         }
-        if (this.btnCancelTrain) {
-          showEl(this.btnCancelTrain, 'flex');
-          this.btnCancelTrain.classList.toggle('slot-hidden', trainQueue.length === 0);
-          this.btnCancelTrain.disabled = trainQueue.length === 0;
-          if (this.cancelTrainLabel) {
-            this.cancelTrainLabel.innerText = trainQueue.length > 0
-              ? `+$${trainQueue[trainQueue.length - 1].cost || trainCost}`
-              : '+$0';
-          }
-        }
+        if (this.btnCancelTrain) hideEl(this.btnCancelTrain);
         if (this.btnRelease) {
           showEl(this.btnRelease, 'flex');
           this.btnRelease.disabled = occ === 0;
@@ -5709,17 +5798,13 @@
         if (this.btnTrainUnit) {
           showEl(this.btnTrainUnit, 'flex');
           this.btnTrainUnit.disabled = qLen >= maxQ || this.scrap < trainCost;
-          if (trainBtnLabel) trainBtnLabel.innerText = qLen >= maxQ ? 'Queue Full' : (this.isMobileTouch ? 'Recruit' : 'Recruit Civilian');
+          const qTag = qLen > 0 ? ` (Q:${qLen})` : '';
+          if (trainBtnLabel) trainBtnLabel.innerText = qLen >= maxQ ? 'Queue Full' : ((this.isMobileTouch ? 'Recruit' : 'Recruit Civilian') + qTag);
         }
         if (this.trainCostLabel) {
           this.trainCostLabel.innerText = qLen >= maxQ ? `${qLen}/${maxQ}` : `$${trainCost}`;
         }
-        if (this.btnCancelTrain) {
-          showEl(this.btnCancelTrain, 'flex');
-          this.btnCancelTrain.classList.toggle('slot-hidden', qLen === 0);
-          this.btnCancelTrain.disabled = qLen === 0 || !hasUnstarted;
-          if (this.cancelTrainLabel) this.cancelTrainLabel.innerText = qLen > 0 ? (hasUnstarted ? `+$${trainCost}` : 'RUN') : '+$0';
-        }
+        if (this.btnCancelTrain) hideEl(this.btnCancelTrain);
         hideEl(this.btnRelease);
       } else if (struct.type === 'gate') {
         hideEl(this.unitTrainSelect);
@@ -8959,18 +9044,20 @@
         return;
       }
 
-      if (this.selectedBuildType === 'wall' && this.wallDrag) {
+      if ((this.selectedBuildType === 'wall' || this.selectedBuildType === 'gate') && this.wallDrag) {
+        const bType = this.selectedBuildType;
         const plan = this.getWallLineDragPlan(
           this.wallDrag.startCol,
           this.wallDrag.startRow,
           this.wallDrag.curCol,
-          this.wallDrag.curRow
+          this.wallDrag.curRow,
+          bType
         );
         for (let i = 0; i < plan.validAffordable.length; i++) {
           const [c, r] = plan.validAffordable[i];
-          ctx.fillStyle = 'rgba(0, 224, 138, 0.35)';
+          ctx.fillStyle = bType === 'gate' ? 'rgba(255, 210, 63, 0.35)' : 'rgba(0, 224, 138, 0.35)';
           ctx.fillRect(c * TILE_SIZE + 2, r * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4);
-          ctx.strokeStyle = 'rgba(0, 224, 138, 0.9)';
+          ctx.strokeStyle = bType === 'gate' ? 'rgba(255, 210, 63, 0.9)' : 'rgba(0, 224, 138, 0.9)';
           ctx.strokeRect(c * TILE_SIZE + 2, r * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4);
         }
         for (let i = 0; i < plan.validUnaffordable.length; i++) {
@@ -8988,7 +9075,8 @@
           ctx.strokeRect(c * TILE_SIZE + 2, r * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4);
         }
 
-        const label = `+${plan.validAffordable.length} Barricade${plan.validAffordable.length === 1 ? '' : 's'} ($${plan.totalCost})`;
+        const typeName = bType === 'gate' ? 'Gate' : 'Barricade';
+        const label = `+${plan.validAffordable.length} ${typeName}${plan.validAffordable.length === 1 ? '' : 's'} ($${plan.totalCost})`;
         const labelOffsetY = this.isMobileTouch ? Math.round(42 / this.camera.zoom) : 16;
         const lx = Math.max(90, Math.min(WIDTH - 90, this.mousePos.x));
         const ly = Math.max(20, this.mousePos.y - labelOffsetY);
@@ -8996,7 +9084,7 @@
         ctx.textAlign = 'center';
         ctx.fillStyle = '#000000';
         ctx.fillText(label, lx + 1, ly + 1);
-        ctx.fillStyle = plan.validAffordable.length > 0 ? '#00E08A' : '#FF3B3B';
+        ctx.fillStyle = plan.validAffordable.length > 0 ? (bType === 'gate' ? '#FFD23F' : '#00E08A') : '#FF3B3B';
         ctx.fillText(label, lx, ly);
         ctx.textAlign = 'left';
         return;
