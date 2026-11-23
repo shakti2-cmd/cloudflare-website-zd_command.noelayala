@@ -1,5 +1,5 @@
 /**
- * Zombie Defense Command - 4-Player Co-Op Multiplayer Manager (v0.28.0)
+ * Zombie Defense Command - 4-Player Co-Op Multiplayer Manager (v0.29.0)
  * $0 Zero-Config WebRTC P2P Mesh (PeerJS) + Public Live Room Directory (ntfy.sh & BroadcastChannel)
  * Pure Vanilla JavaScript - 100% Static Client Deployment (Cloudflare Free Tier Safe)
  */
@@ -470,7 +470,7 @@
       this.roomName = cleanRoom;
       this.roomPassword = String(password || '').trim().slice(0, 20);
       this.hasPassword = !!this.roomPassword;
-      this.difficulty = ['easy', 'normal', 'hard'].includes(difficulty) ? difficulty : 'normal';
+      this.difficulty = ['easy', 'normal', 'hard', 'survival'].includes(difficulty) ? difficulty : 'normal';
       this.inMatch = false;
       this.players = [];
 

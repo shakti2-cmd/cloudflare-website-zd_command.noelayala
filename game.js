@@ -2,20 +2,25 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.28.0 (MP Init Crash Fix, Breach & Relocation Sync, No-Step-Over Structures & MP Audit)
+ * Version: v0.29.0 (Gate Passage, Engineer Fix, Survival Mode & 60s Rifts, Dynamic Map Sizes, Volume, Resume & Co-Op Ping)
  */
 
 (function () {
   'use strict';
 
-  // --- GRID CONSTANTS (32x24 / 1280x960) ---
-  const COLS = 32;
-  const ROWS = 24;
+  // --- DYNAMIC GRID CONSTANTS (Default 32x24 / 1280x960) ---
+  let COLS = 32;
+  let ROWS = 24;
   const TILE_SIZE = 40;
-  const WIDTH = 1280;
-  const HEIGHT = 960;
-  const TOTAL_CELLS = COLS * ROWS; // 768
+  let WIDTH = 1280;
+  let HEIGHT = 960;
+  let TOTAL_CELLS = COLS * ROWS; // 768
   const MAX_PATH_ITERATIONS = 1500;
+  const MAP_SIZE_PRESETS = {
+    portrait: { cols: 18, rows: 32 },
+    classic: { cols: 32, rows: 24 },
+    widescreen: { cols: 36, rows: 18 }
+  };
 
   // Tile Types:
   // 0: Empty ground (walkable, buildable)
@@ -38,23 +43,31 @@
     easy: {
       name: 'Easy',
       startingScrap: 160,
-      zombieHpMult: 0.75,
-      zombieSpeedMult: 0.75,
+      zombieHpMult: 1.0,
+      zombieSpeedMult: 0.85,
       infectionWindow: 3.0
     },
     normal: {
       name: 'Normal',
       startingScrap: 100,
-      zombieHpMult: 1.0,
+      zombieHpMult: 2.0,
       zombieSpeedMult: 1.0,
       infectionWindow: 2.0
     },
     hard: {
       name: 'Hard',
-      startingScrap: 75,
-      zombieHpMult: 3.0,
+      startingScrap: 100,
+      zombieHpMult: 4.0,
       zombieSpeedMult: 1.35,
       infectionWindow: 1.2
+    },
+    survival: {
+      name: 'Survival',
+      startingScrap: 110,
+      zombieHpMult: 1.0,
+      zombieSpeedMult: 1.0,
+      infectionWindow: 2.0,
+      isSurvival: true
     }
   };
 
@@ -331,6 +344,20 @@
       this.muted = false;
       this.onCue = null;
       this._replaying = false;
+      this.volume = 0.8;
+      try {
+        const savedVol = localStorage.getItem('zdc_master_volume');
+        if (savedVol !== null) {
+          const parsed = Number(savedVol);
+          if (Number.isFinite(parsed)) this.volume = Math.max(0, Math.min(1, parsed));
+        }
+      } catch (_) {}
+    }
+
+    setVolume(v) {
+      const n = Number(v);
+      this.volume = Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.8;
+      try { localStorage.setItem('zdc_master_volume', String(this.volume)); } catch (_) {}
     }
 
     emitCue(k, a = null) {
@@ -354,8 +381,9 @@
     }
 
     tone(freqStart, freqEnd, dur, type = 'sine', vol = 0.08) {
-      if (this.muted || !this.ctx || this.ctx.state !== 'running') return;
+      if (this.muted || this.volume <= 0.001 || !this.ctx || this.ctx.state !== 'running') return;
       try {
+        const scaledVol = Math.max(0.001, vol * this.volume);
         const now = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
@@ -364,7 +392,7 @@
         if (freqEnd && freqEnd !== freqStart) {
           osc.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), now + dur);
         }
-        gain.gain.setValueAtTime(vol, now);
+        gain.gain.setValueAtTime(scaledVol, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
@@ -795,7 +823,7 @@
         q2.push([nx, ny]);
       }
     }
-    if (openEmptyCount < 120) return false;
+    if (openEmptyCount < Math.min(120, Math.floor(TOTAL_CELLS * 0.16))) return false;
 
     for (const [spc, spr] of spawnTiles) {
       if (!seenOpen[spr * COLS + spc]) return false;
@@ -810,15 +838,15 @@
       const archIdx = Math.floor(Math.random() * RANDOM_ARCHETYPES.length);
       const archetype = RANDOM_ARCHETYPES[archIdx];
 
-      // Randomize safe zone dimensions & jitter
+      // Randomize safe zone dimensions & jitter proportionally for current COLS x ROWS
       const dc = Math.floor(Math.random() * 5) - 2;
       const dr = Math.floor(Math.random() * 3) - 1;
 
       if (archetype === 'Central Fortress' || archetype === 'Diagonal Crossfire') {
-        const r0 = Math.max(6, Math.min(13, 10 + dr));
-        const c0 = Math.max(9, Math.min(18, 13 + dc));
         const h = 3 + (attempt % 2);
-        const w = 4 + (Math.floor(Math.random() * 3));
+        const w = 4 + Math.floor(Math.random() * 3);
+        const r0 = Math.max(3, Math.min(ROWS - h - 4, Math.floor(ROWS * 0.42) + dr));
+        const c0 = Math.max(3, Math.min(COLS - w - 4, Math.floor(COLS * 0.40) + dc));
         fillRect(g, r0, r0 + h, c0, c0 + w, 2);
 
         // Partial randomized barricade ring with wide gates
@@ -831,38 +859,40 @@
         // Random rock clusters outside keep
         const numRocks = 7 + Math.floor(Math.random() * 6);
         for (let k = 0; k < numRocks; k++) {
-          const pr = 2 + Math.floor(Math.random() * (ROWS - 5));
-          const pc = 2 + Math.floor(Math.random() * (COLS - 5));
+          const pr = 2 + Math.floor(Math.random() * Math.max(2, ROWS - 5));
+          const pc = 2 + Math.floor(Math.random() * Math.max(2, COLS - 5));
           if (pr >= r0 - 3 && pr <= r0 + h + 3 && pc >= c0 - 3 && pc <= c0 + w + 3) continue;
           fillRect(g, pr, pr + (Math.random() < 0.6 ? 1 : 0), pc, pc + (Math.random() < 0.7 ? 1 : 0), 1);
         }
       } else if (archetype === 'Twin North/South Bunkers' || archetype === 'Split Bastion') {
-        const cLeft = 5 + Math.floor(Math.random() * 5);
-        const cRight = 18 + Math.floor(Math.random() * 6);
+        const cLeft = Math.max(2, Math.min(Math.max(2, COLS - 8), Math.floor(COLS * 0.16) + Math.floor(Math.random() * 3)));
+        const cRight = Math.max(2, Math.min(Math.max(2, COLS - 6), Math.floor(COLS * 0.58) + Math.floor(Math.random() * 3)));
+        const botR = Math.max(5, ROWS - 3);
         fillRect(g, 1, 2, cLeft, cLeft + 3, 2);
-        fillRect(g, 21, 22, cRight, cRight + 3, 2);
-        for (let c = cLeft; c <= cLeft + 3; c++) if (Math.random() < 0.65) g[4][c] = 4;
-        for (let c = cRight; c <= cRight + 3; c++) if (Math.random() < 0.65) g[19][c] = 4;
+        fillRect(g, botR, Math.min(ROWS - 2, botR + 1), cRight, cRight + 3, 2);
+        for (let c = cLeft; c <= cLeft + 3; c++) if (inBounds(c, 4) && Math.random() < 0.65) g[4][c] = 4;
+        for (let c = cRight; c <= cRight + 3; c++) if (inBounds(c, botR - 2) && Math.random() < 0.65) g[botR - 2][c] = 4;
 
         const numRocks = 8 + Math.floor(Math.random() * 5);
         for (let k = 0; k < numRocks; k++) {
-          const pr = 6 + Math.floor(Math.random() * 11);
-          const pc = 4 + Math.floor(Math.random() * 23);
+          const pr = Math.min(ROWS - 4, 5 + Math.floor(Math.random() * Math.max(3, ROWS - 10)));
+          const pc = Math.min(COLS - 4, 3 + Math.floor(Math.random() * Math.max(3, COLS - 7)));
           fillRect(g, pr, pr + 1, pc, pc + 1, 1);
         }
       } else if (archetype === 'East-West Siege') {
         const eastSafe = Math.random() < 0.5;
-        const rStart = 4 + Math.floor(Math.random() * 5);
-        const rEnd = rStart + 8 + Math.floor(Math.random() * 5);
+        const rStart = Math.max(3, Math.floor(ROWS * 0.18) + Math.floor(Math.random() * 4));
+        const rEnd = Math.min(ROWS - 3, rStart + Math.max(6, Math.floor(ROWS * 0.42)));
         if (eastSafe) {
-          fillRect(g, rStart, Math.min(21, rEnd), 29, 30, 2);
+          fillRect(g, rStart, rEnd, Math.max(1, COLS - 3), Math.max(1, COLS - 2), 2);
         } else {
-          fillRect(g, rStart, Math.min(21, rEnd), 1, 2, 2);
+          fillRect(g, rStart, rEnd, 1, Math.min(COLS - 2, 2), 2);
         }
-        const cols = [7 + Math.floor(Math.random() * 2), 14 + Math.floor(Math.random() * 3), 21 + Math.floor(Math.random() * 2)];
+        const cols = [Math.floor(COLS * 0.24), Math.floor(COLS * 0.48), Math.floor(COLS * 0.72)];
         for (const col of cols) {
-          const gap1 = 2 + Math.floor(Math.random() * 7);
-          const gap2 = 13 + Math.floor(Math.random() * 7);
+          if (col <= 2 || col >= COLS - 3) continue;
+          const gap1 = Math.max(3, Math.floor(ROWS * 0.25) + Math.floor(Math.random() * 3) - 1);
+          const gap2 = Math.min(ROWS - 4, Math.floor(ROWS * 0.72) + Math.floor(Math.random() * 3) - 1);
           for (let r = 2; r < ROWS - 2; r++) {
             const inGap1 = Math.abs(r - gap1) <= 2;
             const inGap2 = Math.abs(r - gap2) <= 2;
@@ -876,13 +906,13 @@
       } else {
         // Corner Redoubt (randomized corner: SE, SW, NE, or NW)
         const corner = Math.floor(Math.random() * 4);
-        const sr0 = corner < 2 ? 17 : 2;
-        const sc0 = corner % 2 === 0 ? 24 : 2;
-        fillRect(g, sr0, sr0 + 4, sc0, sc0 + 5, 2);
+        const sr0 = corner < 2 ? Math.max(2, ROWS - 7) : 2;
+        const sc0 = corner % 2 === 0 ? Math.max(2, COLS - 8) : 2;
+        fillRect(g, sr0, Math.min(ROWS - 2, sr0 + 4), sc0, Math.min(COLS - 2, sc0 + 5), 2);
         const numRocks = 9 + Math.floor(Math.random() * 5);
         for (let k = 0; k < numRocks; k++) {
-          const pr = 2 + Math.floor(Math.random() * (ROWS - 5));
-          const pc = 2 + Math.floor(Math.random() * (COLS - 5));
+          const pr = 2 + Math.floor(Math.random() * Math.max(2, ROWS - 5));
+          const pc = 2 + Math.floor(Math.random() * Math.max(2, COLS - 5));
           if (Math.abs(pr - sr0) < 6 && Math.abs(pc - sc0) < 7) continue;
           fillRect(g, pr, pr + 1, pc, pc + 1, 1);
         }
@@ -1055,6 +1085,18 @@
       this.mpSfxQueue = [];
       this.mpSfxSeq = 0;
       this.lastPlayedMpSfxId = 0;
+      this.mpPings = [];
+      this.mpSeenPingIds = new Set();
+      this._lastTapTime = 0;
+      this._lastTapX = 0;
+      this._lastTapY = 0;
+      this.cols = COLS;
+      this.rows = ROWS;
+      this.worldW = WIDTH;
+      this.worldH = HEIGHT;
+      this.mapSizePreset = (function() {
+        try { return localStorage.getItem('zdc_map_size') || 'auto'; } catch (_) { return 'auto'; }
+      })();
       if (this.sound) {
         this.sound.onCue = (kind, args) => this.recordMpSfx(kind, args);
       }
@@ -1088,9 +1130,21 @@
       this.waveState = STATE.START_MENU;
       if (document.body) document.body.classList.add('in-start-menu');
       this.syncStartCards();
+      this.syncSettingsUI();
+      this.refreshResumeButton();
       showEl(this.startScreenOverlay, 'flex');
       this.updateHUD();
       this.updateTimerHud();
+
+      const autoSaveSp = () => {
+        if (!this.isMultiplayer && !this.isTutorialMode && this.inPlay) {
+          this.saveSinglePlayerSession();
+        }
+      };
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') autoSaveSp();
+      });
+      window.addEventListener('pagehide', autoSaveSp);
 
       try {
         const urlParams = new URLSearchParams(window.location.search);
@@ -1115,8 +1169,12 @@
       return this.helpOpen || this.zombieGuideOpen;
     }
 
+    get isSurvivalMode() {
+      return this.difficulty === 'survival';
+    }
+
     get isEndlessMode() {
-      return this.isRandomMode || this.isPostDefenseMode;
+      return this.isRandomMode || this.isPostDefenseMode || this.isSurvivalMode;
     }
 
     get requiredQuota() {
@@ -1290,9 +1348,14 @@
       this.btnCloseSettings = $('btnCloseSettings');
       this.btnSettingsBack = $('btnSettingsBack');
       this.settingsRotRow = $('settingsRotRow');
+      this.settingsMapSizeRow = $('settingsMapSizeRow');
+      this.mapSizeCards = $('mapSizeCards');
+      this.btnResumeLastMatch = $('btnResumeLastMatch');
       this.settingsPlayerCallsign = $('settingsPlayerCallsign');
       this.btnSettingsSaveCallsign = $('btnSettingsSaveCallsign');
       this.btnSettingsAudio = $('btnSettingsAudio');
+      this.settingsVolumeSlider = $('settingsVolumeSlider');
+      this.settingsVolumeValue = $('settingsVolumeValue');
       this.btnSettingsHowToPlay = $('btnSettingsHowToPlay');
       this.btnSettingsBestiary = $('btnSettingsBestiary');
 
@@ -1435,6 +1498,7 @@
       });
 
       on(this.btnStartMission, 'click', () => this.deployFromStartScreen());
+      on(this.btnResumeLastMatch, 'click', () => this.loadSinglePlayerSession());
       on(this.btnStartMultiplayer, 'click', () => this.openMultiplayerModal('role'));
       on(this.btnStartSettings, 'click', () => this.openSettingsModal());
       on(this.btnStartTutorial, 'click', () => this.startTutorial());
@@ -1445,10 +1509,30 @@
       on(this.btnDismissHelp, 'click', () => this.closeHowToPlay());
       on(this.btnHudHelp, 'click', () => this.openHowToPlay());
 
+      const selectMapSizePreset = (presetKey) => {
+        this.mapSizePreset = presetKey || 'auto';
+        try { localStorage.setItem('zdc_map_size', this.mapSizePreset); } catch (_) {}
+        this.syncStartCards();
+        this.syncSettingsUI();
+        if (!this.inPlay && !this.isMultiplayer && !this.isTutorialMode) {
+          this.initLevel(this.currentLevel);
+          this.waveState = STATE.START_MENU;
+        }
+        this.sound.playClick();
+      };
+      document.querySelectorAll('[data-map-size]').forEach((btn) => {
+        on(btn, 'click', () => selectMapSizePreset(btn.dataset.mapSize));
+      });
+
       // Settings Modal bindings (v0.25.0)
       on(this.btnCloseSettings, 'click', () => this.closeSettingsModal());
       on(this.btnSettingsBack, 'click', () => this.closeSettingsModal());
       on(this.btnSettingsAudio, 'click', () => this.toggleMute());
+      on(this.settingsVolumeSlider, 'input', () => {
+        const val = Math.max(0, Math.min(100, Number(this.settingsVolumeSlider.value) || 0));
+        this.sound.setVolume(val / 100);
+        if (this.settingsVolumeValue) this.settingsVolumeValue.textContent = `${Math.round(val)}%`;
+      });
       on(this.btnSettingsHowToPlay, 'click', () => this.openHowToPlay());
       on(this.btnSettingsBestiary, 'click', () => this.openZombieGuide());
 
@@ -1917,7 +2001,23 @@
 
       on(this.canvas, 'contextmenu', (e) => {
         e.preventDefault();
-        if (this.inPlay) this.clearSelection();
+        if (!this.inPlay) return;
+        if (
+          this.isMultiplayer &&
+          !this.selectedBuildType &&
+          !this.selectedSoldier &&
+          !this.selectedEngineer &&
+          !this.selectedCivilian &&
+          !this.selectedStructure &&
+          !this.movingStructure
+        ) {
+          const pt = this.screenToWorld(e.clientX, e.clientY);
+          if (pt && inBounds(pt.col, pt.row)) {
+            this.triggerMpPing(pt.x, pt.y);
+          }
+          return;
+        }
+        this.clearSelection();
       });
 
       // Unified touch panning, pinch-to-zoom, tap-to-act & drag-to-paint
@@ -2112,7 +2212,22 @@
                 const pt = this.screenToWorld(changed.clientX, changed.clientY);
                 if (pt) {
                   this.suppressNextClick = true;
-                  this.handleCanvasClick(pt.x, pt.y);
+                  const nowTap = performance.now();
+                  const isDoubleTap =
+                    this.isMultiplayer &&
+                    !this.selectedBuildType &&
+                    !this.movingStructure &&
+                    nowTap - (this._lastTapTime || 0) < 320 &&
+                    Math.hypot(changed.clientX - (this._lastTapX || 0), changed.clientY - (this._lastTapY || 0)) < 36;
+                  if (isDoubleTap && inBounds(pt.col, pt.row)) {
+                    this._lastTapTime = 0;
+                    this.triggerMpPing(pt.x, pt.y);
+                  } else {
+                    this._lastTapTime = nowTap;
+                    this._lastTapX = changed.clientX;
+                    this._lastTapY = changed.clientY;
+                    this.handleCanvasClick(pt.x, pt.y);
+                  }
                 }
               }
             }
@@ -2260,6 +2375,120 @@
         }
         this.camera.maxZoom = 2.8;
       }
+      this.canvas.style.aspectRatio = this.isMobileTouch ? 'auto' : `${COLS} / ${ROWS}`;
+    }
+
+    resolveMapDimensions(presetKey = null) {
+      const key = presetKey || this.mapSizePreset || 'auto';
+      if (key === 'auto') {
+        const vw = Math.max(1, window.innerWidth || 1280);
+        const vh = Math.max(1, (window.visualViewport ? window.visualViewport.height : window.innerHeight) || 960);
+        const forcePortrait = document.body && document.body.classList.contains('force-portrait');
+        const forceLandscape = document.body && document.body.classList.contains('force-landscape');
+        const effW = forceLandscape && vh > vw ? vh : forcePortrait && vw > vh ? vh : vw;
+        const effH = forceLandscape && vh > vw ? vw : forcePortrait && vw > vh ? vw : vh;
+        if (effH > effW) return { cols: 18, rows: 32 };
+        if (this.isMobileTouch && effW / effH >= 1.65) return { cols: 36, rows: 18 };
+        return { cols: 32, rows: 24 };
+      }
+      return MAP_SIZE_PRESETS[key] || { cols: 32, rows: 24 };
+    }
+
+    setMapDimensions(cols, rows) {
+      const nextCols = Math.max(16, Math.min(48, Math.round(Number(cols) || 32)));
+      const nextRows = Math.max(16, Math.min(48, Math.round(Number(rows) || 24)));
+      COLS = nextCols;
+      ROWS = nextRows;
+      WIDTH = COLS * TILE_SIZE;
+      HEIGHT = ROWS * TILE_SIZE;
+      TOTAL_CELLS = COLS * ROWS;
+      this.cols = COLS;
+      this.rows = ROWS;
+      this.worldW = WIDTH;
+      this.worldH = HEIGHT;
+      if (this.canvas) {
+        if (!this.isMobileTouch) {
+          this.canvas.width = WIDTH;
+          this.canvas.height = HEIGHT;
+        }
+        this.syncCanvasViewportSize();
+      }
+      this.clampCamera();
+    }
+
+    adaptLevelMapToGrid(templateGrid, cols, rows) {
+      if (!Array.isArray(templateGrid) || templateGrid.length === 0) return createBlankGrid();
+      const srcRows = templateGrid.length;
+      const srcCols = templateGrid[0].length;
+      if (srcRows === rows && srcCols === cols) {
+        return templateGrid.map((row) => [...row]);
+      }
+
+      const g = [];
+      for (let r = 0; r < rows; r++) {
+        const row = new Array(cols).fill(0);
+        for (let c = 0; c < cols; c++) {
+          if (r === 0 || r === rows - 1 || c === 0 || c === cols - 1) row[c] = 1;
+        }
+        g.push(row);
+      }
+
+      const srcBreaches = [];
+      for (let sr = 1; sr < srcRows - 1; sr++) {
+        for (let sc = 1; sc < srcCols - 1; sc++) {
+          const val = templateGrid[sr][sc];
+          if (val === 1) {
+            const dc = Math.max(1, Math.min(cols - 2, Math.round((sc / (srcCols - 1)) * (cols - 1))));
+            const dr = Math.max(1, Math.min(rows - 2, Math.round((sr / (srcRows - 1)) * (rows - 1))));
+            g[dr][dc] = 1;
+          } else if (val === 3) {
+            srcBreaches.push([sc, sr]);
+          }
+        }
+      }
+
+      // Leave clear interior landing around center before placing mapped Spawn Breaches
+      const midC = Math.floor(cols / 2);
+      const midR = Math.floor(rows / 2);
+      for (let r = Math.max(1, midR - 2); r <= Math.min(rows - 2, midR + 2); r++) {
+        for (let c = Math.max(1, midC - 2); c <= Math.min(cols - 2, midC + 2); c++) {
+          if (g[r][c] === 1) g[r][c] = 0;
+        }
+      }
+
+      for (const [sc, sr] of srcBreaches) {
+        let tc = Math.max(1, Math.min(cols - 2, Math.round((sc / (srcCols - 1)) * (cols - 1))));
+        let tr = Math.max(1, Math.min(rows - 2, Math.round((sr / (srcRows - 1)) * (rows - 1))));
+        if (g[tr][tc] === 3) {
+          let placed = false;
+          for (let rad = 1; rad <= 5 && !placed; rad++) {
+            for (const [dc, dr] of DIRS_8) {
+              const nc = tc + dc * rad;
+              const nr = tr + dr * rad;
+              if (nc >= 1 && nc < cols - 1 && nr >= 1 && nr < rows - 1 && g[nr][nc] !== 3) {
+                tc = nc;
+                tr = nr;
+                placed = true;
+                break;
+              }
+            }
+          }
+        }
+        g[tr][tc] = 3;
+
+        // Carve simple Manhattan corridor from breach toward center if blocked by scaled rock
+        let cc = tc;
+        let cr = tr;
+        while (cc !== midC || cr !== midR) {
+          if (Math.abs(midC - cc) >= Math.abs(midR - cr)) cc += midC > cc ? 1 : -1;
+          else cr += midR > cr ? 1 : -1;
+          if (cc > 0 && cc < cols - 1 && cr > 0 && cr < rows - 1 && g[cr][cc] === 1) {
+            g[cr][cc] = 0;
+          }
+        }
+      }
+
+      return g;
     }
 
     getFitScale() {
@@ -2409,6 +2638,12 @@
       document.querySelectorAll('[data-level]').forEach((c) => {
         c.classList.toggle('selected', !!lvl && c.dataset.level === String(lvl));
       });
+      const mapKey = this.mapSizePreset || 'auto';
+      document.querySelectorAll('[data-map-size]').forEach((c) => {
+        const match = c.dataset.mapSize === mapKey;
+        if (c.classList.contains('rot-btn')) c.classList.toggle('active', match);
+        else c.classList.toggle('selected', match);
+      });
 
       const readyToDeploy = !!diff && !!mode && (mode !== 'campaign' || !!lvl);
       if (readyToDeploy) {
@@ -2490,6 +2725,15 @@
       if (this.btnSettingsAudio) {
         this.btnSettingsAudio.innerHTML = this.sound.muted ? '&#128263; Sound: Muted' : '&#128266; Sound: On';
       }
+      const volPct = Math.round((this.sound ? this.sound.volume : 0.8) * 100);
+      if (this.settingsVolumeSlider) this.settingsVolumeSlider.value = String(volPct);
+      if (this.settingsVolumeValue) this.settingsVolumeValue.textContent = `${volPct}%`;
+      if (this.settingsMapSizeRow) {
+        const mKey = this.mapSizePreset || 'auto';
+        this.settingsMapSizeRow.querySelectorAll('.rot-btn').forEach((btn) => {
+          btn.classList.toggle('active', btn.dataset.mapSize === mKey);
+        });
+      }
     }
 
     applyScreenRotationSetting(mode, fromUserGesture = false) {
@@ -2560,9 +2804,15 @@
         this.setPaused(true);
         this.zombieGuidePausedGame = true;
       }
-      const isHard = (this.selectedDifficulty === 'hard') || (this.difficulty === 'hard');
+      const activeDiffKey = this.inPlay
+        ? (this.difficulty || 'normal')
+        : (this.selectedDifficulty || this.difficulty || 'normal');
+      const preset = DIFFICULTY_PRESETS[activeDiffKey] || DIFFICULTY_PRESETS.normal;
+      const escMult = this.inPlay && this.isSurvivalMode ? this.getSurvivalHpMult() : 1.0;
+      const effHpMult = preset.zombieHpMult * escMult;
       if (this.bestiaryHardIndicator) {
-        this.bestiaryHardIndicator.classList.toggle('hidden', !isHard);
+        this.bestiaryHardIndicator.textContent = `\u26A0 ${preset.name.toUpperCase()} THREAT: ${effHpMult.toFixed(1)}\u00D7 ZOMBIE HP ACTIVE`;
+        this.bestiaryHardIndicator.classList.remove('hidden');
       }
       this.renderBestiaryPortraits();
       showEl(this.zombieGuideModal, 'flex');
@@ -2635,6 +2885,7 @@
       if (this.startValidationMsg) this.startValidationMsg.classList.add('hidden');
       if (this.campaignValidationMsg) this.campaignValidationMsg.classList.add('hidden');
       this.sound.unlock();
+      this.clearSinglePlayerSession();
       const diffVal = this.selectedDifficulty;
       this.difficulty = DIFFICULTY_PRESETS[diffVal] ? diffVal : 'normal';
       const preset = DIFFICULTY_PRESETS[this.difficulty];
@@ -2676,6 +2927,9 @@
     }
 
     returnToStartMenu() {
+      if (!this.isMultiplayer && !this.isTutorialMode && this.inPlay) {
+        this.saveSinglePlayerSession();
+      }
       this.clearTutorial();
       if (this.mp) {
         this.mp.stopDirectoryWatch();
@@ -2704,9 +2958,202 @@
       if (this.startMainSection) showEl(this.startMainSection, 'block');
       if (this.campaignSectorPanel) hideEl(this.campaignSectorPanel);
       this.syncStartCards();
+      this.refreshResumeButton();
       showEl(this.startScreenOverlay, 'flex');
       this.updateTimerHud();
       this.showStatus('Select threat level and mission mode, then start the mission.');
+    }
+
+    refreshResumeButton() {
+      if (!this.btnResumeLastMatch) return;
+      let hasSave = false;
+      try {
+        const raw = localStorage.getItem('zdc_sp_resume_state');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          hasSave = !!(parsed && parsed.grid && Array.isArray(parsed.safeZones) && parsed.safeZones.length > 0);
+        }
+      } catch (_) {}
+      this.btnResumeLastMatch.classList.toggle('hidden', !hasSave);
+    }
+
+    clearSinglePlayerSession() {
+      try { localStorage.removeItem('zdc_sp_resume_state'); } catch (_) {}
+      this.refreshResumeButton();
+    }
+
+    saveSinglePlayerSession() {
+      if (this.isMultiplayer || this.isTutorialMode || !this.inPlay || this.safeZones.size === 0) return;
+      try {
+        const payload = {
+          v: 1,
+          cols: COLS,
+          rows: ROWS,
+          mapSizePreset: this.mapSizePreset || 'auto',
+          difficulty: this.difficulty || 'normal',
+          currentLevel: this.currentLevel,
+          isRandomMode: !!this.isRandomMode,
+          isPostDefenseMode: !!this.isPostDefenseMode,
+          randomSectorCount: this.randomSectorCount || 0,
+          randomArchetype: this.randomArchetype || '',
+          wave: this.wave || 0,
+          nextWaveTimer: this.nextWaveTimer || 0,
+          scrap: Math.floor(this.scrap || 0),
+          score: Math.floor(this.score || 0),
+          savedCount: this.savedCount || 0,
+          infectedCount: this.infectedCount || 0,
+          civTotal: this.civTotal || 0,
+          totalCommandoKills: this.totalCommandoKills || 0,
+          initialSpawnCount: this.initialSpawnCount || Math.max(1, this.spawns.size),
+          hordeScale: this.hordeScale || { hp: 1.0, dmg: 1.0, speed: 1.0, weakened: false },
+          grid: this.grid,
+          safeZones: Array.from(this.safeZones.values()).map((sz) => ({
+            id: sz.id, col: sz.col, row: sz.row, level: sz.level, hp: sz.hp, maxHp: sz.maxHp,
+            invested: sz.invested, preplaced: !!sz.preplaced
+          })),
+          structures: Array.from(this.structures.values()).map((st) => ({
+            id: st.id, type: st.type, col: st.col, row: st.row, level: st.level, hp: st.hp, maxHp: st.maxHp,
+            kills: st.kills || 0, invested: st.invested || 0, preplaced: !!st.preplaced,
+            angle: st.angle || 0, capacity: st.capacity || 4,
+            spawnedCivs: st.spawnedCivs || 0
+          })),
+          spawns: Array.from(this.spawns.values()).map((sp) => ({
+            col: sp.col, row: sp.row, hp: sp.hp, maxHp: sp.maxHp,
+            dormantTimer: sp.dormantTimer || 0
+          })),
+          soldiers: this.soldiers.map((s) => ({
+            id: s.id, level: s.level, isCommando: !!s.isCommando, x: s.x, y: s.y, hp: s.hp, maxHp: s.maxHp,
+            range: s.range, dmg: s.dmg, rate: s.rate, kills: s.kills || 0, name: s.name || '', color: s.color || '#38E8FF'
+          })),
+          engineers: this.engineers.map((e) => ({
+            id: e.id, level: e.level, x: e.x, y: e.y, hp: e.hp, maxHp: e.maxHp, speed: e.speed, repairRate: e.repairRate,
+            repairedTotal: e.repairedTotal || 0, name: e.name || '', color: e.color || '#FFD23F'
+          })),
+          civilians: this.civilians.map((c) => ({
+            id: c.id, x: c.x, y: c.y, isIncubating: !!c.isIncubating, incubationTimer: c.incubationTimer || 0
+          }))
+        };
+        localStorage.setItem('zdc_sp_resume_state', JSON.stringify(payload));
+        this.refreshResumeButton();
+      } catch (_) {}
+    }
+
+    loadSinglePlayerSession() {
+      let saved = null;
+      try {
+        const raw = localStorage.getItem('zdc_sp_resume_state');
+        if (raw) saved = JSON.parse(raw);
+      } catch (_) {}
+      if (!saved || !saved.grid || !Array.isArray(saved.safeZones) || saved.safeZones.length === 0) {
+        this.clearSinglePlayerSession();
+        return false;
+      }
+
+      this.sound.unlock();
+      this.clearTutorial();
+      this.isMultiplayer = false;
+      this.isMpHost = false;
+      if (saved.mapSizePreset) this.mapSizePreset = saved.mapSizePreset;
+      this.setMapDimensions(saved.cols || 32, saved.rows || 24);
+
+      this.difficulty = DIFFICULTY_PRESETS[saved.difficulty] ? saved.difficulty : 'normal';
+      const preset = DIFFICULTY_PRESETS[this.difficulty];
+      this.zombieHpMult = preset.zombieHpMult;
+      this.zombieSpeedMult = preset.zombieSpeedMult;
+      this.infectionWindow = preset.infectionWindow;
+
+      this.currentLevel = saved.currentLevel || 0;
+      this.isRandomMode = !!saved.isRandomMode;
+      this.isPostDefenseMode = !!saved.isPostDefenseMode;
+      this.randomSectorCount = saved.randomSectorCount || 0;
+      this.randomArchetype = saved.randomArchetype || '';
+      this.totalWaves = this.isEndlessMode ? Infinity : 5;
+      this.wave = saved.wave || 0;
+      this.nextWaveTimer = Math.max(5.0, Number(saved.nextWaveTimer) || 15.0);
+      this.scrap = Number(saved.scrap) || preset.startingScrap;
+      this.score = Number(saved.score) || 0;
+      this.savedCount = saved.savedCount || 0;
+      this.infectedCount = saved.infectedCount || 0;
+      this.civTotal = saved.civTotal || 0;
+      this.totalCommandoKills = saved.totalCommandoKills || 0;
+      this.initialSpawnCount = saved.initialSpawnCount || 1;
+      this.hordeScale = saved.hordeScale || { hp: 1.0, dmg: 1.0, speed: 1.0, weakened: false };
+      this.grid = saved.grid;
+
+      this.structures.clear();
+      this.safeZones.clear();
+      this.spawns.clear();
+      this.zombies = [];
+      this.projectiles = [];
+      this.particles = [];
+      this.pulseRings = [];
+      this.floatingTexts = [];
+      this.waveSpawnQueue = [];
+
+      for (const sz of saved.safeZones) {
+        const p = tileCenter(sz.col, sz.row);
+        this.safeZones.set(`${sz.col},${sz.row}`, {
+          ...sz, type: 'safezone', x: p.x, y: p.y, flash: 0
+        });
+      }
+      for (const st of saved.structures || []) {
+        const p = tileCenter(st.col, st.row);
+        const spec = STRUCTURE_SPECS[st.type];
+        const lv = spec && spec.levels ? spec.levels[Math.max(0, (st.level || 1) - 1)] : null;
+        this.structures.set(`${st.col},${st.row}`, {
+          ...st,
+          x: p.x,
+          y: p.y,
+          cooldown: 0,
+          flash: 0,
+          occupants: [],
+          trainQueue: [],
+          activeTrainers: [],
+          trainTimer: 0,
+          trainDuration: (lv && lv.trainDuration) || (spec && spec.trainDuration) || 4.0
+        });
+      }
+      for (const sp of saved.spawns || []) {
+        const p = tileCenter(sp.col, sp.row);
+        this.spawns.set(`${sp.col},${sp.row}`, {
+          type: 'spawn', col: sp.col, row: sp.row, x: p.x, y: p.y,
+          hp: sp.hp, maxHp: sp.maxHp, flash: 0, timeSinceHit: 99, isRegenerating: false,
+          dormantTimer: sp.dormantTimer || 0
+        });
+      }
+      this.soldiers = (saved.soldiers || []).map((s) => ({
+        ...s, radius: 7, speed: s.isCommando ? 85 : 70, cooldown: 0, angle: -Math.PI / 2,
+        path: [], dest: null, targetBunker: null, targetBarracks: null, targetEngineering: null, assignedHubId: null, manualMoveOrder: false, reenterCooldown: 0
+      }));
+      this.engineers = (saved.engineers || []).map((e) => ({
+        ...e, radius: 7, unitType: 'engineer', path: [], dest: null, repairTarget: null, targetEngineering: null, manualOrder: false, manualMoveOrder: false, reenterCooldown: 0
+      }));
+      this.civilians = (saved.civilians || []).map((c) => ({
+        ...c, radius: 6, speed: 60, path: [], dest: null, repathTimer: 0.2, targetBarracks: null
+      }));
+
+      hideEl(this.startScreenOverlay);
+      if (document.body) {
+        document.body.classList.remove('in-start-menu');
+        document.body.classList.remove('is-multiplayer');
+      }
+      this.waveState = STATE.PREPARE;
+      this.recalcBaseIntegrity();
+      this.clearSelection();
+      this.updateHUD();
+      this.updateTimerHud();
+      if (this.isMobileTouch) {
+        this.syncCanvasViewportSize();
+        const startZoom = this.mapSizePreset === 'auto'
+          ? Math.max(1.0, this.getCoverZoom())
+          : Math.min(this.camera.maxZoom, Math.max(1.45, this.getCoverZoom()));
+        this.focusCameraOnSafeZones(startZoom);
+      } else {
+        this.setCameraZoom(1.0);
+      }
+      this.showStatus(`Resumed interrupted run (${preset.name} \u2022 Wave ${this.wave}, $${Math.floor(this.scrap)} Scrap)!`);
+      this.sound.playClick();
+      return true;
     }
 
     // --- 4-PLAYER CO-OP MULTIPLAYER UI & STATE (v0.23.0) ---
@@ -3308,6 +3755,8 @@
       this.lastAppliedMpSeq = 0;
       this.lastMpMigrationGen = 0;
       if (this.mpSeenProjIds) this.mpSeenProjIds.clear();
+      if (this.mpSeenPingIds) this.mpSeenPingIds.clear();
+      this.mpPings = [];
       this.mpSfxQueue = [];
       this.mpSfxSeq = 0;
       this.lastPlayedMpSfxId = 0;
@@ -3318,6 +3767,15 @@
       this.zombieHpMult = preset.zombieHpMult;
       this.zombieSpeedMult = preset.zombieSpeedMult;
       this.infectionWindow = preset.infectionWindow;
+
+      if (config.cols && config.rows) {
+        this.setMapDimensions(config.cols, config.rows);
+      } else if (this.isMpHost) {
+        const dims = this.resolveMapDimensions();
+        this.setMapDimensions(dims.cols, dims.rows);
+      } else {
+        this.setMapDimensions(32, 24);
+      }
 
       this.isTutorialMode = false;
       this.isPostDefenseMode = false;
@@ -3378,11 +3836,15 @@
         Array.from({ length: COLS }, (__, c) => (r === 0 || r === ROWS - 1 || c === 0 || c === COLS - 1 ? 1 : 0))
       );
 
+      const leftC = Math.max(2, Math.floor(COLS * 0.20));
+      const rightC = Math.min(COLS - 5, Math.floor(COLS * 0.72));
+      const topR = Math.max(2, Math.floor(ROWS * 0.20));
+      const botR = Math.min(ROWS - 5, Math.floor(ROWS * 0.70));
       const anchors = [
-        [7, 5],
-        [22, 5],
-        [7, 16],
-        [22, 16]
+        [leftC, topR],
+        [rightC, topR],
+        [leftC, botR],
+        [rightC, botR]
       ];
       const szLv1 = STRUCTURE_SPECS.safezone.levels[0];
       const wl = STRUCTURE_SPECS.wall.levels[0];
@@ -3537,7 +3999,9 @@
         if (myZones.length > 0) {
           const avgX = myZones.reduce((sum, sz) => sum + sz.x, 0) / myZones.length;
           const avgY = myZones.reduce((sum, sz) => sum + sz.y, 0) / myZones.length;
-          const startZoom = Math.min(this.camera.maxZoom, Math.max(1.45, this.getCoverZoom()));
+          const startZoom = this.mapSizePreset === 'auto'
+            ? Math.max(1.0, this.getCoverZoom())
+            : Math.min(this.camera.maxZoom, Math.max(1.45, this.getCoverZoom()));
           this.centerCameraOnWorld(avgX, avgY, startZoom);
         } else {
           this.focusCameraOnSafeZones(1.45);
@@ -3650,8 +4114,48 @@
         case 'next_wave':
           this.triggerNextWaveEarly(senderId);
           break;
+        case 'ping':
+          this.triggerMpPing(action.x, action.y, senderId, action.id);
+          break;
       }
       if (this.mp) this.mp.broadcastState(this.serializeMpState(), true);
+    }
+
+    triggerMpPing(worldX, worldY, actorId = null, forcedId = null) {
+      if (!this.isMultiplayer || !this.inPlay) return;
+      const effActor = this.getEffectiveActorId(actorId);
+      if (!this.isMpHost && !actorId) {
+        const pingId = Math.random().toString(36).slice(2, 10);
+        const pMeta = this.getPlayerMeta(effActor);
+        this.mpPings.push({
+          id: pingId,
+          x: Math.round(worldX),
+          y: Math.round(worldY),
+          color: (pMeta && pMeta.color) || '#00E5FF',
+          ownerName: (pMeta && pMeta.callsign) || 'Player',
+          life: 3.0,
+          maxLife: 3.0
+        });
+        this.mpSeenPingIds.add(pingId);
+        this.sound.playClick();
+        if (this.mp) this.mp.sendAction({ kind: 'ping', x: Math.round(worldX), y: Math.round(worldY), id: pingId });
+        return;
+      }
+      const pMeta = this.getPlayerMeta(effActor);
+      const pingId = forcedId || Math.random().toString(36).slice(2, 10);
+      if (this.mpSeenPingIds.has(pingId)) return;
+      this.mpSeenPingIds.add(pingId);
+      this.mpPings.push({
+        id: pingId,
+        x: Math.round(worldX),
+        y: Math.round(worldY),
+        color: (pMeta && pMeta.color) || '#00E5FF',
+        ownerName: (pMeta && pMeta.callsign) || 'Commander',
+        life: 3.0,
+        maxLife: 3.0
+      });
+      if (this.mpPings.length > 16) this.mpPings.shift();
+      this.sound.playClick();
     }
 
     applyRemoteUnitCommand(actorId, action) {
@@ -3728,10 +4232,13 @@
         spArr.push({
           col: sp.col, row: sp.row, hp: sp.hp, maxHp: sp.maxHp,
           flash: sp.flash || 0,
-          isRegenerating: !!sp.isRegenerating
+          isRegenerating: !!sp.isRegenerating,
+          dormantTimer: sp.dormantTimer ? Math.round(sp.dormantTimer * 10) / 10 : 0
         });
       }
       return {
+        cols: COLS,
+        rows: ROWS,
         wave: this.wave,
         waveState: this.waveState,
         nextWaveTimer: this.nextWaveTimer,
@@ -3801,12 +4308,19 @@
           life: Math.round((p.life || 0.11) * 1000) / 1000,
           maxLife: Math.round((p.maxLife || 0.11) * 1000) / 1000
         })),
-        sfx: this.mpSfxQueue.slice()
+        sfx: this.mpSfxQueue.slice(),
+        pings: this.mpPings.map((pg) => ({
+          id: pg.id, x: pg.x, y: pg.y, color: pg.color, ownerName: pg.ownerName, life: Math.round(pg.life * 10) / 10
+        }))
       };
     }
 
     applyMpState(snap) {
       if (!this.isMultiplayer || this.isMpHost || !snap) return;
+
+      if (snap.cols && snap.rows && (snap.cols !== COLS || snap.rows !== ROWS)) {
+        this.setMapDimensions(snap.cols, snap.rows);
+      }
 
       const snapGen = Number(snap.migrationGen) || 0;
       if (snapGen > (this.lastMpMigrationGen || 0)) {
@@ -3961,7 +4475,8 @@
           maxHp: sp.maxHp,
           flash: sp.flash || 0,
           timeSinceHit: 99,
-          isRegenerating: !!sp.isRegenerating
+          isRegenerating: !!sp.isRegenerating,
+          dormantTimer: sp.dormantTimer || 0
         });
         if (this.grid[sp.row]) this.grid[sp.row][sp.col] = 3;
       }
@@ -4179,6 +4694,23 @@
         }
       }
 
+      if (Array.isArray(snap.pings)) {
+        for (const pg of snap.pings) {
+          if (!pg || !pg.id || this.mpSeenPingIds.has(pg.id)) continue;
+          this.mpSeenPingIds.add(pg.id);
+          if (this.mpSeenPingIds.size > 128) {
+            const firstKey = this.mpSeenPingIds.values().next().value;
+            this.mpSeenPingIds.delete(firstKey);
+          }
+          this.mpPings.push({
+            ...pg,
+            life: pg.life || 3.0,
+            maxLife: 3.0
+          });
+          this.sound.playClick();
+        }
+      }
+
       if (prevSelKey) {
         const match = this.structures.get(prevSelKey) || this.safeZones.get(prevSelKey) || null;
         this.selectedStructure = match;
@@ -4225,6 +4757,7 @@
     resetCurrentLevel() {
       if (!this.inPlay && this.waveState === STATE.START_MENU) return;
       this.sound.unlock();
+      this.clearSinglePlayerSession();
       if (this.isTutorialMode) {
         this.startTutorial();
         return;
@@ -4467,7 +5000,11 @@
     }
 
     // --- LEVEL INITIALIZATION (Rolled Safe Zones & Destructible Spawn Breaches) ---
-    initLevel(levelTarget) {
+    initLevel(levelTarget, skipDimResolve = false) {
+      if (!skipDimResolve) {
+        const dims = this.resolveMapDimensions();
+        this.setMapDimensions(dims.cols, dims.rows);
+      }
       if (levelTarget === 'tutorial') {
         this.isTutorialMode = true;
         this.isPostDefenseMode = false;
@@ -4477,10 +5014,14 @@
         this.grid = Array.from({ length: ROWS }, (_, r) =>
           Array.from({ length: COLS }, (__, c) => (r === 0 || r === ROWS - 1 || c === 0 || c === COLS - 1 ? 1 : 0))
         );
-        for (let r = 10; r <= 12; r++) {
-          for (let c = 14; c <= 16; c++) this.grid[r][c] = 2;
+        const midC = Math.max(3, Math.min(COLS - 5, Math.floor(COLS / 2) - 1));
+        const midR = Math.max(3, Math.min(ROWS - 5, Math.floor(ROWS / 2) - 1));
+        for (let r = midR; r <= midR + 2; r++) {
+          for (let c = midC; c <= midC + 2; c++) this.grid[r][c] = 2;
         }
-        this.grid[11][10] = 3;
+        const spC = Math.max(1, midC - 4);
+        const spR = midR + 1;
+        this.grid[spR][spC] = 3;
         if (this.levelSelect) this.levelSelect.value = 'tutorial';
         if (this.startLevelSelect) this.startLevelSelect.value = 'tutorial';
       } else {
@@ -4514,7 +5055,7 @@
           this.currentLevel = Math.max(0, Math.min(LEVEL_MAPS.length - 1, Number(levelTarget) || 0));
           if (this.levelSelect) this.levelSelect.value = String(this.currentLevel + 1);
           if (this.startLevelSelect) this.startLevelSelect.value = String(this.currentLevel + 1);
-          this.grid = LEVEL_MAPS[this.currentLevel].map((row) => [...row]);
+          this.grid = this.adaptLevelMapToGrid(LEVEL_MAPS[this.currentLevel], COLS, ROWS);
         }
       }
 
@@ -4636,7 +5177,9 @@
       }
       if (this.isMobileTouch) {
         this.syncCanvasViewportSize();
-        const startZoom = Math.min(this.camera.maxZoom, Math.max(1.45, this.getCoverZoom()));
+        const startZoom = this.mapSizePreset === 'auto'
+          ? Math.max(1.0, this.getCoverZoom())
+          : Math.min(this.camera.maxZoom, Math.max(1.45, this.getCoverZoom()));
         this.focusCameraOnSafeZones(startZoom);
       } else {
         this.setCameraZoom(1.0);
@@ -5277,8 +5820,76 @@
       return this.hordeScale;
     }
 
+    getSurvivalHpMult() {
+      const steps = Math.floor(Math.max(0, (this.wave || 1) - 1) / 5);
+      return 1.0 + 0.20 * steps;
+    }
+
+    spawnSurvivalDormantRift() {
+      const cap = 6 * (this.isMultiplayer ? Math.max(1, this.mpPlayers.length) : 1);
+      if (this.spawns.size >= cap || this.safeZones.size === 0) return false;
+      const szTiles = Array.from(this.safeZones.values());
+      const sampleSz = szTiles[0];
+      const candidates = [];
+      for (let r = 1; r < ROWS - 1; r++) {
+        for (let c = 1; c < COLS - 1; c++) {
+          if (this.grid[r][c] !== 0) continue;
+          const key = `${c},${r}`;
+          if (this.spawns.has(key) || this.structures.has(key) || this.safeZones.has(key)) continue;
+          let minSzD = Infinity;
+          for (const sz of szTiles) {
+            const d = Math.hypot(c - sz.col, r - sz.row);
+            if (d < minSzD) minSzD = d;
+          }
+          if (minSzD >= 6) candidates.push([c, r]);
+        }
+      }
+      for (let i = candidates.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+      }
+      for (let attempt = 0; attempt < Math.min(25, candidates.length); attempt++) {
+        const [bc, br] = candidates[attempt];
+        const path = findPath(bc, br, sampleSz.col, sampleSz.row, (c, r) => !inBounds(c, r) || this.grid[r][c] === 1);
+        if (!path) continue;
+        this.grid[br][bc] = 3;
+        const p = tileCenter(bc, br);
+        const breachHp = 750 + Math.floor((this.wave || 1) / 5) * 150;
+        this.spawns.set(`${bc},${br}`, {
+          type: 'spawn',
+          col: bc,
+          row: br,
+          x: p.x,
+          y: p.y,
+          hp: breachHp,
+          maxHp: breachHp,
+          flash: 0,
+          timeSinceHit: 99,
+          isRegenerating: false,
+          dormantTimer: 60.0
+        });
+        this.pulseRings.push({ x: p.x, y: p.y, radius: 10, maxRadius: 72, color: '#FFD23F', life: 1.2, maxLife: 1.2 });
+        this.addFloatingText('NEW RIFT FORMING (60s)!', p.x, p.y - 16, '#FFD23F');
+        this.sound.playWaveWarning();
+        this.showStatus('Warning: Dormant Survival Rift detected! Activates in 60s!');
+        return true;
+      }
+      return false;
+    }
+
     computeThreatMultipliers() {
       const w = this.wave || 1;
+      if (this.isSurvivalMode) {
+        const steps = Math.floor(Math.max(0, w - 1) / 5);
+        const sMult = this.getSurvivalHpMult();
+        this.threatMult = sMult;
+        return {
+          hp: sMult,
+          dmg: 1.0 + 0.10 * steps,
+          speed: Math.min(1.5, 1.0 + 0.04 * steps),
+          tier: steps
+        };
+      }
       const tier = Math.floor(Math.max(0, w - 1) / 10);
       if (w < 11) {
         this.threatMult = 1.0;
@@ -5399,6 +6010,13 @@
         }
       }
 
+      // Survival escalation (+20% HP per 5 waves & 60s dormant rift on Wave 6, 11, 16...)
+      if (this.isSurvivalMode && w >= 6 && (w - 1) % 5 === 0) {
+        const sMult = this.getSurvivalHpMult();
+        this.addFloatingText(`SURVIVAL ESCALATION (${sMult.toFixed(1)}x HP)!`, WIDTH / 2, 138, '#00E5FF');
+        this.spawnSurvivalDormantRift();
+      }
+
       this.computeThreatMultipliers();
       const earlyNote = wasEarly ? ` (+$${earlyBonus} early launch bonus!)` : '';
       const waveLabel = (this.isEndlessMode || !Number.isFinite(this.totalWaves))
@@ -5412,6 +6030,9 @@
       this.sound.playLaser(300, 150, 0.2);
       this.updateHUD();
       this.updateTimerHud();
+      if (!this.isMultiplayer && !this.isTutorialMode) {
+        this.saveSinglePlayerSession();
+      }
     }
 
     // Count active Demolishers + Wreckers on screen (v1.9.0 Max 4 Combined Cap)
@@ -5479,7 +6100,9 @@
         }
       }
 
-      const breachList = Array.from(this.spawns.values());
+      const allSpawns = Array.from(this.spawns.values());
+      const activeBreaches = allSpawns.filter((sp) => !(sp.dormantTimer > 0));
+      const breachList = activeBreaches.length > 0 ? activeBreaches : allSpawns;
       let pick = breachList[Math.floor(Math.random() * breachList.length)];
       if (this.isMultiplayer && assignedPlayerId && breachList.length > 1) {
         const pZones = Array.from(this.safeZones.values()).filter((sz) => sz.ownerId === assignedPlayerId);
@@ -6585,13 +7208,16 @@
       if (!inBounds(c, r)) return true;
       const t = this.grid[r][c];
       if (t === 1 || t === 3) return true;
-      return !!this.structures.get(`${c},${r}`);
+      const st = this.structures.get(`${c},${r}`);
+      // Security Gates allow friendly units (Civilians, Soldiers, Commandos) to pass freely; all other structures block
+      return !!st && st.type !== 'gate';
     }
 
     safeZoneOnlyBlocked(c, r) {
       if (!inBounds(c, r)) return true;
       if (this.grid[r][c] !== 2 || !this.safeZones.has(`${c},${r}`)) return true;
-      return !!this.structures.get(`${c},${r}`);
+      const st = this.structures.get(`${c},${r}`);
+      return !!st && st.type !== 'gate';
     }
 
     engineerBlocked(c, r) {
@@ -9672,6 +10298,9 @@
             if (eng.path.length === 0) {
               eng.dest = null;
               eng.manualOrder = false;
+              if (!this.structures.has(`${Math.floor(eng.x / TILE_SIZE)},${Math.floor(eng.y / TILE_SIZE)}`)) {
+                eng.targetEngineering = null;
+              }
               if (eng.manualMoveOrder) {
                 eng.manualMoveOrder = false;
                 if (this.selectedEngineer === eng) {
@@ -9716,6 +10345,16 @@
             this.addParticles(target.x + (Math.random() - 0.5) * 14, target.y + (Math.random() - 0.5) * 14, '#00E5FF', 1, 22);
           }
           continue;
+        }
+
+        if (eng.repairTarget && eng.path.length === 0 && !this.isEngineerAtRepairAnchor(eng, eng.repairTarget)) {
+          const repathed = this.commandEngineerToTarget(eng, eng.repairTarget);
+          if (!repathed) eng.repairTarget = null;
+        }
+
+        // Clear stale Engineering order once stationary so idle Engineers always scan for repairs
+        if (eng.path.length === 0 && eng.targetEngineering) {
+          eng.targetEngineering = null;
         }
 
         // When idle, scan for damaged territory targets; if none, return to closest Engineering bay for standby +6 HP/s regen
@@ -10230,6 +10869,16 @@
       for (const sp of this.spawns.values()) {
         if (sp.flash > 0) sp.flash -= dt;
         sp.turretLocked = false;
+        if (sp.dormantTimer > 0) {
+          sp.dormantTimer = Math.max(0, sp.dormantTimer - dt);
+          if (sp.dormantTimer === 0) {
+            this.addFloatingText('SPAWN RIFT ACTIVE!', sp.x, sp.y - 16, '#FF3B3B');
+            this.pulseRings.push({ x: sp.x, y: sp.y, radius: 8, maxRadius: 56, color: '#FF3B3B', life: 0.9, maxLife: 0.9 });
+            this.sound.playWaveWarning();
+            this.showStatus('Dormant Survival Rift has opened and is spawning zombies!');
+          }
+          continue;
+        }
         sp.timeSinceHit = (sp.timeSinceHit || 0) + dt;
         if (sp.hp > 0 && sp.hp < sp.maxHp && sp.timeSinceHit >= 4.0) {
           sp.hp = Math.min(sp.maxHp, sp.hp + 15 * dt);
@@ -10617,6 +11266,12 @@
         ft.alpha = Math.max(0, Math.min(1, ft.life));
         if (ft.life <= 0) this.floatingTexts.splice(i, 1);
       }
+      if (this.mpPings && this.mpPings.length > 0) {
+        for (let i = this.mpPings.length - 1; i >= 0; i--) {
+          this.mpPings[i].life -= dt;
+          if (this.mpPings[i].life <= 0) this.mpPings.splice(i, 1);
+        }
+      }
     }
 
     // --- VICTORY / DEFEAT OVERLAYS ---
@@ -10657,6 +11312,7 @@
     onVictory() {
       this.waveState = STATE.VICTORY;
       this.clearSelection();
+      this.clearSinglePlayerSession();
       if (this.isMultiplayer && this.mp) this.mp.clearActiveSession();
       this.sound.playRescue();
 
@@ -10702,6 +11358,7 @@
     onDefeat(reason) {
       this.waveState = STATE.GAMEOVER;
       this.clearSelection();
+      this.clearSinglePlayerSession();
       if (this.isMultiplayer && this.mp) this.mp.clearActiveSession();
       this.sound.playBarricadeBreak();
       this.showStatus(`MISSION FAILED: ${reason}`);
@@ -10732,9 +11389,44 @@
       this.renderZombies(ctx, t);
       this.renderProjectiles(ctx);
       this.renderParticles(ctx);
+      this.renderMpPings(ctx, t);
       this.renderTutorialHighlights(ctx, t);
       this.renderBuildPreview(ctx);
       this.renderFloatingTexts(ctx);
+    }
+
+    renderMpPings(ctx, t) {
+      if (!this.mpPings || this.mpPings.length === 0) return;
+      ctx.save();
+      for (const pg of this.mpPings) {
+        const alpha = Math.max(0, Math.min(1, pg.life / (pg.maxLife || 3.0)));
+        const pulse = (t * 2.2) % 1;
+        const r1 = 10 + pulse * 26;
+        const r2 = 6 + ((pulse + 0.5) % 1) * 20;
+        ctx.globalAlpha = alpha * (1 - pulse * 0.7);
+        ctx.strokeStyle = pg.color || '#00E5FF';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(pg.x, pg.y, r1, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.globalAlpha = alpha * 0.85;
+        ctx.beginPath();
+        ctx.arc(pg.x, pg.y, r2, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = pg.color || '#00E5FF';
+        ctx.beginPath();
+        ctx.arc(pg.x, pg.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (pg.ownerName) {
+          ctx.font = 'bold 10px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(pg.ownerName, pg.x, pg.y - 16);
+        }
+      }
+      ctx.restore();
     }
 
     renderTiles(ctx) {
@@ -10861,6 +11553,26 @@
         const x = sp.col * TILE_SIZE;
         const y = sp.row * TILE_SIZE;
         const flash = sp.flash > 0;
+
+        if (sp.dormantTimer > 0) {
+          ctx.fillStyle = 'rgba(255, 170, 51, 0.16)';
+          ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+          const ringR = 14 + Math.sin(t * 6 + sp.col) * 3.0;
+          ctx.strokeStyle = Math.sin(t * 8) > 0 ? '#FFD23F' : '#B833FF';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([4, 3]);
+          ctx.beginPath();
+          ctx.arc(sp.x, sp.y, ringR, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.lineWidth = 1;
+          ctx.fillStyle = '#FFD23F';
+          ctx.font = 'bold 11px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(`${Math.ceil(sp.dormantTimer)}s`, sp.x, sp.y + 4);
+          ctx.textAlign = 'left';
+          continue;
+        }
 
         ctx.fillStyle = flash ? 'rgba(255, 255, 255, 0.55)' : 'rgba(255, 59, 59, 0.20)';
         ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);

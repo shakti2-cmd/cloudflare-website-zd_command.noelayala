@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Zombie Defense Command - Tactical Grid Survival (v0.28.0)</title>
+  <title>Zombie Defense Command - Tactical Grid Survival (v0.29.0)</title>
 
   <!-- PWA & Mobile Web App Meta -->
   <meta name="theme-color" content="#07090d">
@@ -30,7 +30,7 @@
     <header id="topHud">
       <div class="hud-brand">
         <span class="hud-logo">&#9763;</span>
-        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.28.0</small></span>
+        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.29.0</small></span>
       </div>
 
       <div class="hud-stats">
@@ -133,7 +133,7 @@
         <div class="modal-card start-card">
           <div class="start-icon">&#9763;</div>
           <h1 class="start-title">ZOMBIE DEFENSE COMMAND</h1>
-          <div class="start-version-badge">v0.28.0</div>
+          <div class="start-version-badge">v0.29.0</div>
           <p class="start-subtitle">Expand green Safe Zones within 3 tiles of Red Spawn Breaches and deploy Commandos to destroy them (towers defend against zombies only).</p>
 
           <div id="startMainSection">
@@ -141,37 +141,57 @@
             <div class="card-row" id="difficultyCards">
               <button type="button" class="pick-card diff-card tag-easy" data-diff="easy">
                 <span class="pick-name">EASY</span>
+                <span class="pick-desc">1.0&times; HP &bull; $160 Scrap</span>
               </button>
               <button type="button" class="pick-card diff-card tag-normal" data-diff="normal">
                 <span class="pick-name">NORMAL</span>
+                <span class="pick-desc">2.0&times; HP &bull; $100 Scrap</span>
               </button>
               <button type="button" class="pick-card diff-card tag-hard" data-diff="hard">
                 <span class="pick-name">HARD</span>
+                <span class="pick-desc">4.0&times; HP &bull; $100 Scrap</span>
+              </button>
+              <button type="button" class="pick-card diff-card tag-survival" data-diff="survival">
+                <span class="pick-name">SURVIVAL &#8734;</span>
+                <span class="pick-desc">1.0&times; HP (+20% / 5w) &bull; 60s Rifts</span>
               </button>
             </div>
             <select id="difficultySelect" class="sync-select" aria-label="Difficulty">
               <option value="" disabled selected>Select Threat Level</option>
-              <option value="easy">Easy - 160 Scrap, 0.75x zombies, 3.0s incubation</option>
-              <option value="normal">Normal - 100 Scrap, 1.0x zombies, 2.0s incubation</option>
-              <option value="hard">Hard - 75 Scrap, 3.0x zombies, 1.2s incubation</option>
+              <option value="easy">Easy - 160 Scrap, 1.0x zombies, 3.0s incubation</option>
+              <option value="normal">Normal - 100 Scrap, 2.0x zombies, 2.0s incubation</option>
+              <option value="hard">Hard - 100 Scrap, 4.0x zombies, 1.2s incubation</option>
+              <option value="survival">Survival - 110 Scrap, 1.0x (+20% / 5 waves), endless rifts</option>
             </select>
 
             <div class="option-label">MISSION MODE</div>
             <div class="card-row" id="modeCards">
               <button type="button" class="pick-card mode-card" data-mode="campaign">
                 <span class="pick-name">CAMPAIGN</span>
+                <span class="pick-desc">Sectors 1&ndash;4</span>
               </button>
               <button type="button" class="pick-card mode-card tag-random" data-mode="random">
                 <span class="pick-name">RANDOM SECTOR &#8734;</span>
+                <span class="pick-desc">Procedural Maps</span>
               </button>
               <button type="button" class="pick-card mode-card tag-post" data-mode="post_defense">
                 <span class="pick-name">POST DEFENSE &#8734;</span>
+                <span class="pick-desc">Endless Outpost</span>
               </button>
+            </div>
+
+            <div class="option-label">MAP SIZE</div>
+            <div class="card-row map-size-row" id="mapSizeCards">
+              <button type="button" class="pick-card map-card selected" data-map-size="auto"><span class="pick-name">AUTO FIT</span><span class="pick-desc">Fit Device</span></button>
+              <button type="button" class="pick-card map-card" data-map-size="portrait"><span class="pick-name">PORTRAIT</span><span class="pick-desc">18&times;32</span></button>
+              <button type="button" class="pick-card map-card" data-map-size="classic"><span class="pick-name">CLASSIC</span><span class="pick-desc">32&times;24</span></button>
+              <button type="button" class="pick-card map-card" data-map-size="widescreen"><span class="pick-name">WIDE</span><span class="pick-desc">36&times;18</span></button>
             </div>
 
             <div id="startValidationMsg" class="start-validation-msg hidden" role="alert"></div>
 
             <div class="modal-actions" id="mainModalActions">
+              <button id="btnResumeLastMatch" class="modal-btn primary-btn resume-btn hidden">&#8634; Resume Last Match</button>
               <button id="btnStartMission" class="modal-btn primary-btn">&#9654; Start Mission</button>
               <button id="btnStartMultiplayer" class="modal-btn secondary-btn mp-start-btn">&#127760; Multiplayer</button>
               <button id="btnStartSettings" class="modal-btn secondary-btn">&#9881; Settings</button>
@@ -208,11 +228,11 @@
             <option value="tutorial">Tutorial: Basic Training</option>
           </select>
 
-          <div class="start-hint">v0.28.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; M mute</div>
+          <div class="start-hint">v0.29.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; M mute</div>
         </div>
       </div>
 
-      <!-- Settings Modal (v0.28.0) -->
+      <!-- Settings Modal (v0.29.0) -->
       <div id="settingsModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
         <div class="modal-card settings-card">
           <button id="btnCloseSettings" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
@@ -229,6 +249,17 @@
             </div>
 
             <div class="settings-group">
+              <label class="settings-label">Map Size</label>
+              <div class="settings-rot-row" id="settingsMapSizeRow">
+                <button type="button" class="rot-btn active" data-map-size="auto">Auto Fit</button>
+                <button type="button" class="rot-btn" data-map-size="portrait">18&times;32</button>
+                <button type="button" class="rot-btn" data-map-size="classic">32&times;24</button>
+                <button type="button" class="rot-btn" data-map-size="widescreen">36&times;18</button>
+              </div>
+              <div class="settings-hint">Auto Fit fills portrait or widescreen screens edge-to-edge on next launch.</div>
+            </div>
+
+            <div class="settings-group">
               <label class="settings-label" for="settingsPlayerCallsign">Commander Callsign</label>
               <div class="settings-callsign-row">
                 <input type="text" id="settingsPlayerCallsign" class="settings-input" maxlength="16" placeholder="Commander" autocomplete="off" autocorrect="off" autocapitalize="words" />
@@ -241,6 +272,11 @@
               <label class="settings-label">Audio FX</label>
               <div class="settings-row">
                 <button id="btnSettingsAudio" class="modal-btn secondary-btn" type="button">&#128266; Sound: On</button>
+              </div>
+              <div class="settings-volume-row">
+                <label class="settings-vol-label" for="settingsVolumeSlider">Master Volume</label>
+                <input type="range" id="settingsVolumeSlider" class="settings-volume-slider" min="0" max="100" step="1" value="80" />
+                <span id="settingsVolumeValue" class="settings-vol-val">80%</span>
               </div>
             </div>
 
@@ -262,7 +298,7 @@
       <div id="howToPlayModal" class="modal-overlay hidden">
         <div class="modal-card help-card">
           <button id="btnCloseHowToPlay" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.28.0)</h2>
+          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.29.0)</h2>
           <div class="help-grid">
             <section>
               <h3>Single 3&times;3 Start &amp; Line-Drag Barricades</h3>
@@ -299,7 +335,7 @@
       <div id="zombieGuideModal" class="modal-overlay hidden">
         <div class="modal-card help-card zombie-guide-card">
           <button id="btnCloseZombieGuide" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.28.0)</h2>
+          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.29.0)</h2>
           <div id="bestiaryHardIndicator" class="bestiary-hard-indicator hidden">&#9888; HARD MODE ACTIVE: 3.0&times; ZOMBIE HP APPLIED</div>
           <p class="bestiary-note"><b class="c-orange">25% Random Brute-Breach Trait:</b> Any spawned Walker, Runner, Tank, or Wrecker has a 25% chance (100% on Demolisher) to smash straight toward Safe Zones, dealing a <b>fixed unscaled 12 damage</b> (<b>16 damage</b> for Demolishers) per strike against structures &amp; Safe Zones.</p>
           <div class="zombie-intel-list">
@@ -365,7 +401,7 @@
         </div>
       </div>
 
-      <!-- 4-Player Co-Op Multiplayer Modals (v0.28.0) -->
+      <!-- 4-Player Co-Op Multiplayer Modals (v0.29.0) -->
       <div id="mpRoleModal" class="modal-overlay hidden">
         <div class="modal-card mp-card">
           <h2 class="help-title mp-modal-title">&#127760; 4-PLAYER CO-OP MULTIPLAYER</h2>
@@ -421,6 +457,9 @@
               </button>
               <button type="button" class="pick-card diff-card tag-hard" data-mp-diff="hard">
                 <span class="pick-name">HARD</span>
+              </button>
+              <button type="button" class="pick-card diff-card tag-survival" data-mp-diff="survival">
+                <span class="pick-name">SURVIVAL &#8734;</span>
               </button>
             </div>
             <div id="mpHostError" class="start-validation-msg hidden" role="alert"></div>
@@ -494,7 +533,7 @@
         </div>
       </div>
 
-      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.28.0) -->
+      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.29.0) -->
       <div id="mpPauseModal" class="modal-overlay hidden">
         <div class="modal-card mp-card mp-pause-card">
           <h2 id="mpPauseTitle" class="help-title mp-modal-title">&#9208; MATCH PAUSED</h2>
@@ -597,7 +636,7 @@
             <button id="toolWall" class="tool-btn" data-tool="wall" title="Barricade $10 (Lv2 $90, Lv3 $180): Click or Line-Drag on Safe Zone OR within 3 tiles of a Safe Zone; ignored by Horde Scaling (1)">
               <span class="tool-key">1</span><span class="tool-icon">&#9646;</span><span class="tool-name">Barricade</span><span class="tool-cost">$10</span>
             </button>
-            <button id="toolGate" class="tool-btn" data-tool="gate" title="Security Gate $100: Heavy defensive chokepoint up to 3 tiles from Safe Zone; blocks zombies and non-engineer units (only Engineers traverse Safe-Zone structures) (2)">
+            <button id="toolGate" class="tool-btn" data-tool="gate" title="Security Gate $100: Friendly units &amp; Commandos pass freely while blocking zombies (only Engineers step over other Safe-Zone structures) (2)">
               <span class="tool-key">2</span><span class="tool-icon">&#9638;</span><span class="tool-name">Gate</span><span class="tool-cost">$100</span>
             </button>
             <button id="toolBarracks" class="tool-btn" data-tool="barracks" title="Barracks $80: Safe Zone Only; trains Commandos (4-unit cap) &mdash; ONLY unit that destroys Red Spawn Breaches (1.25x dmg); intercepts &amp; kites within 3 tiles of Safe Zones (4)">
@@ -663,7 +702,7 @@
         </div>
 
         <div id="deckHint">
-          <span class="hint-text">v0.28.0 &bull; Towers target zombies only &bull; Expand $10 Safe Zones &le;3 tiles of a Breach so Commandos destroy it! &bull; Engineers +20/+40/+70 HP/s</span>
+          <span class="hint-text">v0.29.0 &bull; Towers target zombies only &bull; Expand $10 Safe Zones &le;3 tiles of a Breach so Commandos destroy it! &bull; Engineers +20/+40/+70 HP/s</span>
         </div>
       </div>
     </footer>

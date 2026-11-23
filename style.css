@@ -1,4 +1,4 @@
-/* Zombie Defense Command v0.28.0 - tactical command-center theme (offline, zero layout shift) */
+/* Zombie Defense Command v0.29.0 - tactical command-center theme (offline, zero layout shift) */
 :root {
   --bg: #07090d;
   --panel: #0e131b;
@@ -246,8 +246,34 @@ select:hover, .hud-btn:hover { border-color: var(--color-cyan); background: #182
 .tag-easy .pick-name { color: var(--color-green); }
 .tag-normal .pick-name { color: var(--color-yellow); }
 .tag-hard .pick-name { color: var(--color-red); }
+.tag-survival .pick-name { color: var(--color-cyan); }
 .tag-random .pick-name { color: var(--color-orange); }
 .tag-post .pick-name { color: var(--color-violet); }
+#difficultyCards,
+#modeCards {
+  flex-direction: column;
+  gap: 5px;
+}
+#difficultyCards .pick-card,
+#modeCards .pick-card {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 12px;
+  text-align: left;
+}
+.map-size-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+}
+.resume-btn {
+  width: 100%;
+  background: linear-gradient(180deg, #0ea672, #097650) !important;
+  border-color: #29f0a8 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 14px rgba(0, 224, 138, 0.32);
+}
 .sync-select { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; overflow: hidden; }
 
 /* Startup screen validation prompt & pulse animation */
@@ -1301,7 +1327,7 @@ body.is-mobile-touch .camera-controls {
   }
 }
 
-/* ---------- 4-Player Co-Op Multiplayer Modals & HUD Locks (v0.28.0) ---------- */
+/* ---------- 4-Player Co-Op Multiplayer Modals & HUD Locks (v0.29.0) ---------- */
 .mp-card {
   width: min(560px, 96vw);
   border-top-color: var(--color-cyan);
@@ -1817,7 +1843,7 @@ body.is-multiplayer #btnMobileReset {
   }
 }
 
-/* ---------- System Settings Modal & Screen Rotation Locks (v0.28.0) ---------- */
+/* ---------- System Settings Modal & Screen Rotation Locks (v0.29.0) ---------- */
 .settings-card {
   width: min(520px, 94vw);
   border-top: 3px solid var(--color-cyan);
@@ -1906,6 +1932,32 @@ body.is-multiplayer #btnMobileReset {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 10px;
+}
+.settings-volume-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+.settings-vol-label {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--dim);
+  white-space: nowrap;
+}
+.settings-volume-slider {
+  flex: 1 1 auto;
+  min-width: 0;
+  accent-color: var(--color-cyan);
+  cursor: pointer;
+}
+.settings-vol-val {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-cyan);
+  min-width: 38px;
+  text-align: right;
 }
 
 /* CSS orientation fallback when screen.orientation is unsupported */
