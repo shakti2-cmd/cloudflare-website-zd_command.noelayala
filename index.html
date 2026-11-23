@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Zombie Defense Command - Tactical Grid Survival (v0.29.0)</title>
+  <title>Zombie Defense Command - Tactical Grid Survival (v0.30.0)</title>
 
   <!-- PWA & Mobile Web App Meta -->
   <meta name="theme-color" content="#07090d">
@@ -30,7 +30,7 @@
     <header id="topHud">
       <div class="hud-brand">
         <span class="hud-logo">&#9763;</span>
-        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.29.0</small></span>
+        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.30.0</small></span>
       </div>
 
       <div class="hud-stats">
@@ -78,6 +78,7 @@
         <button id="btnSpeed" class="hud-btn" title="Toggle simulation speed">Speed: 1x</button>
         <button id="btnMute" class="hud-btn icon-only-btn" title="Mute / unmute audio (M)" aria-label="Mute / unmute audio">&#128266;</button>
         <button id="btnHudHelp" class="hud-btn icon-only-btn" title="How to play (pauses the game)" aria-label="How to play">?</button>
+        <button id="btnHudSettings" class="hud-btn" title="System Settings" aria-label="Settings">&#9881; Settings</button>
         <button id="btnMobileSettings" class="hud-btn mobile-settings-btn" title="Settings" aria-label="Settings" aria-haspopup="true" aria-expanded="false">&#9881;</button>
       </div>
     </header>
@@ -133,7 +134,7 @@
         <div class="modal-card start-card">
           <div class="start-icon">&#9763;</div>
           <h1 class="start-title">ZOMBIE DEFENSE COMMAND</h1>
-          <div class="start-version-badge">v0.29.0</div>
+          <div class="start-version-badge">v0.30.0</div>
           <p class="start-subtitle">Expand green Safe Zones within 3 tiles of Red Spawn Breaches and deploy Commandos to destroy them (towers defend against zombies only).</p>
 
           <div id="startMainSection">
@@ -153,7 +154,7 @@
               </button>
               <button type="button" class="pick-card diff-card tag-survival" data-diff="survival">
                 <span class="pick-name">SURVIVAL &#8734;</span>
-                <span class="pick-desc">1.0&times; HP (+20% / 5w) &bull; 60s Rifts</span>
+                <span class="pick-desc">4.0&times; HP (+60% / 5w) &bull; 1.35&times; Spd &bull; 60s Rifts</span>
               </button>
             </div>
             <select id="difficultySelect" class="sync-select" aria-label="Difficulty">
@@ -161,7 +162,7 @@
               <option value="easy">Easy - 160 Scrap, 1.0x zombies, 3.0s incubation</option>
               <option value="normal">Normal - 100 Scrap, 2.0x zombies, 2.0s incubation</option>
               <option value="hard">Hard - 100 Scrap, 4.0x zombies, 1.2s incubation</option>
-              <option value="survival">Survival - 110 Scrap, 1.0x (+20% / 5 waves), endless rifts</option>
+              <option value="survival">Survival - 110 Scrap, 4.0x HP (+60% / 5 waves), 1.35x speed, 10-wave rift reshuffle</option>
             </select>
 
             <div class="option-label">MISSION MODE</div>
@@ -228,17 +229,17 @@
             <option value="tutorial">Tutorial: Basic Training</option>
           </select>
 
-          <div class="start-hint">v0.29.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; M mute</div>
+          <div class="start-hint">v0.30.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; M mute</div>
         </div>
       </div>
 
-      <!-- Settings Modal (v0.29.0) -->
+      <!-- Settings Modal (v0.30.0) -->
       <div id="settingsModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
         <div class="modal-card settings-card">
           <button id="btnCloseSettings" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
           <h2 id="settingsTitle" class="help-title">&#9881; SYSTEM SETTINGS</h2>
           <div class="settings-content">
-            <div class="settings-group">
+            <div class="settings-group settings-mobile-only">
               <label class="settings-label">Screen Rotation</label>
               <div class="settings-rot-row" id="settingsRotRow">
                 <button type="button" class="rot-btn active" data-rot="auto">&#8646; Auto</button>
@@ -298,7 +299,7 @@
       <div id="howToPlayModal" class="modal-overlay hidden">
         <div class="modal-card help-card">
           <button id="btnCloseHowToPlay" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.29.0)</h2>
+          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.30.0)</h2>
           <div class="help-grid">
             <section>
               <h3>Single 3&times;3 Start &amp; Line-Drag Barricades</h3>
@@ -318,7 +319,7 @@
             </section>
             <section>
               <h3>Zombie-Only Towers &amp; 40% Sniper HEADSHOT</h3>
-              <p><b>Sentries</b>, <b>Cryo</b> (slows movement + <b>attack speed</b>) &amp; <b>Snipers</b> (<b class="c-violet">40% HEADSHOT</b>) target <b>zombies exclusively</b> &mdash; expand <b>$10 Safe Zones within 3 tiles of a Spawn Breach</b> so Commandos can assault it!</p>
+              <p><b>Sentries</b>, <b>Cryo</b> (slows movement + <b>attack speed</b>) &amp; <b>Snipers</b> (<b class="c-violet">30% HEADSHOT</b>) target <b>zombies exclusively</b> &mdash; expand <b>$10 Safe Zones within 3 tiles of a Spawn Breach</b> so Commandos can assault it!</p>
             </section>
             <section>
               <h3>Visual Spotlight Tutorial &amp; Controls</h3>
@@ -335,42 +336,42 @@
       <div id="zombieGuideModal" class="modal-overlay hidden">
         <div class="modal-card help-card zombie-guide-card">
           <button id="btnCloseZombieGuide" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.29.0)</h2>
+          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.30.0)</h2>
           <div id="bestiaryHardIndicator" class="bestiary-hard-indicator hidden">&#9888; HARD MODE ACTIVE: 3.0&times; ZOMBIE HP APPLIED</div>
           <p class="bestiary-note"><b class="c-orange">25% Random Brute-Breach Trait:</b> Any spawned Walker, Runner, Tank, or Wrecker has a 25% chance (100% on Demolisher) to smash straight toward Safe Zones, dealing a <b>fixed unscaled 12 damage</b> (<b>16 damage</b> for Demolishers) per strike against structures &amp; Safe Zones.</p>
           <div class="zombie-intel-list">
             <div class="zombie-intel-row">
               <canvas id="zPortraitWalker" class="z-portrait" width="52" height="52"></canvas>
               <div class="z-info">
-                <div class="z-head"><span class="z-name c-red">1. WALKER (walker)</span><span class="z-stats">HP: 40 &bull; Speed: 45 px/s &bull; Dmg: 10 / 0.5s &bull; Bounty: +$5 &bull; Wave 1+</span></div>
+                <div class="z-head"><span class="z-name c-red">1. WALKER (walker)</span><span class="z-stats">HP: 40 &bull; Speed: 45 px/s &bull; Dmg: 10 / 0.5s &bull; Bounty: +$2 &bull; Wave 1+</span></div>
                 <p>Standard infected shambler. Pursues nearest uninfected civilian, then Rescued Soldiers/Engineers within 300px, then green Safe Zone blocks. Routes around structures when an open lane exists.</p>
               </div>
             </div>
             <div class="zombie-intel-row">
               <canvas id="zPortraitRunner" class="z-portrait" width="52" height="52"></canvas>
               <div class="z-info">
-                <div class="z-head"><span class="z-name c-orange">2. RUNNER (runner)</span><span class="z-stats">HP: 25 &bull; Speed: 85 px/s &bull; Dmg: 8 / 0.5s &bull; Bounty: +$8 &bull; Wave 2+</span></div>
+                <div class="z-head"><span class="z-name c-orange">2. RUNNER (runner)</span><span class="z-stats">HP: 25 &bull; Speed: 85 px/s &bull; Dmg: 8 / 0.5s &bull; Bounty: +$4 &bull; Wave 2+</span></div>
                 <p>High-velocity sprinter appearing from Wave 2+. Closes distance rapidly to bite exposed civilians; also spawns immediately whenever an infected white-dot civilian completes incubation.</p>
               </div>
             </div>
             <div class="zombie-intel-row">
               <canvas id="zPortraitTank" class="z-portrait" width="52" height="52"></canvas>
               <div class="z-info">
-                <div class="z-head"><span class="z-name c-red">3. TANK (tank)</span><span class="z-stats">HP: 220 &bull; Speed: 25 px/s &bull; Dmg: 32 / 0.5s &bull; Bounty: +$20 &bull; Wave 3+</span></div>
+                <div class="z-head"><span class="z-name c-red">3. TANK (tank)</span><span class="z-stats">HP: 220 &bull; Speed: 25 px/s &bull; Dmg: 32 / 0.5s &bull; Bounty: +$10 &bull; Wave 3+</span></div>
                 <p>Heavily armored juggernaut (Wave 3+). Soaks kinetic fire and pounds structures or Safe Zone blocks for 32 damage per strike. Counter with Cryo slow + Sniper railguns.</p>
               </div>
             </div>
             <div class="zombie-intel-row">
               <canvas id="zPortraitDemolisher" class="z-portrait" width="52" height="52"></canvas>
               <div class="z-info">
-                <div class="z-head"><span class="z-name c-orange">4. DEMOLISHER (demolisher)</span><span class="z-stats">HP: 180 &bull; Speed: 38 px/s &bull; Dmg: 20 / 0.5s &bull; Bounty: +$18 &bull; Wave 6+</span></div>
+                <div class="z-head"><span class="z-name c-orange">4. DEMOLISHER (demolisher)</span><span class="z-stats">HP: 180 &bull; Speed: 38 px/s &bull; Dmg: 20 / 0.5s &bull; Bounty: +$9 &bull; Wave 6+</span></div>
                 <p>Base-breaching siege brute (crimson-black armor, hazard-orange ring &amp; front spikes; unlocked Wave 6+, max 4 combined with Wreckers). Marches straight toward the nearest Safe Zone and smashes every structure in its path. Prioritized by Snipers!</p>
               </div>
             </div>
             <div class="zombie-intel-row">
               <canvas id="zPortraitWrecker" class="z-portrait" width="52" height="52"></canvas>
               <div class="z-info">
-                <div class="z-head"><span class="z-name c-violet">5. WRECKER (wrecker)</span><span class="z-stats">HP: 110 &bull; Speed: 62 px/s &bull; Dmg: 14 / 0.5s &bull; Bounty: +$14 &bull; Wave 6+</span></div>
+                <div class="z-head"><span class="z-name c-violet">5. WRECKER (wrecker)</span><span class="z-stats">HP: 110 &bull; Speed: 62 px/s &bull; Dmg: 14 / 0.5s &bull; Bounty: +$7 &bull; Wave 6+</span></div>
                 <p>Anti-tower hunter (electric-violet chassis, hazard-yellow siege ring &amp; claws; unlocked Wave 6+, max 4 combined with Demolishers). Actively hunts Turrets and Barracks first before advancing on Safe Zones. Prioritized by Snipers!</p>
               </div>
             </div>
@@ -401,7 +402,7 @@
         </div>
       </div>
 
-      <!-- 4-Player Co-Op Multiplayer Modals (v0.29.0) -->
+      <!-- 4-Player Co-Op Multiplayer Modals (v0.30.0) -->
       <div id="mpRoleModal" class="modal-overlay hidden">
         <div class="modal-card mp-card">
           <h2 class="help-title mp-modal-title">&#127760; 4-PLAYER CO-OP MULTIPLAYER</h2>
@@ -533,7 +534,7 @@
         </div>
       </div>
 
-      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.29.0) -->
+      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.30.0) -->
       <div id="mpPauseModal" class="modal-overlay hidden">
         <div class="modal-card mp-card mp-pause-card">
           <h2 id="mpPauseTitle" class="help-title mp-modal-title">&#9208; MATCH PAUSED</h2>
@@ -663,7 +664,7 @@
             <button id="toolCryo" class="tool-btn" data-tool="cryo" title="Cryo $180: Safe Zone Only; slows zombie movement + attack speed &amp; deals AoE chip damage (towers target zombies only) (9)">
               <span class="tool-key">9</span><span class="tool-icon">&#10052;</span><span class="tool-name">Cryo</span><span class="tool-cost">$180</span>
             </button>
-            <button id="toolSniper" class="tool-btn" data-tool="sniper" title="Sniper $225: Safe Zone Only; targets Demolishers, Wreckers &amp; high-HP zombies with 40% HEADSHOT instakill (towers target zombies only) (0)">
+            <button id="toolSniper" class="tool-btn" data-tool="sniper" title="Sniper $225: Safe Zone Only; targets Demolishers, Wreckers &amp; high-HP zombies with 30% HEADSHOT instakill (towers target zombies only) (0)">
               <span class="tool-key">0</span><span class="tool-icon">&#8982;</span><span class="tool-name">Sniper</span><span class="tool-cost">$225</span>
             </button>
           </div>
@@ -702,7 +703,7 @@
         </div>
 
         <div id="deckHint">
-          <span class="hint-text">v0.29.0 &bull; Towers target zombies only &bull; Expand $10 Safe Zones &le;3 tiles of a Breach so Commandos destroy it! &bull; Engineers +20/+40/+70 HP/s</span>
+          <span class="hint-text">v0.30.0 &bull; Towers target zombies only &bull; Expand $10 Safe Zones &le;3 tiles of a Breach so Commandos destroy it! &bull; Engineers +20/+40/+70 HP/s</span>
         </div>
       </div>
     </footer>

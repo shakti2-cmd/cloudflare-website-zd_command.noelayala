@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.29.0 (Gate Passage, Engineer Fix, Survival Mode & 60s Rifts, Dynamic Map Sizes, Volume, Resume & Co-Op Ping)
+ * Version: v0.30.0 (Survival 4x HP / 1.35x Spd / +60% Escalation / 10-Wave Reshuffle, 50% Zombie Scrap, 8-Way Diagonal Pathing, 30% Sniper Headshot & Desktop Settings)
  */
 
 (function () {
@@ -64,8 +64,8 @@
     survival: {
       name: 'Survival',
       startingScrap: 110,
-      zombieHpMult: 1.0,
-      zombieSpeedMult: 1.0,
+      zombieHpMult: 4.0,
+      zombieSpeedMult: 1.35,
       infectionWindow: 2.0,
       isSurvival: true
     }
@@ -617,13 +617,16 @@
       const cx = curIdx % COLS;
       const cy = (curIdx - cx) / COLS;
 
-      for (let i = 0; i < 4; i++) {
-        const nx = cx + BFS_DIRS[i][0];
-        const ny = cy + BFS_DIRS[i][1];
+      for (let i = 0; i < 8; i++) {
+        const dx = DIRS_8[i][0];
+        const dy = DIRS_8[i][1];
+        const nx = cx + dx;
+        const ny = cy + dy;
         if (!inBounds(nx, ny)) continue;
         const nIdx = ny * COLS + nx;
         if (bfsVisited[nIdx]) continue;
         if (isBlockedFn(nx, ny)) continue;
+        if (dx !== 0 && dy !== 0 && (isBlockedFn(cx + dx, cy) || isBlockedFn(cx, cy + dy))) continue;
 
         bfsVisited[nIdx] = 1;
         bfsParent[nIdx] = curIdx;
@@ -647,10 +650,10 @@
     return path;
   }
 
-  // Non-linear randomized weighted zombie pathfinding (4-bucket Dial's shortest path with shuffled neighbors & jittered costs 1..3)
+  // Non-linear randomized weighted zombie pathfinding (8-bucket Dial's shortest path with 8-way diagonal movement)
   const zBfsDist = new Int16Array(TOTAL_CELLS);
   const zBfsParent = new Int16Array(TOTAL_CELLS);
-  const zDirOrder = [0, 1, 2, 3];
+  const zDirOrder = [0, 1, 2, 3, 4, 5, 6, 7];
 
   function findZombiePath(startCol, startRow, goalCol, goalRow, isBlockedFn) {
     if (!inBounds(startCol, startRow) || !inBounds(goalCol, goalRow)) return null;
@@ -664,15 +667,15 @@
     const goalIdx = goalRow * COLS + goalCol;
     zBfsDist[startIdx] = 0;
 
-    const buckets = [[startIdx], [], [], []];
-    const bucketHeads = [0, 0, 0, 0];
+    const buckets = [[startIdx], [], [], [], [], [], [], []];
+    const bucketHeads = [0, 0, 0, 0, 0, 0, 0, 0];
     let totalQueued = 1;
     let curCost = 0;
     let iterations = 0;
     let found = false;
 
     while (totalQueued > 0 && iterations < MAX_PATH_ITERATIONS) {
-      const b = curCost & 3;
+      const b = curCost & 7;
       if (bucketHeads[b] >= buckets[b].length) {
         buckets[b].length = 0;
         bucketHeads[b] = 0;
@@ -692,26 +695,30 @@
       const cx = curIdx % COLS;
       const cy = (curIdx - cx) / COLS;
 
-      for (let i = 3; i > 0; i--) {
+      for (let i = 7; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         const tmp = zDirOrder[i];
         zDirOrder[i] = zDirOrder[j];
         zDirOrder[j] = tmp;
       }
 
-      for (let i = 0; i < 4; i++) {
-        const d = BFS_DIRS[zDirOrder[i]];
-        const nx = cx + d[0];
-        const ny = cy + d[1];
+      for (let i = 0; i < 8; i++) {
+        const d = DIRS_8[zDirOrder[i]];
+        const dx = d[0];
+        const dy = d[1];
+        const nx = cx + dx;
+        const ny = cy + dy;
         if (!inBounds(nx, ny)) continue;
         if (isBlockedFn(nx, ny)) continue;
+        if (dx !== 0 && dy !== 0 && (isBlockedFn(cx + dx, cy) || isBlockedFn(cx, cy + dy))) continue;
         const nIdx = ny * COLS + nx;
-        const stepCost = 1 + Math.floor(Math.random() * 3);
+        const baseStep = (dx !== 0 && dy !== 0) ? 3 : 2;
+        const stepCost = baseStep + Math.floor(Math.random() * 2);
         const nd = curCost + stepCost;
         if (nd < zBfsDist[nIdx]) {
           zBfsDist[nIdx] = nd;
           zBfsParent[nIdx] = curIdx;
-          buckets[nd & 3].push(nIdx);
+          buckets[nd & 7].push(nIdx);
           totalQueued++;
         }
       }
@@ -1233,6 +1240,7 @@
       this.btnSpeed = $('btnSpeed');
       this.btnMute = $('btnMute');
       this.btnHudHelp = $('btnHudHelp');
+      this.btnHudSettings = $('btnHudSettings');
       this.btnHudZombies = $('btnHudZombies');
       this.statusMessage = $('statusMessage');
 
@@ -1508,6 +1516,7 @@
       on(this.btnCloseHowToPlay, 'click', () => this.closeHowToPlay());
       on(this.btnDismissHelp, 'click', () => this.closeHowToPlay());
       on(this.btnHudHelp, 'click', () => this.openHowToPlay());
+      on(this.btnHudSettings, 'click', () => this.openSettingsModal());
 
       const selectMapSizePreset = (presetKey) => {
         this.mapSizePreset = presetKey || 'auto';
@@ -5619,13 +5628,20 @@
       }
       for (let h = 0; h < q.length; h++) {
         const [cx, cy] = q[h];
-        for (let i = 0; i < 4; i++) {
-          const nx = cx + BFS_DIRS[i][0];
-          const ny = cy + BFS_DIRS[i][1];
+        for (let i = 0; i < 8; i++) {
+          const dx = DIRS_8[i][0];
+          const dy = DIRS_8[i][1];
+          const nx = cx + dx;
+          const ny = cy + dy;
           if (!inBounds(nx, ny)) continue;
           const idx = ny * COLS + nx;
           const stHere = this.structures.get(`${nx},${ny}`);
           if (seen[idx] || this.grid[ny][nx] === 1 || (stHere && stHere.type !== 'gate')) continue;
+          if (dx !== 0 && dy !== 0) {
+            const stA = this.structures.get(`${cx + dx},${cy}`);
+            const stB = this.structures.get(`${cx},${cy + dy}`);
+            if (this.grid[cy][cx + dx] === 1 || (stA && stA.type !== 'gate') || this.grid[cy + dy][cx] === 1 || (stB && stB.type !== 'gate')) continue;
+          }
           seen[idx] = 1;
           q.push([nx, ny]);
         }
@@ -5822,7 +5838,65 @@
 
     getSurvivalHpMult() {
       const steps = Math.floor(Math.max(0, (this.wave || 1) - 1) / 5);
-      return 1.0 + 0.20 * steps;
+      return 1.0 + 0.60 * steps;
+    }
+
+    reshuffleSurvivalSpawns() {
+      if (this.safeZones.size === 0) return;
+      const cap = 6 * (this.isMultiplayer ? Math.max(1, this.mpPlayers.length) : 1);
+      const targetCount = Math.max(1, Math.min(cap, this.spawns.size || 4));
+      for (const sp of this.spawns.values()) {
+        if (this.grid[sp.row] && this.grid[sp.row][sp.col] === 3) {
+          this.grid[sp.row][sp.col] = 0;
+        }
+      }
+      this.spawns.clear();
+
+      const szTiles = Array.from(this.safeZones.values());
+      const sampleSz = szTiles[0];
+      const candidates = [];
+      for (let r = 1; r < ROWS - 1; r++) {
+        for (let c = 1; c < COLS - 1; c++) {
+          if (this.grid[r][c] !== 0) continue;
+          const key = `${c},${r}`;
+          if (this.structures.has(key) || this.safeZones.has(key)) continue;
+          let minSzD = Infinity;
+          for (const sz of szTiles) {
+            const d = Math.hypot(c - sz.col, r - sz.row);
+            if (d < minSzD) minSzD = d;
+          }
+          if (minSzD >= 6) candidates.push([c, r]);
+        }
+      }
+      for (let i = candidates.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+      }
+      const breachHp = 750 + Math.floor((this.wave || 1) / 5) * 150;
+      for (let i = 0; i < candidates.length && this.spawns.size < targetCount; i++) {
+        const [bc, br] = candidates[i];
+        const path = findPath(bc, br, sampleSz.col, sampleSz.row, (c, r) => !inBounds(c, r) || this.grid[r][c] === 1);
+        if (!path) continue;
+        this.grid[br][bc] = 3;
+        const p = tileCenter(bc, br);
+        this.spawns.set(`${bc},${br}`, {
+          type: 'spawn',
+          col: bc,
+          row: br,
+          x: p.x,
+          y: p.y,
+          hp: breachHp,
+          maxHp: breachHp,
+          flash: 0,
+          timeSinceHit: 99,
+          isRegenerating: false,
+          dormantTimer: 60.0
+        });
+        this.pulseRings.push({ x: p.x, y: p.y, radius: 10, maxRadius: 72, color: '#FFD23F', life: 1.2, maxLife: 1.2 });
+      }
+      this.sound.playWaveWarning();
+      this.addFloatingText('SPAWNS RESHUFFLED (60s COOLDOWN)!', WIDTH / 2, 165, '#FFD23F');
+      this.showStatus('Survival Wave 10-boundary: All Spawn Breaches reshuffled with a 60s cooldown!');
     }
 
     spawnSurvivalDormantRift() {
@@ -5886,7 +5960,7 @@
         return {
           hp: sMult,
           dmg: 1.0 + 0.10 * steps,
-          speed: Math.min(1.5, 1.0 + 0.04 * steps),
+          speed: 1.0,
           tier: steps
         };
       }
@@ -6010,11 +6084,15 @@
         }
       }
 
-      // Survival escalation (+20% HP per 5 waves & 60s dormant rift on Wave 6, 11, 16...)
+      // Survival escalation (+60% HP per 5 waves; reshuffle spawns with 60s cooldown every 10 waves; dormant rift on Wave 6, 16, 26...)
       if (this.isSurvivalMode && w >= 6 && (w - 1) % 5 === 0) {
         const sMult = this.getSurvivalHpMult();
         this.addFloatingText(`SURVIVAL ESCALATION (${sMult.toFixed(1)}x HP)!`, WIDTH / 2, 138, '#00E5FF');
-        this.spawnSurvivalDormantRift();
+        if (w >= 11 && (w - 1) % 10 === 0) {
+          this.reshuffleSurvivalSpawns();
+        } else {
+          this.spawnSurvivalDormantRift();
+        }
       }
 
       this.computeThreatMultipliers();
@@ -6073,7 +6151,7 @@
         dmg,
         radius: T.radius,
         color: T.color,
-        reward: T.reward,
+        reward: Math.max(1, Math.floor(T.reward * 0.5)),
         angle: 0,
         bruteBreach: type === 'demolisher' ? true : Math.random() < 0.25,
         slowTimer: 0,
@@ -6102,7 +6180,11 @@
 
       const allSpawns = Array.from(this.spawns.values());
       const activeBreaches = allSpawns.filter((sp) => !(sp.dormantTimer > 0));
-      const breachList = activeBreaches.length > 0 ? activeBreaches : allSpawns;
+      if (activeBreaches.length === 0) {
+        this.waveSpawnQueue.unshift(entry);
+        return;
+      }
+      const breachList = activeBreaches;
       let pick = breachList[Math.floor(Math.random() * breachList.length)];
       if (this.isMultiplayer && assignedPlayerId && breachList.length > 1) {
         const pZones = Array.from(this.safeZones.values()).filter((sz) => sz.ownerId === assignedPlayerId);
@@ -11219,7 +11301,7 @@
         maxLife: 0.2
       });
       target.lastAttackerOwnerId = t.ownerId || target.lastAttackerOwnerId || null;
-      if (Math.random() < 0.40) {
+      if (Math.random() < 0.30) {
         target.hp = 0;
         t.kills = (t.kills || 0) + 1;
         this.addFloatingText('HEADSHOT!', target.x, target.y - 16, '#FF00FF');

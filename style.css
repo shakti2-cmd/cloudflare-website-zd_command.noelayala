@@ -1,4 +1,4 @@
-/* Zombie Defense Command v0.29.0 - tactical command-center theme (offline, zero layout shift) */
+/* Zombie Defense Command v0.30.0 - tactical command-center theme (offline, zero layout shift) */
 :root {
   --bg: #07090d;
   --panel: #0e131b;
@@ -1171,7 +1171,11 @@ body.is-mobile-touch #btnHudZombies,
 body.is-mobile-touch #btnResetLevel,
 body.is-mobile-touch #btnHudMainMenu,
 body.is-mobile-touch #btnMute,
-body.is-mobile-touch #btnHudHelp {
+body.is-mobile-touch #btnHudHelp,
+body.is-mobile-touch #btnHudSettings {
+  display: none !important;
+}
+body:not(.is-mobile-touch) .settings-mobile-only {
   display: none !important;
 }
 body.is-mobile-touch #commandDeck {
@@ -1327,7 +1331,7 @@ body.is-mobile-touch .camera-controls {
   }
 }
 
-/* ---------- 4-Player Co-Op Multiplayer Modals & HUD Locks (v0.29.0) ---------- */
+/* ---------- 4-Player Co-Op Multiplayer Modals & HUD Locks (v0.30.0) ---------- */
 .mp-card {
   width: min(560px, 96vw);
   border-top-color: var(--color-cyan);
@@ -1843,7 +1847,7 @@ body.is-multiplayer #btnMobileReset {
   }
 }
 
-/* ---------- System Settings Modal & Screen Rotation Locks (v0.29.0) ---------- */
+/* ---------- System Settings Modal & Screen Rotation Locks (v0.30.0) ---------- */
 .settings-card {
   width: min(520px, 94vw);
   border-top: 3px solid var(--color-cyan);
