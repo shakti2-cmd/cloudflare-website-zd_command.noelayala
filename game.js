@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.30.0 (Survival 4x HP / 1.35x Spd / +60% Escalation / 10-Wave Reshuffle, 50% Zombie Scrap, 8-Way Diagonal Pathing, 30% Sniper Headshot & Desktop Settings)
+ * Version: v0.31.0 (Developer Tuning Modal with 1.0x Centered Multipliers, Top Nav Mute Removal & Centered Main Menu)
  */
 
 (function () {
@@ -1010,6 +1010,12 @@
       this.zombieSpeedMult = 1.0;
       this.infectionWindow = 2.0;
 
+      // Developer Tuning Live Multipliers (v0.31.0)
+      this.devTowerStrengthMult = 1.0;
+      this.devZombieHpMult = 1.0;
+      this.devZombieScrapMult = 1.0;
+      this.devSliderStops = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0];
+
       this.scrap = 100;
       this.score = 0;
       this.totalCommandoKills = 0;
@@ -1366,6 +1372,19 @@
       this.settingsVolumeValue = $('settingsVolumeValue');
       this.btnSettingsHowToPlay = $('btnSettingsHowToPlay');
       this.btnSettingsBestiary = $('btnSettingsBestiary');
+      this.btnSettingsDeveloper = $('btnSettingsDeveloper');
+
+      // Developer Tuning UI Elements (v0.31.0)
+      this.developerModal = $('developerModal');
+      this.btnCloseDeveloper = $('btnCloseDeveloper');
+      this.btnDoneDeveloper = $('btnDoneDeveloper');
+      this.btnResetDeveloper = $('btnResetDeveloper');
+      this.sliderDevTowerStrength = $('sliderDevTowerStrength');
+      this.sliderDevZombieHp = $('sliderDevZombieHp');
+      this.sliderDevZombieScrap = $('sliderDevZombieScrap');
+      this.valDevTowerStrength = $('valDevTowerStrength');
+      this.valDevZombieHp = $('valDevZombieHp');
+      this.valDevZombieScrap = $('valDevZombieScrap');
 
       // Multiplayer UI Elements (v0.23.0)
       this.btnStartMultiplayer = $('btnStartMultiplayer');
@@ -1544,6 +1563,31 @@
       });
       on(this.btnSettingsHowToPlay, 'click', () => this.openHowToPlay());
       on(this.btnSettingsBestiary, 'click', () => this.openZombieGuide());
+
+      // Developer Tuning Modal bindings (v0.31.0)
+      on(this.btnSettingsDeveloper, 'click', () => this.openDeveloperModal());
+      on(this.btnCloseDeveloper, 'click', () => this.closeDeveloperModal());
+      on(this.btnDoneDeveloper, 'click', () => this.closeDeveloperModal());
+      on(this.btnResetDeveloper, 'click', () => this.resetDeveloperDefaults());
+
+      const updateDevSlider = (slider, key, readout) => {
+        if (!slider) return;
+        const idx = Math.max(0, Math.min(this.devSliderStops.length - 1, parseInt(slider.value, 10) || 0));
+        const val = this.devSliderStops[idx];
+        if (key === 'hp') {
+          this.setDevZombieHpMult(val);
+        } else if (key === 'tower') {
+          this.devTowerStrengthMult = val;
+          if (this.selectedStructure) this.updateUpgradePanel();
+        } else if (key === 'scrap') {
+          this.devZombieScrapMult = val;
+        }
+        if (readout) readout.textContent = val + 'x';
+      };
+
+      on(this.sliderDevTowerStrength, 'input', () => updateDevSlider(this.sliderDevTowerStrength, 'tower', this.valDevTowerStrength));
+      on(this.sliderDevZombieHp, 'input', () => updateDevSlider(this.sliderDevZombieHp, 'hp', this.valDevZombieHp));
+      on(this.sliderDevZombieScrap, 'input', () => updateDevSlider(this.sliderDevZombieScrap, 'scrap', this.valDevZombieScrap));
 
       const saveSettingsCallsign = () => {
         if (!this.settingsPlayerCallsign) return;
@@ -2302,7 +2346,9 @@
       window.addEventListener('keydown', (e) => {
         const key = e.key.toLowerCase();
         if (key === 'escape') {
-          if (this.settingsModal && !this.settingsModal.classList.contains('hidden')) {
+          if (this.developerModal && !this.developerModal.classList.contains('hidden')) {
+            this.closeDeveloperModal();
+          } else if (this.settingsModal && !this.settingsModal.classList.contains('hidden')) {
             this.closeSettingsModal();
           } else if (this.zombieGuideOpen) {
             this.closeZombieGuide();
@@ -2714,6 +2760,87 @@
       }
       this.settingsPausedGame = false;
       this.sound.playClick();
+    }
+
+    openDeveloperModal() {
+      if (!this.developerModal) return;
+      this.syncDeveloperUI();
+      showEl(this.developerModal, 'flex');
+      this.sound.playClick();
+    }
+
+    closeDeveloperModal() {
+      if (!this.developerModal) return;
+      hideEl(this.developerModal);
+      this.sound.playClick();
+    }
+
+    syncDeveloperUI() {
+      const getStopIndex = (val) => {
+        let bestIdx = 3;
+        let minDiff = Infinity;
+        for (let i = 0; i < this.devSliderStops.length; i++) {
+          const diff = Math.abs(this.devSliderStops[i] - val);
+          if (diff < minDiff) {
+            minDiff = diff;
+            bestIdx = i;
+          }
+        }
+        return bestIdx;
+      };
+
+      if (this.sliderDevTowerStrength) {
+        this.sliderDevTowerStrength.value = getStopIndex(this.devTowerStrengthMult || 1.0);
+      }
+      if (this.valDevTowerStrength) {
+        this.valDevTowerStrength.textContent = (this.devTowerStrengthMult || 1.0) + 'x';
+      }
+
+      if (this.sliderDevZombieHp) {
+        this.sliderDevZombieHp.value = getStopIndex(this.devZombieHpMult || 1.0);
+      }
+      if (this.valDevZombieHp) {
+        this.valDevZombieHp.textContent = (this.devZombieHpMult || 1.0) + 'x';
+      }
+
+      if (this.sliderDevZombieScrap) {
+        this.sliderDevZombieScrap.value = getStopIndex(this.devZombieScrapMult || 1.0);
+      }
+      if (this.valDevZombieScrap) {
+        this.valDevZombieScrap.textContent = (this.devZombieScrapMult || 1.0) + 'x';
+      }
+    }
+
+    resetDeveloperDefaults() {
+      const defaultIdx = 3; // corresponds to 1.0x in [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0]
+      if (this.sliderDevTowerStrength) this.sliderDevTowerStrength.value = defaultIdx;
+      if (this.sliderDevZombieHp) this.sliderDevZombieHp.value = defaultIdx;
+      if (this.sliderDevZombieScrap) this.sliderDevZombieScrap.value = defaultIdx;
+      if (this.valDevTowerStrength) this.valDevTowerStrength.textContent = '1.0x';
+      if (this.valDevZombieHp) this.valDevZombieHp.textContent = '1.0x';
+      if (this.valDevZombieScrap) this.valDevZombieScrap.textContent = '1.0x';
+      this.devTowerStrengthMult = 1.0;
+      this.devZombieScrapMult = 1.0;
+      this.setDevZombieHpMult(1.0);
+      if (this.selectedStructure) this.updateUpgradePanel();
+      this.sound.playClick();
+    }
+
+    setDevZombieHpMult(newMult) {
+      if (typeof newMult !== 'number' || newMult <= 0) newMult = 1.0;
+      const prev = this.devZombieHpMult || 1.0;
+      if (Math.abs(prev - newMult) > 0.0001) {
+        const ratio = newMult / prev;
+        if (Array.isArray(this.zombies)) {
+          for (let i = 0; i < this.zombies.length; i++) {
+            const z = this.zombies[i];
+            if (!z || z.dead) continue;
+            z.maxHp = Math.max(1, Math.round(z.maxHp * ratio));
+            z.hp = Math.max(1, Math.min(z.maxHp, Math.round(z.hp * ratio)));
+          }
+        }
+      }
+      this.devZombieHpMult = newMult;
     }
 
     syncSettingsUI() {
@@ -6135,7 +6262,8 @@
       }[type] || { hp: 40, speed: 45, dmg: 10, radius: 7, color: '#FF3333', reward: 5 };
 
       const esc = this.computeThreatMultipliers();
-      const hp = Math.round(T.hp * this.zombieHpMult * esc.hp);
+      const devHp = this.devZombieHpMult || 1.0;
+      const hp = Math.max(1, Math.round(T.hp * this.zombieHpMult * esc.hp * devHp));
       const speed = Math.round(T.speed * this.zombieSpeedMult * esc.speed);
       const dmg = Math.round(T.dmg * esc.dmg);
 
@@ -8822,10 +8950,11 @@
         }
         if (this.inspectStatDmg) {
           const mult = this.getSafeZoneDmgMult();
+          const devMult = this.devTowerStrengthMult || 1.0;
           this.inspectStatDmg.innerText = cur.dmg
-            ? `Damage: ${Math.round(cur.dmg * mult)} (${cur.dmg} base)`
+            ? `Damage: ${Math.round(cur.dmg * mult * devMult)}${devMult !== 1.0 ? ` (${devMult}x dev)` : ` (${cur.dmg} base)`}`
             : struct.type === 'cryo'
-            ? `Slow: ${Math.round(cur.slow * 100)}%`
+            ? `Slow: ${Math.round(cur.slow * 100)}%${devMult !== 1.0 ? ` (Pulse: ${Math.round(8 * mult * devMult)}dmg)` : ''}`
             : 'Armor: Block';
         }
         if (this.inspectStatKills) this.inspectStatKills.innerText = `Kills: ${struct.kills || 0}`;
@@ -9421,9 +9550,12 @@
           }
           if (cur.dmg) {
             const mult = this.getSafeZoneDmgMult();
-            parts.push(`Dmg: ${Math.round(cur.dmg * mult)}`);
+            const devMult = this.devTowerStrengthMult || 1.0;
+            parts.push(`Dmg: ${Math.round(cur.dmg * mult * devMult)}`);
           } else if (entity.type === 'cryo' && cur.slow) {
-            parts.push(`Slow: ${Math.round(cur.slow * 100)}%`);
+            const mult = this.getSafeZoneDmgMult();
+            const devMult = this.devTowerStrengthMult || 1.0;
+            parts.push(`Slow: ${Math.round(cur.slow * 100)}%${devMult !== 1.0 ? ` (${Math.round(8 * mult * devMult)}dmg)` : ''}`);
           }
           if (entity.kills !== undefined) parts.push(`Kills: ${entity.kills}`);
         }
@@ -10606,7 +10738,9 @@
         if (z.hp <= 0) {
           this.zombies.splice(i, 1);
           const lastStand = this.safeZones.size <= 5;
-          const bounty = lastStand ? Math.ceil(z.reward * 1.25) : z.reward;
+          const devScrapMult = this.devZombieScrapMult || 1.0;
+          const baseBounty = lastStand ? Math.ceil(z.reward * 1.25) : z.reward;
+          const bounty = Math.max(1, Math.round(baseBounty * devScrapMult));
           if (this.isMultiplayer) {
             const killOwner = z.lastAttackerOwnerId || this.getNearestSafeZoneOwner(z.x, z.y);
             this.addPlayerScrap(killOwner, bounty);
@@ -11253,7 +11387,7 @@
         life: 0.11,
         maxLife: 0.11
       });
-      const hitDmg = Math.round(lv.dmg * this.getSafeZoneDmgMult());
+      const hitDmg = Math.round(lv.dmg * this.getSafeZoneDmgMult() * (this.devTowerStrengthMult || 1.0));
       target.lastAttackerOwnerId = t.ownerId || target.lastAttackerOwnerId || null;
       target.hp -= hitDmg;
       if (target.hp <= 0) t.kills = (t.kills || 0) + 1;
@@ -11274,7 +11408,7 @@
         maxLife: 0.35
       });
       const mult = this.getSafeZoneDmgMult();
-      const chipZ = Math.round(8 * mult);
+      const chipZ = Math.round(8 * mult * (this.devTowerStrengthMult || 1.0));
       for (const z of this.zombies) {
         if (z.hp <= 0 || Math.hypot(z.x - t.x, z.y - t.y) > lv.range) continue;
         z.slowTimer = lv.slowDur;
@@ -11307,7 +11441,7 @@
         this.addFloatingText('HEADSHOT!', target.x, target.y - 16, '#FF00FF');
         this.addParticles(target.x, target.y, '#FF00FF', 18, 85);
       } else {
-        const hitDmg = Math.round(lv.dmg * this.getSafeZoneDmgMult());
+        const hitDmg = Math.round(lv.dmg * this.getSafeZoneDmgMult() * (this.devTowerStrengthMult || 1.0));
         target.hp -= hitDmg;
         if (target.hp <= 0) t.kills = (t.kills || 0) + 1;
         this.addParticles(target.x, target.y, '#FF00FF', 10, 70);
