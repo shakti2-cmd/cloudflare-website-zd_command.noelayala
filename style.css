@@ -1,4 +1,4 @@
-/* Zombie Defense Command v0.49.0 - tactical command-center theme (offline, zero layout shift) */
+/* Zombie Defense Command v0.50.0 - tactical command-center theme (offline, zero layout shift) */
 :root {
   --bg: #07090d;
   --panel: #0e131b;
@@ -2520,7 +2520,7 @@ body.is-mobile-touch .ability-btn {
 
 
 /* ==========================================================================
-   v0.49.0 QUARANTINE OUTPOST TACTICAL THEME (Start Screen + All Modals)
+   v0.50.0 QUARANTINE OUTPOST TACTICAL THEME (Start Screen + All Modals)
    (In-game #topHud / #commandDeck / #buildPanel / #gameCanvas untouched)
    ========================================================================== */
 

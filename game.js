@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.49.0 (Medic Zombie-Kiting & Reliable Engineering Garrisoning)
+ * Version: v0.50.0 (Medic Zombie-Kiting & Reliable Engineering Garrisoning)
  */
 
 (function () {
@@ -192,8 +192,8 @@
       requiresAdjacency: false,
       levels: [
         { hp: 100, cost: 10, repairCost: 6, color: '#8B5A2B', border: '#D2B48C' },
-        { hp: 250, cost: 90, repairCost: 55, color: '#555566', border: '#8888AA' },
-        { hp: 500, cost: 180, repairCost: 105, color: '#1B3B5F', border: '#00FFFF' }
+        { hp: 250, cost: 250, repairCost: 100, color: '#555566', border: '#8888AA' },
+        { hp: 900, cost: 1000, repairCost: 360, color: '#1B3B5F', border: '#00FFFF' }
       ]
     },
     gate: {
@@ -1630,7 +1630,7 @@
       this.arsenalTabUnits = $('arsenalTabUnits');
       this.arsenalTabTowers = $('arsenalTabTowers');
 
-      // Developer Tuning UI Elements (v0.49.0)
+      // Developer Tuning UI Elements (v0.50.0)
       this.developerModal = $('developerModal');
       this.btnCloseDeveloper = $('btnCloseDeveloper');
       this.btnDoneDeveloper = $('btnDoneDeveloper');
@@ -1864,7 +1864,7 @@
       on(this.tabArsenalUnits, 'click', () => { this.setArsenalTab('units'); this.sound.playClick(); });
       on(this.tabArsenalTowers, 'click', () => { this.setArsenalTab('towers'); this.sound.playClick(); });
 
-      // Developer Tuning Modal bindings (v0.49.0)
+      // Developer Tuning Modal bindings (v0.50.0)
       on(this.btnSettingsDeveloper, 'click', () => this.openDeveloperModal());
       on(this.btnCloseDeveloper, 'click', () => this.closeDeveloperModal());
       on(this.btnDoneDeveloper, 'click', () => this.closeDeveloperModal());
@@ -5488,6 +5488,9 @@
           if (st) this.salvageStructureForActor(st, senderId);
           break;
         }
+        case 'retire_unit':
+          this.retireUnitForActor(action.unitType, action.unitId, senderId);
+          break;
         case 'move_struct': {
           const st = this.structures.get(action.fromKey);
           if (st) this.attemptMoveStructure(st, action.col, action.row, senderId);
@@ -10822,6 +10825,8 @@
       const refund = Math.floor(struct.invested * 0.6);
 
       showEl(this.upgradePanel, 'flex');
+      showEl(this.btnUpgrade, 'flex');
+      showEl(this.btnSalvage, 'flex');
       const isAllyReadOnly = !!(this.isMultiplayer && struct.ownerId && struct.ownerId !== this.localPlayerId);
       this.upgradePanel.classList.toggle('is-ally-readonly', isAllyReadOnly);
       if (this.inspectIcon) this.inspectIcon.innerHTML = STRUCT_ICONS[struct.type] || '&#9646;';
@@ -11053,14 +11058,14 @@
         if (this.upgradeCostLabel) this.upgradeCostLabel.innerText = '--';
         if (this.btnUpgrade) this.btnUpgrade.disabled = true;
       } else {
-        if (upgradeBtnLabel) upgradeBtnLabel.innerText = this.isMobileTouch ? 'Upgrade' : 'Upgrade [W]';
+        if (upgradeBtnLabel) upgradeBtnLabel.innerText = 'Upgrade';
         if (this.upgradeCostLabel) this.upgradeCostLabel.innerText = next ? `$${next.cost}` : 'MAX';
         if (this.btnUpgrade) this.btnUpgrade.disabled = notMine || !next || this.scrap < next.cost;
       }
 
       if (struct.type === 'safezone') {
         const salvageBtnLabel = this.btnSalvage ? this.btnSalvage.querySelector('span:first-child') : null;
-        if (salvageBtnLabel) salvageBtnLabel.innerText = this.isMobileTouch ? 'Salvage' : 'Salvage [S]';
+        if (salvageBtnLabel) salvageBtnLabel.innerText = 'Salvage';
         if (this.salvageRefundLabel) this.salvageRefundLabel.innerText = '--';
         if (this.btnSalvage) {
           this.btnSalvage.disabled = true;
@@ -11071,9 +11076,7 @@
         const isConfirmingSalvage = this.salvageConfirmId === struct.id && performance.now() < this.salvageConfirmUntil;
         const salvageBtnLabel = this.btnSalvage ? this.btnSalvage.querySelector('span:first-child') : null;
         if (salvageBtnLabel) {
-          salvageBtnLabel.innerText = isConfirmingSalvage
-            ? (this.isMobileTouch ? 'Confirm' : 'Confirm [S]')
-            : (this.isMobileTouch ? 'Salvage' : 'Salvage [S]');
+          salvageBtnLabel.innerText = isConfirmingSalvage ? 'Confirm' : 'Salvage';
         }
         if (this.salvageRefundLabel) this.salvageRefundLabel.innerText = `+$${refund}`;
         if (this.btnSalvage) {
@@ -11216,11 +11219,22 @@
       hideEl(this.btnRelease);
       hideEl(this.inspectRepairStatus);
       hideEl(this.btnMoveStructure);
+      hideEl(this.btnUpgrade);
       if (this.btnMoveStructure) this.btnMoveStructure.classList.remove('moving-active', 'on-cooldown');
-      const upgradeBtnLabel = this.btnUpgrade ? this.btnUpgrade.querySelector('span:first-child') : null;
-      if (upgradeBtnLabel) upgradeBtnLabel.innerText = this.isMobileTouch ? 'Upgrade' : 'Upgrade [W]';
+      const isRecruit = !soldier.isCommando && (soldier.level || 1) === 1;
+      const notMine = !!(this.isMultiplayer && soldier.ownerId && soldier.ownerId !== this.localPlayerId);
       const salvageBtnLabel = this.btnSalvage ? this.btnSalvage.querySelector('span:first-child') : null;
-      if (salvageBtnLabel) salvageBtnLabel.innerText = this.isMobileTouch ? 'Salvage' : 'Salvage [S]';
+      if (isRecruit) {
+        hideEl(this.btnSalvage);
+      } else {
+        showEl(this.btnSalvage, 'flex');
+        if (salvageBtnLabel) salvageBtnLabel.innerText = 'Retire';
+        if (this.salvageRefundLabel) this.salvageRefundLabel.innerText = 'Civilian';
+        if (this.btnSalvage) {
+          this.btnSalvage.disabled = notMine;
+          this.btnSalvage.title = 'Retire unit back into a Civilian';
+        }
+      }
       if (this.btnSalvage) this.btnSalvage.classList.remove('confirming');
       if (this.inspectIcon) this.inspectIcon.innerHTML = STRUCT_ICONS.soldier;
       if (soldier.isCommando) {
@@ -11265,14 +11279,12 @@
         this.inspectHpBar.style.width = `${Math.max(0, Math.min(100, (soldier.hp / soldier.maxHp) * 100))}%`;
       }
 
-      if (this.salvageRefundLabel) this.salvageRefundLabel.innerText = '--';
-      if (this.btnSalvage) this.btnSalvage.disabled = true;
-
       this.updateMobileFloatingDetails(soldier);
     }
 
     renderEngineerInspector(engineer) {
       if (!this.upgradePanel || !engineer) return;
+      this._lastFloatMenuHtml = '';
       hideEl(this.buildingUnitFloatMenu);
       this.upgradePanel.classList.remove('details-expanded', 'is-ally-readonly');
       this.salvageConfirmId = null;
@@ -11291,12 +11303,18 @@
       hideEl(this.btnRelease);
       hideEl(this.inspectRepairStatus);
       hideEl(this.btnMoveStructure);
+      hideEl(this.btnUpgrade);
       if (this.btnMoveStructure) this.btnMoveStructure.classList.remove('moving-active', 'on-cooldown');
-      const upgradeBtnLabel = this.btnUpgrade ? this.btnUpgrade.querySelector('span:first-child') : null;
-      if (upgradeBtnLabel) upgradeBtnLabel.innerText = this.isMobileTouch ? 'Upgrade' : 'Upgrade [W]';
+      const notMineEng = !!(this.isMultiplayer && engineer.ownerId && engineer.ownerId !== this.localPlayerId);
+      showEl(this.btnSalvage, 'flex');
       const salvageBtnLabel = this.btnSalvage ? this.btnSalvage.querySelector('span:first-child') : null;
-      if (salvageBtnLabel) salvageBtnLabel.innerText = this.isMobileTouch ? 'Salvage' : 'Salvage [S]';
-      if (this.btnSalvage) this.btnSalvage.classList.remove('confirming');
+      if (salvageBtnLabel) salvageBtnLabel.innerText = 'Retire';
+      if (this.salvageRefundLabel) this.salvageRefundLabel.innerText = 'Civilian';
+      if (this.btnSalvage) {
+        this.btnSalvage.disabled = notMineEng;
+        this.btnSalvage.title = 'Retire unit back into a Civilian';
+        this.btnSalvage.classList.remove('confirming');
+      }
       if (this.inspectIcon) this.inspectIcon.innerHTML = STRUCT_ICONS.engineer;
       const isMedic = engineer.unitKind === 'medic';
       const isSapper = engineer.unitKind === 'sapper';
@@ -11329,31 +11347,14 @@
         if (this.inspectStatKills) this.inspectStatKills.innerText = `HP Repaired: ${Math.floor(engineer.repairedTotal || 0)}`;
       }
 
-      if (this.upgradeCostLabel) this.upgradeCostLabel.innerText = engineer.homeHubId ? 'HUB' : (next ? `$${next.upgradeCost}` : 'MAX');
-      if (this.btnUpgrade) this.btnUpgrade.disabled = !!engineer.homeHubId || !next || this.scrap < next.upgradeCost;
-
-      if (this.salvageRefundLabel) this.salvageRefundLabel.innerText = '--';
-      if (this.btnSalvage) this.btnSalvage.disabled = true;
-
       this.updateMobileFloatingDetails(engineer);
     }
 
     upgradeSelectedEntity() {
       if (!this.inPlay) return;
-      if (this.selectedSoldier) {
-        if (this.isMultiplayer && !this.isMpHost) {
-          if (this.mp) this.mp.sendAction({ kind: 'upgrade_unit', unitType: 'soldier', unitId: this.selectedSoldier.id });
-          return;
-        }
-        this.upgradeSoldierForActor(this.selectedSoldier, this.localPlayerId);
-        return;
-      }
-      if (this.selectedEngineer) {
-        if (this.isMultiplayer && !this.isMpHost) {
-          if (this.mp) this.mp.sendAction({ kind: 'upgrade_unit', unitType: 'engineer', unitId: this.selectedEngineer.id });
-          return;
-        }
-        this.upgradeEngineerForActor(this.selectedEngineer, this.localPlayerId);
+      if (this.selectedSoldier || this.selectedEngineer) {
+        this.showStatus('Units upgrade through their Barracks or Engineering hub.');
+        this.sound.playHit();
         return;
       }
       const s = this.selectedStructure;
@@ -11456,8 +11457,40 @@
     }
 
     salvageSelectedStructure(fromHotkey = false) {
+      if (!this.inPlay) return;
+      if (this.selectedSoldier) {
+        const sol = this.selectedSoldier;
+        if (!sol.isCommando && (sol.level || 1) === 1) return;
+        if (this.isMultiplayer && sol.ownerId && sol.ownerId !== this.localPlayerId) {
+          this.showStatus('Cannot retire another player\'s unit.');
+          this.sound.playHit();
+          return;
+        }
+        if (this.isMultiplayer && !this.isMpHost) {
+          if (this.mp) this.mp.sendAction({ kind: 'retire_unit', unitType: 'soldier', unitId: sol.id });
+          this.closeUpgradePanel();
+          return;
+        }
+        this.retireUnitForActor('soldier', sol.id, this.localPlayerId);
+        return;
+      }
+      if (this.selectedEngineer) {
+        const eng = this.selectedEngineer;
+        if (this.isMultiplayer && eng.ownerId && eng.ownerId !== this.localPlayerId) {
+          this.showStatus('Cannot retire another player\'s unit.');
+          this.sound.playHit();
+          return;
+        }
+        if (this.isMultiplayer && !this.isMpHost) {
+          if (this.mp) this.mp.sendAction({ kind: 'retire_unit', unitType: 'engineer', unitId: eng.id });
+          this.closeUpgradePanel();
+          return;
+        }
+        this.retireUnitForActor('engineer', eng.id, this.localPlayerId);
+        return;
+      }
       const s = this.selectedStructure;
-      if (!s || !this.inPlay) return;
+      if (!s) return;
       if (s.type === 'safezone') {
         this.showStatus('Safe Zones cannot be dismantled! They form the permanent perimeter.');
         this.sound.playHit();
@@ -11541,6 +11574,78 @@
       hideEl(this.buildingUnitFloatMenu);
       hideEl(this.upgradePanel);
       if (this.mobileFloatingDetails) this.mobileFloatingDetails.classList.add('hidden');
+    }
+
+    retireUnitForActor(unitType, unitId, actorId = null) {
+      if (!unitId) return;
+      const effActor = this.getEffectiveActorId(actorId);
+      let unit = null;
+      let idx = -1;
+      if (unitType === 'soldier') {
+        idx = this.soldiers.findIndex((s) => s.id === unitId);
+        if (idx === -1) return;
+        unit = this.soldiers[idx];
+        if (!unit.isCommando && (unit.level || 1) === 1) return;
+        if (this.isMultiplayer && unit.ownerId && effActor && unit.ownerId !== effActor) return;
+        this.soldiers.splice(idx, 1);
+        if (this.selectedSoldier === unit) this.closeUpgradePanel();
+      } else if (unitType === 'engineer') {
+        idx = this.engineers.findIndex((e) => e.id === unitId);
+        if (idx === -1) return;
+        unit = this.engineers[idx];
+        if (this.isMultiplayer && unit.ownerId && effActor && unit.ownerId !== effActor) return;
+        this.engineers.splice(idx, 1);
+        if (this.selectedEngineer === unit) this.closeUpgradePanel();
+      } else {
+        return;
+      }
+
+      const uc = Math.floor(unit.x / TILE_SIZE);
+      const ur = Math.floor(unit.y / TILE_SIZE);
+      let spawnCol = uc;
+      let spawnRow = ur;
+      let foundTile = inBounds(uc, ur) && this.grid[ur][uc] === 0 && !this.safeZones.has(`${uc},${ur}`) && !this.unitBlocked(uc, ur);
+      if (!foundTile) {
+        for (let rad = 1; rad <= 4 && !foundTile; rad++) {
+          for (let dr = -rad; dr <= rad && !foundTile; dr++) {
+            for (let dc = -rad; dc <= rad && !foundTile; dc++) {
+              const nc = uc + dc;
+              const nr = ur + dr;
+              if (!inBounds(nc, nr)) continue;
+              const k = `${nc},${nr}`;
+              if (this.grid[nr][nc] === 0 && !this.safeZones.has(k) && !this.unitBlocked(nc, nr)) {
+                spawnCol = nc;
+                spawnRow = nr;
+                foundTile = true;
+              }
+            }
+          }
+        }
+      }
+      const spawnPos = foundTile ? tileCenter(spawnCol, spawnRow) : { x: unit.x, y: unit.y };
+      const bfsToSafe = this.findPathToNearestSafeZone(spawnCol, spawnRow);
+      const autoPath = bfsToSafe && bfsToSafe.length > 0 ? bfsToSafe.map(([c, r]) => tileCenter(c, r)) : [];
+      const destTile = bfsToSafe && bfsToSafe.length > 0 ? { col: bfsToSafe[bfsToSafe.length - 1][0], row: bfsToSafe[bfsToSafe.length - 1][1] } : null;
+
+      this.civilians.push({
+        id: Math.random().toString(36).slice(2, 11),
+        x: spawnPos.x,
+        y: spawnPos.y,
+        radius: 6,
+        speed: 60,
+        path: autoPath,
+        dest: destTile,
+        targetBarracks: null,
+        wanderTimer: 2.5,
+        isIncubating: false,
+        incubationTimer: 0
+      });
+      this.civTotal += 1;
+      this.sound.playClick();
+      this.addFloatingText('Retired \u2192 Civilian', spawnPos.x, spawnPos.y - 12, '#00E5FF');
+      this.addParticles(spawnPos.x, spawnPos.y, '#00E5FF', 10, 45);
+      this.updateHUD();
+      this.showStatus('Unit retired back into a Civilian and routed to Safe Zone.');
     }
 
     isMovableStructure(struct) {
@@ -12139,6 +12244,11 @@
       this.updateCivilians(dt);
       this.updateSoldiers(dt);
       this.updateEngineers(dt);
+      this.unitTaskPingTimer = (typeof this.unitTaskPingTimer === 'number' ? this.unitTaskPingTimer : 3.5) - dt;
+      if (this.unitTaskPingTimer <= 0) {
+        this.unitTaskPingTimer = 3.5;
+        this.remindAllUnitsToResumeTasks();
+      }
       this.updateMines(dt);
       this.updateZombies(dt);
       this.updateStructures(dt);
@@ -12815,6 +12925,92 @@
       return anchors.some(([ac, ar]) => Math.hypot(tileCenter(ac, ar).x - eng.x, tileCenter(ac, ar).y - eng.y) <= 24);
     }
 
+    remindAllUnitsToResumeTasks() {
+      const nudgeOffBlockedOrGate = (unit, blockFn) => {
+        const c = Math.floor(unit.x / TILE_SIZE);
+        const r = Math.floor(unit.y / TILE_SIZE);
+        const stAt = inBounds(c, r) ? this.structures.get(`${c},${r}`) : null;
+        const onGateIdle = (!unit.path || unit.path.length === 0) && stAt && stAt.type === 'gate';
+        if (!inBounds(c, r) || blockFn(c, r) || onGateIdle) {
+          for (let k = 0; k < DIRS_8.length; k++) {
+            const nc = c + DIRS_8[k][0];
+            const nr = r + DIRS_8[k][1];
+            if (!inBounds(nc, nr) || blockFn(nc, nr)) continue;
+            const nSt = this.structures.get(`${nc},${nr}`);
+            if (nSt && nSt.type === 'gate') continue;
+            unit.path = [tileCenter(nc, nr)];
+            return true;
+          }
+        }
+        return false;
+      };
+
+      const isUnitBlocked = (c, r) => this.unitBlocked(c, r);
+      const isEngBlocked = (c, r) => this.engineerBlocked(c, r);
+
+      for (let i = 0; i < this.civilians.length; i++) {
+        const civ = this.civilians[i];
+        nudgeOffBlockedOrGate(civ, isUnitBlocked);
+        if (!civ.path || civ.path.length === 0) {
+          civ.repathTimer = 0;
+        }
+      }
+
+      for (let i = 0; i < this.soldiers.length; i++) {
+        const sol = this.soldiers[i];
+        nudgeOffBlockedOrGate(sol, isUnitBlocked);
+        if (sol.targetBarracks) {
+          const b = sol.targetBarracks;
+          const bAlive = this.structures.get(`${b.col},${b.row}`) === b;
+          const bHasOrder = (b.trainQueue && b.trainQueue.some((o) => o.recruitId === sol.id))
+            || (b.activeTrainers && b.activeTrainers.some((t) => t.recruitId === sol.id))
+            || this.canUnitEnterHub(b, 'soldier');
+          if (!bAlive || !bHasOrder) {
+            sol.targetBarracks = null;
+          }
+        }
+        if (sol.targetEngineering) {
+          const eHub = sol.targetEngineering;
+          const eAlive = this.structures.get(`${eHub.col},${eHub.row}`) === eHub;
+          const eHasOrder = (eHub.trainQueue && eHub.trainQueue.some((o) => o.recruitId === sol.id))
+            || (eHub.activeTrainers && eHub.activeTrainers.some((t) => t.recruitId === sol.id));
+          if (!eAlive || !eHasOrder) {
+            sol.targetEngineering = null;
+          }
+        }
+        if ((!sol.path || sol.path.length === 0) && !sol.manualMoveOrder && !sol.manualOrder) {
+          sol.aiTimer = 0;
+          sol.repathTimer = 0;
+        }
+      }
+
+      for (let i = 0; i < this.engineers.length; i++) {
+        const eng = this.engineers[i];
+        const blockFn = (eng.unitKind === 'medic' || eng.unitKind === 'sapper') ? isUnitBlocked : isEngBlocked;
+        nudgeOffBlockedOrGate(eng, blockFn);
+        if (eng.targetEngineering) {
+          const hub = eng.targetEngineering;
+          const hubAlive = this.structures.get(`${hub.col},${hub.row}`) === hub;
+          if (!hubAlive || !this.canUnitEnterHub(hub, 'engineer')) {
+            eng.targetEngineering = null;
+          }
+        }
+        if (eng.repairTarget) {
+          const rt = eng.repairTarget;
+          const k = `${rt.col},${rt.row}`;
+          const exists = this.structures.get(k) === rt || this.safeZones.get(k) === rt;
+          if (!exists || rt.hp >= rt.maxHp) {
+            eng.repairTarget = null;
+          }
+        }
+        if ((!eng.path || eng.path.length === 0) && !eng.manualMoveOrder && !eng.healBeamTarget && !eng.isWelding) {
+          eng.manualOrder = false;
+          eng.aiTimer = 0;
+          eng.scanTimer = 0;
+        }
+      }
+    }
+
     updateEngineers(dt) {
       for (let i = this.engineers.length - 1; i >= 0; i--) {
         const eng = this.engineers[i];
@@ -12939,13 +13135,15 @@
                   const nc = ec + DIRS_8[k][0];
                   const nr = er + DIRS_8[k][1];
                   if (this.unitBlocked(nc, nr)) continue;
+                  const stAt = this.structures.get(`${nc},${nr}`);
+                  const gatePenalty = stAt && stAt.type === 'gate' ? -240 : 0;
                   const cPos = tileCenter(nc, nr);
                   const dz = Math.hypot(cPos.x - nearestZ.x, cPos.y - nearestZ.y);
                   if (dz <= nearestD) continue;
                   const inHealBonus = (bestMate && Math.hypot(cPos.x - bestMate.x, cPos.y - bestMate.y) <= hRange) ? 300 : 0;
                   const onSafeBonus = this.grid[nr][nc] === 2 ? 120 : 0;
                   const anchorBonus = retreatAnchor ? -Math.hypot(cPos.x - retreatAnchor.x, cPos.y - retreatAnchor.y) * 0.65 : 0;
-                  const score = inHealBonus + onSafeBonus + dz + anchorBonus;
+                  const score = inHealBonus + onSafeBonus + gatePenalty + dz + anchorBonus;
                   if (score > bestScore) {
                     bestScore = score;
                     pick = [nc, nr];
@@ -12987,13 +13185,30 @@
                 }
                 if (needTarget) {
                   eng.targetEngineering = null;
-                  const tc = Math.floor(needTarget.x / TILE_SIZE);
-                  const tr = Math.floor(needTarget.y / TILE_SIZE);
-                  const p = Math.hypot(needTarget.x - eng.x, needTarget.y - eng.y) <= TILE_SIZE * 1.4
-                    ? null
-                    : this.findPathToAdjacentTile(ec, er, tc, tr, (c, r) => this.unitBlocked(c, r));
-                  if (p && p.length > 0) {
-                    eng.path = p.map(([c, r]) => tileCenter(c, r));
+                  const distToNeed = Math.hypot(needTarget.x - eng.x, needTarget.y - eng.y);
+                  if (distToNeed > hRange * 0.9) {
+                    const tc = Math.floor(needTarget.x / TILE_SIZE);
+                    const tr = Math.floor(needTarget.y / TILE_SIZE);
+                    let p = this.findPathToAdjacentTile(ec, er, tc, tr, (c, r) => this.unitBlocked(c, r));
+                    if (!p || p.length === 0) {
+                      p = findPath(ec, er, tc, tr, (c, r) => this.unitBlocked(c, r));
+                    }
+                    if (p && p.length > 0) {
+                      eng.path = p.map(([c, r]) => tileCenter(c, r));
+                    } else if (!this.safeZones.has(`${ec},${er}`)) {
+                      let bestSz = null;
+                      let bestSzD = Infinity;
+                      for (const sz of this.safeZones.values()) {
+                        const k = `${sz.col},${sz.row}`;
+                        if (this.structures.has(k)) continue;
+                        const d = Math.hypot(sz.x - eng.x, sz.y - eng.y);
+                        if (d < bestSzD) { bestSzD = d; bestSz = sz; }
+                      }
+                      if (bestSz) {
+                        const sp = findPath(ec, er, bestSz.col, bestSz.row, (c, r) => this.unitBlocked(c, r));
+                        if (sp && sp.length > 0) eng.path = sp.map(([c, r]) => tileCenter(c, r));
+                      }
+                    }
                   }
                 } else if (!bestMate) {
                   // Nobody needs healing: return to nearest Engineering bay or Safe Zone
@@ -13078,17 +13293,33 @@
             this.sound.playClick();
             this.addFloatingText('MINE SET', mp.x, mp.y - 10, '#FFAE00');
           } else if (ownMines >= maxMines && !eng.manualOrder && !eng.manualMoveOrder && eng.path.length === 0 && !eng.targetEngineering) {
-            // Return to nearest Engineering hub once all 5 mines are active
+            // Return to nearest Engineering hub once all 5 mines are active (fallback to open Safe Zone tile if bays full)
             eng.scanTimer = (eng.scanTimer || 0) - dt;
             if (eng.scanTimer <= 0) {
               eng.scanTimer = 0.7;
               const bestBay = this.findNearestAvailableEngineeringBay(eng.x, eng.y);
+              let routed = false;
               if (bestBay) {
                 const p = this.findPathToAdjacentTile(ec, er, bestBay.col, bestBay.row, (c, r) => this.unitBlocked(c, r));
                 if (p && p.length > 0) {
                   eng.path = p.map(([c, r]) => tileCenter(c, r));
                   eng.targetEngineering = bestBay;
                   eng.reenterCooldown = 0;
+                  routed = true;
+                }
+              }
+              if (!routed && !this.safeZones.has(`${ec},${er}`)) {
+                let bestSz = null;
+                let bestSzD = Infinity;
+                for (const sz of this.safeZones.values()) {
+                  const k = `${sz.col},${sz.row}`;
+                  if (this.structures.has(k)) continue;
+                  const d = Math.hypot(sz.x - eng.x, sz.y - eng.y);
+                  if (d < bestSzD) { bestSzD = d; bestSz = sz; }
+                }
+                if (bestSz) {
+                  const sp = findPath(ec, er, bestSz.col, bestSz.row, (c, r) => this.unitBlocked(c, r));
+                  if (sp && sp.length > 0) eng.path = sp.map(([c, r]) => tileCenter(c, r));
                 }
               }
             }
@@ -13116,13 +13347,18 @@
               }
               if (openTiles.length > 0) {
                 openTiles.sort((a, b) => (b.adjBarrier - a.adjBarrier) || (a.d - b.d));
-                const hasBarrierSpot = openTiles[0].adjBarrier;
-                const poolSize = hasBarrierSpot ? Math.min(2, openTiles.length) : Math.min(5, openTiles.length);
-                const pick = openTiles[Math.floor(Math.random() * poolSize)];
-                const p = findPath(ec, er, pick.c, pick.r, (c, r) => this.unitBlocked(c, r));
-                if (p && p.length > 0) {
-                  eng.path = p.map(([c, r]) => tileCenter(c, r));
+                const maxTry = Math.min(6, openTiles.length);
+                let foundMinePath = false;
+                for (let t = 0; t < maxTry; t++) {
+                  const pick = openTiles[t];
+                  const p = findPath(ec, er, pick.c, pick.r, (c, r) => this.unitBlocked(c, r));
+                  if (p && p.length > 0) {
+                    eng.path = p.map(([c, r]) => tileCenter(c, r));
+                    foundMinePath = true;
+                    break;
+                  }
                 }
+                if (!foundMinePath) eng.scanTimer = 0.25;
               }
             }
           }
