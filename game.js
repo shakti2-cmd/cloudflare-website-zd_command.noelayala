@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.47.1 (Medic Zombie-Kiting & Reliable Engineering Garrisoning)
+ * Version: v0.48.0 (Medic Zombie-Kiting & Reliable Engineering Garrisoning)
  */
 
 (function () {
@@ -1630,7 +1630,7 @@
       this.arsenalTabUnits = $('arsenalTabUnits');
       this.arsenalTabTowers = $('arsenalTabTowers');
 
-      // Developer Tuning UI Elements (v0.47.1)
+      // Developer Tuning UI Elements (v0.48.0)
       this.developerModal = $('developerModal');
       this.btnCloseDeveloper = $('btnCloseDeveloper');
       this.btnDoneDeveloper = $('btnDoneDeveloper');
@@ -1864,7 +1864,7 @@
       on(this.tabArsenalUnits, 'click', () => { this.setArsenalTab('units'); this.sound.playClick(); });
       on(this.tabArsenalTowers, 'click', () => { this.setArsenalTab('towers'); this.sound.playClick(); });
 
-      // Developer Tuning Modal bindings (v0.47.1)
+      // Developer Tuning Modal bindings (v0.48.0)
       on(this.btnSettingsDeveloper, 'click', () => this.openDeveloperModal());
       on(this.btnCloseDeveloper, 'click', () => this.closeDeveloperModal());
       on(this.btnDoneDeveloper, 'click', () => this.closeDeveloperModal());
@@ -11703,7 +11703,7 @@
 
     updateMobileFloatingDetails(entity) {
       if (!this.mobileFloatingDetails) return;
-      if (!this.isMobileTouch || !entity) {
+      if (!entity) {
         this.mobileFloatingDetails.classList.add('hidden');
         return;
       }

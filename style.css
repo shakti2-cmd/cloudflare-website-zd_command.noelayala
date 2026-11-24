@@ -1,4 +1,4 @@
-/* Zombie Defense Command v0.47.1 - tactical command-center theme (offline, zero layout shift) */
+/* Zombie Defense Command v0.48.0 - tactical command-center theme (offline, zero layout shift) */
 :root {
   --bg: #07090d;
   --panel: #0e131b;
@@ -119,32 +119,48 @@ body {
 
 .zombies-intel-btn {
   height: 36px;
-  padding: 4px 9px;
-  border-color: rgba(184, 51, 255, 0.55);
-  color: #ebccff;
-  background: linear-gradient(180deg, #241336, #160c22);
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--panel-2);
   flex: 0 0 auto;
 }
 .zombies-intel-btn:hover,
 .zombies-intel-btn.active {
-  border-color: var(--color-violet);
-  background: #2f1847;
-  box-shadow: 0 0 10px rgba(184, 51, 255, 0.45);
+  border-color: var(--color-cyan);
+  background: #182234;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.28);
 }
 
-.hud-controls { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; flex: 0 0 auto; }
+.hud-controls { display: flex; flex-wrap: nowrap; align-items: center; gap: 5px; flex: 0 0 auto; }
+#topHud #levelSelect,
+#topHud #btnResetLevel,
+#topHud #btnHudMainMenu,
+#topHud #btnHudHelp {
+  display: none !important;
+}
 select, .hud-btn {
-  font-family: var(--font); font-size: 11px; font-weight: 600;
+  font-family: var(--font); font-size: 11px; font-weight: 700;
   color: var(--text); background: var(--panel-2);
-  border: 1px solid var(--line); border-radius: 5px;
-  padding: 4px 7px; height: 32px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 6px;
+  padding: 4px 9px; height: 36px; cursor: pointer;
   white-space: nowrap;
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
 select:hover, .hud-btn:hover { border-color: var(--color-cyan); background: #182234; }
 .hud-btn:active { transform: translateY(1px); }
-.hud-btn.primary-btn { background: linear-gradient(180deg, #0c8a63, #086548); border-color: var(--color-green); }
-.hud-btn.primary-btn:hover { box-shadow: 0 0 10px rgba(0, 224, 138, 0.5); }
+.hud-btn.primary-btn {
+  background: var(--panel-2);
+  border-color: rgba(0, 224, 138, 0.55);
+  color: var(--text);
+}
+.hud-btn.primary-btn:hover {
+  border-color: var(--color-green);
+  background: #132824;
+  box-shadow: 0 0 10px rgba(0, 224, 138, 0.35);
+}
 .hud-btn.confirming {
   border-color: var(--color-orange);
   color: var(--color-orange);
@@ -597,20 +613,9 @@ kbd { font-family: var(--mono); font-size: 11px; background: #1b2638; border: 1p
   overflow: hidden;
 }
 #deckHint {
-  width: 100%;
-  height: 54px;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 0 8px;
-  font-size: 11px;
-  color: var(--dim);
-  font-family: var(--mono);
-  white-space: nowrap;
-  overflow: hidden;
+  display: none !important;
 }
-#upgradePanel.hidden + #deckHint { display: flex; }
+#upgradePanel.hidden + #deckHint { display: none !important; }
 .hint-text {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -638,21 +643,28 @@ kbd { font-family: var(--mono); font-size: 11px; background: #1b2638; border: 1p
 .tool-cost { font-family: var(--mono); font-size: 9.5px; color: var(--color-yellow); line-height: 1.05; }
 
 #upgradePanel {
-  flex: 0 0 54px;
+  flex: 0 1 auto;
   height: 54px;
-  width: 100%;
-  max-width: 1020px;
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
   margin: 0 auto;
   align-items: center;
+  gap: 6px;
   padding: 4px 10px;
   background: #0f1620; border: 1px solid var(--color-cyan); border-radius: 8px;
-  box-shadow: 0 0 12px rgba(0, 229, 255, 0.15);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85), 0 0 12px rgba(0, 229, 255, 0.15);
 }
-.inspector-head { display: flex; align-items: center; gap: 8px; min-width: 135px; }
+.inspector-head { display: flex; align-items: center; gap: 8px; min-width: 120px; }
 .inspect-icon { font-size: 24px; color: var(--color-cyan); }
 .inspect-name { font-weight: 800; font-size: 12.5px; white-space: nowrap; }
 .inspect-tier { font-size: 10.5px; color: var(--color-yellow); font-family: var(--mono); white-space: nowrap; }
-.inspector-body { flex: 1 1 auto; min-width: 120px; }
+.inspector-body,
+#inspectRepairStatus,
+#unitTrainSelect,
+#btnRelease {
+  display: none !important;
+}
 .bar-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--dim); font-family: var(--mono); }
 .progress-bar { height: 6px; background: #05080c; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; margin: 2px 0; }
 .progress-fill { height: 100%; background: linear-gradient(90deg, #00b36a, #00e08a); transition: width 0.15s; }
@@ -1093,20 +1105,20 @@ body.is-mobile-touch.is-multiplayer #mobileTabBar {
 .mobile-floating-details {
   display: none;
 }
-body.is-mobile-touch .mobile-floating-details:not(.hidden) {
+.mobile-floating-details:not(.hidden) {
   display: flex !important;
   position: absolute;
   top: calc(52px + env(safe-area-inset-top, 0px) + 26px);
   left: 50%;
   transform: translateX(-50%);
   width: calc(100% - 16px);
-  max-width: 620px;
-  background: rgba(10, 16, 26, 0.76);
+  max-width: 680px;
+  background: rgba(10, 16, 26, 0.78);
   border: 1px solid rgba(0, 229, 255, 0.35);
   border-radius: 6px;
   padding: 4px 10px;
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: 10px;
   font-weight: 700;
   color: #c8daf2;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
@@ -1237,9 +1249,10 @@ body.is-mobile-touch #topHud .hud-controls {
 }
 body.is-mobile-touch .mobile-settings-btn {
   display: inline-flex !important;
-  font-size: 16px;
-  padding: 4px 9px;
-  min-height: 32px;
+  font-size: 15px;
+  padding: 4px 10px;
+  height: 36px;
+  min-height: 36px;
   align-items: center;
   justify-content: center;
 }
@@ -1825,6 +1838,14 @@ body.is-multiplayer #btnMobileReset {
 }
 
 @media (max-height: 520px) and (orientation: landscape) {
+  #topHud .hud-btn,
+  #topHud select,
+  body.is-mobile-touch .mobile-settings-btn {
+    height: 28px;
+    min-height: 28px;
+    font-size: 10px;
+    padding: 2px 7px;
+  }
   body.is-mobile-touch #commandDeck {
     flex: 0 0 auto;
     height: auto;
@@ -2285,8 +2306,8 @@ body.is-multiplayer #btnMobileReset {
 /* ---------- Bottom-Left Floating Vertical Unit Picker & Mobile 4-Tower Row (v0.33.0) ---------- */
 #buildingUnitFloatMenu {
   position: absolute;
-  bottom: calc(54px + 10px);
-  left: max(12px, calc(50% - 510px));
+  bottom: 120px;
+  left: max(12px, calc(50% - 210px));
   z-index: 45;
   display: flex;
   flex-direction: column;
@@ -2478,7 +2499,7 @@ body.is-mobile-touch .ability-btn {
 
 
 /* ==========================================================================
-   v0.47.1 QUARANTINE OUTPOST TACTICAL THEME (Start Screen + All Modals)
+   v0.48.0 QUARANTINE OUTPOST TACTICAL THEME (Start Screen + All Modals)
    (In-game #topHud / #commandDeck / #buildPanel / #gameCanvas untouched)
    ========================================================================== */
 
@@ -2798,15 +2819,16 @@ body.is-mobile-touch .ability-btn {
 
 #mapSizeCards .map-card {
   display: flex !important;
-  flex-direction: row !important;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 6px !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px;
+  min-width: 0;
+  padding: 9px 6px !important;
   background: rgba(8, 18, 29, 0.92) !important;
   border: 1px solid rgba(0, 229, 255, 0.26) !important;
   border-radius: 7px !important;
-  text-align: left !important;
+  text-align: center !important;
 }
 
 #mapSizeCards .map-card .map-ico {
@@ -2818,18 +2840,22 @@ body.is-mobile-touch .ability-btn {
 #mapSizeCards .map-card .map-txt {
   display: flex;
   flex-direction: column;
-  line-height: 1.15;
+  align-items: center;
+  text-align: center;
+  line-height: 1.2;
 }
 
 #mapSizeCards .map-card .pick-name {
   font-size: 10.5px !important;
   font-weight: 800;
   color: #e6f3ff !important;
+  white-space: nowrap;
 }
 
 #mapSizeCards .map-card .pick-desc {
   font-size: 9.5px !important;
   color: #82a2be !important;
+  white-space: nowrap;
 }
 
 #mapSizeCards .map-card.selected {
