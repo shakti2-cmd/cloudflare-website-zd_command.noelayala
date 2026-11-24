@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.37.0 (Survival Invincible Rifts & Hidden HP Bars, Uncapped 5-Wave Reshuffle, Instant Wave Chaining, 0.75x Default Breach Count & Clean Desktop Card)
+ * Version: v0.38.0 (Mortar/Laser/Radar Towers, Gunner/Medic/Sapper Specialists, Barracks Hold Stance & Rally Point, Overcharge/Napalm Abilities & Survival 10-Wave Hive Behemoth)
  */
 
 (function () {
@@ -252,6 +252,40 @@
         { range: 200, rate: 0.65, dmg: 58, chainCount: 8, chainRange: 115, hp: 310, cost: 500, repairCost: 200, color: '#2B5BB8', border: '#80F5FF' }
       ]
     },
+    mortar: {
+      name: 'Mortar Artillery',
+      role: 'turret',
+      baseCost: 240,
+      requiresAdjacency: true,
+      armorMult: 0.35,
+      levels: [
+        { range: 280, minRange: 80, rate: 2.2, dmg: 45, aoe: 56, hp: 110, cost: 240, repairCost: 96, color: '#D97724', border: '#FFB800' },
+        { range: 320, minRange: 80, rate: 1.9, dmg: 75, aoe: 68, hp: 190, cost: 360, repairCost: 144, color: '#E8882C', border: '#FFD23F' },
+        { range: 360, minRange: 80, rate: 1.6, dmg: 115, aoe: 80, hp: 300, cost: 550, repairCost: 220, color: '#FF9A1F', border: '#FFF088' }
+      ]
+    },
+    laser: {
+      name: 'Laser Prism',
+      role: 'turret',
+      baseCost: 260,
+      requiresAdjacency: true,
+      levels: [
+        { range: 160, rate: 0.25, dmg: 14, hp: 120, cost: 260, repairCost: 104, color: '#CC1F3D', border: '#FF5C77' },
+        { range: 195, rate: 0.25, dmg: 24, hp: 210, cost: 390, repairCost: 156, color: '#E62247', border: '#FF8899' },
+        { range: 230, rate: 0.25, dmg: 38, hp: 330, cost: 600, repairCost: 240, color: '#FF2A55', border: '#FFD2D9' }
+      ]
+    },
+    radar: {
+      name: 'Radar Beacon',
+      role: 'turret',
+      baseCost: 175,
+      requiresAdjacency: true,
+      levels: [
+        { range: 140, buffRange: 140, buffPct: 0.15, hp: 130, cost: 175, repairCost: 70, color: '#147A8F', border: '#00E5FF' },
+        { range: 170, buffRange: 170, buffPct: 0.20, hp: 220, cost: 260, repairCost: 104, color: '#199CB5', border: '#38E8FF' },
+        { range: 200, buffRange: 200, buffPct: 0.25, hp: 340, cost: 400, repairCost: 160, color: '#1FC4E0', border: '#80F5FF' }
+      ]
+    },
     barracks: {
       name: 'Barracks',
       role: 'barracks',
@@ -343,6 +377,46 @@
     color: '#FF6B1A'
   };
 
+  const GUNNER_SPEC = {
+    level: 2,
+    unitKind: 'gunner',
+    name: 'Gunner',
+    maxHp: 380,
+    range: 100,
+    dmg: 16,
+    rate: 0.32,
+    speed: 68,
+    trainCost: 110,
+    color: '#38B6FF'
+  };
+
+  const MEDIC_SPEC = {
+    level: 2,
+    unitKind: 'medic',
+    name: 'Medic',
+    maxHp: 120,
+    healRange: 110,
+    healRate: 18,
+    speed: 78,
+    trainCost: 85,
+    color: '#00FF9D'
+  };
+
+  const SAPPER_SPEC = {
+    level: 3,
+    unitKind: 'sapper',
+    name: 'Sapper',
+    maxHp: 130,
+    mineCooldown: 5.5,
+    mineDmg: 75,
+    mineRadius: 48,
+    maxMines: 6,
+    armorMult: 0.35,
+    speed: 76,
+    trainCost: 90,
+    color: '#FFAE00'
+  };
+
   // --- AUTO-REPAIR ENGINEER SPECS (Trained in Engineering from Lv1 Recruits over 4.0s; upgrades linked to Engineering Lv1-Lv3) ---
   const ENGINEER_SPECS = [
     { level: 1, name: 'Engineer', maxHp: 70, speed: 70, repairRate: 20, upgradeCost: 0, color: '#FFB800' },
@@ -357,6 +431,9 @@
     cryo: '&#10052;',
     sniper: '&#8982;',
     tesla: '&#9889;',
+    mortar: '&#128163;',
+    laser: '&#9728;',
+    radar: '&#128225;',
     barracks: '&#9874;',
     engineering: '&#9881;',
     habitat: '&#8962;',
@@ -451,6 +528,19 @@
       setTimeout(() => this.tone(1280, 740, 0.06, 'square', 0.04), 28);
       this.emitCue('tesla');
     }
+    playMortarLaunch() {
+      this.tone(160, 75, 0.22, 'triangle', 0.08);
+      this.emitCue('mortar');
+    }
+    playExplosion() {
+      this.tone(110, 38, 0.28, 'sawtooth', 0.11);
+      setTimeout(() => this.tone(85, 30, 0.18, 'square', 0.07), 35);
+      this.emitCue('explosion');
+    }
+    playAbility() {
+      this.tone(480, 960, 0.22, 'triangle', 0.09);
+      this.emitCue('ability');
+    }
     playHit() {
       this.tone(190, 95, 0.06, 'square', 0.05);
       this.emitCue('hit');
@@ -495,6 +585,12 @@
           this.playFlameBurst();
         } else if (cue.k === 'tesla') {
           this.playTeslaZap();
+        } else if (cue.k === 'mortar') {
+          this.playMortarLaunch();
+        } else if (cue.k === 'explosion') {
+          this.playExplosion();
+        } else if (cue.k === 'ability') {
+          this.playAbility();
         } else if (cue.k === 'hit') {
           this.playHit();
         } else if (cue.k === 'break') {
@@ -602,6 +698,35 @@
       ctx.fillStyle = '#FFFFFF';
       ctx.beginPath();
       ctx.arc(z.x, z.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 1;
+    } else if (z.type === 'behemoth') {
+      ctx.fillStyle = z.color || '#6E0D25';
+      ctx.beginPath();
+      ctx.arc(z.x, z.y, z.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#FF3366';
+      ctx.lineWidth = 2.6;
+      ctx.stroke();
+
+      ctx.save();
+      ctx.translate(z.x, z.y);
+      ctx.rotate(t * 0.9);
+      ctx.fillStyle = '#FF9A1F';
+      for (let k = 0; k < 6; k++) {
+        ctx.rotate(Math.PI / 3);
+        ctx.beginPath();
+        ctx.moveTo(z.radius - 2, -2.5);
+        ctx.lineTo(z.radius + 5, 0);
+        ctx.lineTo(z.radius - 2, 2.5);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+
+      ctx.fillStyle = Math.sin(t * 7) > 0 ? '#FF5588' : '#FFD23F';
+      ctx.beginPath();
+      ctx.arc(z.x, z.y, Math.max(4, z.radius * 0.34), 0, Math.PI * 2);
       ctx.fill();
       ctx.lineWidth = 1;
     } else if (z.type === 'tank') {
@@ -1042,9 +1167,15 @@
       this.engineers = [];
       this.zombies = [];
       this.projectiles = [];
+      this.mines = [];
       this.particles = [];
       this.pulseRings = [];
       this.floatingTexts = [];
+      this.settingBarracksHoldPoint = null;
+      this.armingNapalm = false;
+      this.overchargeTimer = 0;
+      this.overchargeCooldown = 0;
+      this.napalmCooldown = 0;
 
       this.difficulty = 'normal';
       this.zombieHpMult = 1.0;
@@ -1368,6 +1499,11 @@
       this.btnCamReset = $('btnCamReset');
       this.btnCamZoomIn = $('btnCamZoomIn');
       this.btnCamFocusBase = $('btnCamFocusBase');
+      this.abilityBar = $('abilityBar');
+      this.btnAbilityOvercharge = $('btnAbilityOvercharge');
+      this.valAbilityOvercharge = $('valAbilityOvercharge');
+      this.btnAbilityNapalm = $('btnAbilityNapalm');
+      this.valAbilityNapalm = $('valAbilityNapalm');
 
       // Mobile 6-Tab Navigation Bar & Sub-Drawer
       this.mobileTabBar = $('mobileTabBar');
@@ -1961,10 +2097,56 @@
 
       // Inspector buttons
       on(this.buildingUnitFloatMenu, 'click', (e) => {
+        const stanceBtn = e.target ? e.target.closest('.stance-btn') : null;
+        if (stanceBtn) {
+          const st = this.selectedStructure;
+          const reqStance = stanceBtn.dataset.stance || 'kite';
+          if (st && st.type === 'barracks') {
+            if (reqStance === 'hold') {
+              this.selectedBuildType = null;
+              this.armingNapalm = false;
+              this.movingStructure = null;
+              this.settingBarracksHoldPoint = st;
+              this.updateBuildPanelUI();
+              this.updateAbilityUI();
+              this.showStatus('Hold Position armed: click/tap any walkable map tile to set Barracks rally point.');
+              this.sound.playClick();
+            } else {
+              this.setBarracksStance(st, 'kite', null, null, this.localPlayerId);
+            }
+          }
+          return;
+        }
         const btn = e.target ? e.target.closest('.float-unit-btn') : null;
         if (!btn || btn.disabled) return;
         const unitKind = btn.dataset.unitKind || null;
         this.trainFromSelectedBuilding(this.selectedStructure, this.localPlayerId, unitKind);
+      });
+      on(this.btnAbilityOvercharge, 'click', () => this.triggerOvercharge(this.localPlayerId));
+      on(this.btnAbilityNapalm, 'click', () => {
+        if (!this.inPlay || this.modalBlocking) return;
+        if ((this.napalmCooldown || 0) > 0) {
+          this.showStatus(`Napalm Strike recharging (${Math.ceil(this.napalmCooldown)}s remaining).`);
+          this.sound.playHit();
+          return;
+        }
+        if (this.scrap < 300) {
+          this.showStatus('Insufficient Scrap: Napalm Strike requires $300.');
+          this.sound.playHit();
+          return;
+        }
+        this.armingNapalm = !this.armingNapalm;
+        if (this.armingNapalm) {
+          this.selectedBuildType = null;
+          this.movingStructure = null;
+          this.settingBarracksHoldPoint = null;
+          this.updateBuildPanelUI();
+          this.showStatus('Napalm Strike armed ($300): click/tap target tile to ignite 110px firestorm!');
+        } else {
+          this.showStatus('Napalm Strike cancelled.');
+        }
+        this.sound.playClick();
+        this.updateAbilityUI();
       });
       on(this.btnTrainUnit, 'click', () => this.trainFromSelectedBuilding(this.selectedStructure));
       on(this.btnCancelTrain, 'click', () => this.cancelLastQueuedTraining(this.selectedStructure));
@@ -2791,7 +2973,8 @@
         { id: 'zPortraitRunner', type: 'runner', radius: 9, color: '#FF7700' },
         { id: 'zPortraitTank', type: 'tank', radius: 15, color: '#990000' },
         { id: 'zPortraitDemolisher', type: 'demolisher', radius: 15, color: '#3B0910' },
-        { id: 'zPortraitWrecker', type: 'wrecker', radius: 13, color: '#B833FF' }
+        { id: 'zPortraitWrecker', type: 'wrecker', radius: 13, color: '#B833FF' },
+        { id: 'zPortraitBehemoth', type: 'behemoth', radius: 16, color: '#6E0D25' }
       ];
       for (const p of portraits) {
         const cvs = document.getElementById(p.id);
@@ -3345,9 +3528,15 @@
       this.spawns.clear();
       this.zombies = [];
       this.projectiles = [];
+      this.mines = [];
       this.particles = [];
       this.pulseRings = [];
       this.floatingTexts = [];
+      this.settingBarracksHoldPoint = null;
+      this.armingNapalm = false;
+      this.overchargeTimer = 0;
+      this.overchargeCooldown = 0;
+      this.napalmCooldown = 0;
       this.waveSpawnQueue = [];
 
       for (const sz of saved.safeZones) {
@@ -4084,9 +4273,15 @@
       this.engineers = [];
       this.zombies = [];
       this.projectiles = [];
+      this.mines = [];
       this.particles = [];
       this.pulseRings = [];
       this.floatingTexts = [];
+      this.settingBarracksHoldPoint = null;
+      this.armingNapalm = false;
+      this.overchargeTimer = 0;
+      this.overchargeCooldown = 0;
+      this.napalmCooldown = 0;
 
       // 32x24 open co-op arena with border rocks
       this.grid = Array.from({ length: ROWS }, (_, r) =>
@@ -4372,6 +4567,17 @@
         case 'ping':
           this.triggerMpPing(action.x, action.y, senderId, action.id);
           break;
+        case 'set_stance': {
+          const st = this.structures.get(action.key);
+          if (st) this.setBarracksStance(st, action.stance, action.col, action.row, senderId);
+          break;
+        }
+        case 'overcharge':
+          this.triggerOvercharge(senderId);
+          break;
+        case 'napalm':
+          this.triggerNapalmStrike(action.x, action.y, senderId);
+          break;
       }
       if (this.mp) this.mp.broadcastState(this.serializeMpState(), true);
     }
@@ -4478,8 +4684,12 @@
           spawnedCivs: st.spawnedCivs || 0,
           occCount: st.occupants ? st.occupants.length : 0,
           qLen: st.trainQueue ? st.trainQueue.length : 0,
-          qKinds: st.type === 'barracks' && st.trainQueue ? st.trainQueue.map((o) => o.unitKind || 'commando') : undefined,
+          qKinds: (st.type === 'barracks' || st.type === 'engineering') && st.trainQueue
+            ? st.trainQueue.map((o) => o.unitKind || (st.type === 'engineering' ? 'engineer' : 'commando'))
+            : undefined,
           activeT: st.activeTrainers ? st.activeTrainers.length : 0,
+          stance: st.type === 'barracks' ? (st.stance || 'kite') : undefined,
+          holdTile: st.type === 'barracks' && st.holdTile ? st.holdTile : undefined,
           ownerId: st.ownerId || null, ownerSlot: st.ownerSlot || 0, ownerColor: st.ownerColor || null, ownerName: st.ownerName || null
         });
       }
@@ -4507,6 +4717,15 @@
         baseIntegrity: this.baseIntegrity,
         totalCommandoKills: this.totalCommandoKills,
         qCount: this.waveSpawnQueue.length,
+        overchargeTimer: Math.round((this.overchargeTimer || 0) * 10) / 10,
+        overchargeCooldown: Math.round((this.overchargeCooldown || 0) * 10) / 10,
+        napalmCooldown: Math.round((this.napalmCooldown || 0) * 10) / 10,
+        mines: (this.mines || []).map((m) => ({
+          id: m.id,
+          x: Math.round(m.x),
+          y: Math.round(m.y),
+          radius: m.radius || 48
+        })),
         wallets: { ...this.playerWallets },
         grid: this.grid,
         safeZones: szArr,
@@ -4534,10 +4753,15 @@
         })),
         engineers: this.engineers.map((e) => ({
           id: e.id, level: e.level,
+          unitKind: e.unitKind || 'engineer',
           x: Math.round(e.x * 10) / 10, y: Math.round(e.y * 10) / 10,
           vx: Math.round((e.vx || 0) * 10) / 10, vy: Math.round((e.vy || 0) * 10) / 10,
           hp: e.hp, maxHp: e.maxHp, speed: e.speed, repairRate: e.repairRate,
-          repairedTotal: e.repairedTotal || 0, name: e.name || '', color: e.color || '#FFD23F',
+          repairedTotal: e.repairedTotal || 0,
+          minesPlanted: e.minesPlanted || 0,
+          curedCount: e.curedCount || 0,
+          healBeamTarget: e.healBeamTarget ? { x: Math.round(e.healBeamTarget.x), y: Math.round(e.healBeamTarget.y) } : null,
+          name: e.name || '', color: e.color || '#FFD23F',
           homeHubId: e.homeHubId || null, ownerId: e.ownerId || null,
           ownerColor: e.ownerColor || null, ownerName: e.ownerName || null
         })),
@@ -4546,7 +4770,7 @@
           x: Math.round(z.x * 10) / 10, y: Math.round(z.y * 10) / 10,
           vx: Math.round((z.vx || 0) * 10) / 10, vy: Math.round((z.vy || 0) * 10) / 10,
           hp: z.hp, maxHp: z.maxHp, radius: z.radius, color: z.color,
-          angle: z.angle || 0, slowTimer: z.slowTimer || 0, bruteBreach: !!z.bruteBreach
+          angle: z.angle || 0, slowTimer: z.slowTimer || 0, bruteBreach: !!z.bruteBreach, broodBuffed: !!z.broodBuffed
         })),
         projectiles: this.projectiles.map((p) => ({
           id: p.id || 0,
@@ -4562,6 +4786,8 @@
           vy: p.vy !== undefined ? Math.round(p.vy * 10) / 10 : undefined,
           radius: p.radius !== undefined ? Math.round(p.radius * 10) / 10 : undefined,
           maxRadius: p.maxRadius !== undefined ? Math.round(p.maxRadius * 10) / 10 : undefined,
+          aoe: p.aoe,
+          width: p.width,
           color: p.color || '#FFD23F',
           life: Math.round((p.life || 0.11) * 1000) / 1000,
           maxLife: Math.round((p.maxLife || 0.11) * 1000) / 1000
@@ -4620,6 +4846,10 @@
       this.baseIntegrity = Number(snap.baseIntegrity) || 0;
       this.totalCommandoKills = snap.totalCommandoKills || 0;
       this.waveSpawnQueue = new Array(snap.qCount || 0).fill('walker');
+      this.overchargeTimer = Number(snap.overchargeTimer) || 0;
+      this.overchargeCooldown = Number(snap.overchargeCooldown) || 0;
+      this.napalmCooldown = Number(snap.napalmCooldown) || 0;
+      this.mines = Array.isArray(snap.mines) ? snap.mines.map((m) => ({ ...m })) : [];
 
       if (snap.wallets) {
         this.playerWallets = { ...snap.wallets };
@@ -4651,7 +4881,11 @@
           cooldown: 0,
           flash: 0,
           occupants: new Array(st.occCount || 0).fill(0).map(() => ({ isCommando: false, unitType: 'recruit', hp: 100, maxHp: 100 })),
-          trainQueue: new Array(st.qLen || 0).fill(0).map((_, qIdx) => ({ cost: 50, started: true, unitKind: Array.isArray(st.qKinds) ? (st.qKinds[qIdx] || 'commando') : 'commando' })),
+          trainQueue: new Array(st.qLen || 0).fill(0).map((_, qIdx) => ({
+            cost: 50,
+            started: true,
+            unitKind: Array.isArray(st.qKinds) ? (st.qKinds[qIdx] || (st.type === 'engineering' ? 'engineer' : 'commando')) : (st.type === 'engineering' ? 'engineer' : 'commando')
+          })),
           activeTrainers: new Array(st.activeT || 0).fill(0).map(() => ({ timer: st.trainTimer || 0 }))
         });
       }
@@ -4847,9 +5081,13 @@
           e.hp = se.hp;
           e.maxHp = se.maxHp;
           e.level = se.level;
+          e.unitKind = se.unitKind || 'engineer';
           e.speed = se.speed;
           e.repairRate = se.repairRate;
           e.repairedTotal = se.repairedTotal;
+          e.minesPlanted = se.minesPlanted || 0;
+          e.curedCount = se.curedCount || 0;
+          e.healBeamTarget = se.healBeamTarget || null;
           e.name = se.name;
           e.color = se.color;
           e.homeHubId = se.homeHubId;
@@ -4868,6 +5106,7 @@
       for (const se of snapEngMap.values()) {
         this.engineers.push({
           ...se,
+          unitKind: se.unitKind || 'engineer',
           targetX: se.x,
           targetY: se.y,
           vx: se.vx || 0,
@@ -4897,6 +5136,7 @@
           z.angle = sz.angle;
           z.slowTimer = sz.slowTimer;
           z.bruteBreach = sz.bruteBreach;
+          z.broodBuffed = !!sz.broodBuffed;
           if (Math.hypot(z.x - sz.x, z.y - sz.y) > 80) {
             z.x = sz.x;
             z.y = sz.y;
@@ -4928,13 +5168,15 @@
             this.mpSeenProjIds.delete(firstKey);
           }
         }
-        const minLife = sp.type === 'bullet' ? 0.09 : (sp.type === 'railBeam' || sp.type === 'lightningArc' ? 0.16 : 0.2);
+        const minLife = sp.type === 'bullet' ? 0.09 : (sp.type === 'railBeam' || sp.type === 'lightningArc' || sp.type === 'laserBeam' ? 0.16 : sp.type === 'mortarShell' ? 0.35 : 0.2);
         this.projectiles.push({
           ...sp,
           life: Math.max(sp.life || minLife, minLife),
           maxLife: Math.max(sp.maxLife || minLife, minLife)
         });
-        if (sp.type === 'lightningArc' && Array.isArray(sp.points)) {
+        if (sp.type === 'napalmBlast') {
+          this.addParticles(sp.x, sp.y, '#FF5511', 20, 95);
+        } else if (sp.type === 'lightningArc' && Array.isArray(sp.points)) {
           for (let pi = 1; pi < sp.points.length; pi++) {
             this.addParticles(sp.points[pi].x, sp.points[pi].y, '#5CEEFF', 4, 42);
           }
@@ -5331,9 +5573,15 @@
       this.engineers = [];
       this.zombies = [];
       this.projectiles = [];
+      this.mines = [];
       this.particles = [];
       this.pulseRings = [];
       this.floatingTexts = [];
+      this.settingBarracksHoldPoint = null;
+      this.armingNapalm = false;
+      this.overchargeTimer = 0;
+      this.overchargeCooldown = 0;
+      this.napalmCooldown = 0;
 
       const preset = DIFFICULTY_PRESETS[this.difficulty] || DIFFICULTY_PRESETS.normal;
       this.scrap = this.isTutorialMode ? 260 : preset.startingScrap;
@@ -5487,6 +5735,8 @@
     }
 
     openMobileCategory(cat) {
+      this.armingNapalm = false;
+      this.settingBarracksHoldPoint = null;
       this.closeUpgradePanel();
       this.activeMobileCategory = cat;
       if (this.mobileSubDrawer) showEl(this.mobileSubDrawer, 'block');
@@ -6432,6 +6682,12 @@
           this.waveSpawnQueue.push(...batch);
         }
       }
+      if (this.isSurvivalMode && w >= 10 && w % 10 === 0 && this.spawns.size > 0) {
+        const firstKey = this.spawns.keys().next().value;
+        this.waveSpawnQueue.push({ type: 'behemoth', breachKey: firstKey });
+        this.addFloatingText('WARNING: HIVE BEHEMOTH BOSS!', WIDTH / 2, 192, '#FF3366');
+        this.sound.playWaveWarning();
+      }
       if (this.spawnTimer <= 0) this.spawnTimer = 0.35;
 
       this.computeThreatMultipliers();
@@ -6470,7 +6726,8 @@
         runner: { hp: 25, speed: 85, dmg: 8, radius: 6, color: '#FF7700', reward: 8 },
         tank: { hp: 220, speed: 25, dmg: 32, radius: 11, color: '#990000', reward: 20 },
         demolisher: { hp: 180, speed: 38, dmg: 20, radius: 12, color: '#3B0910', reward: 18 },
-        wrecker: { hp: 110, speed: 62, dmg: 14, radius: 9, color: '#B833FF', reward: 14 }
+        wrecker: { hp: 110, speed: 62, dmg: 14, radius: 9, color: '#B833FF', reward: 14 },
+        behemoth: { hp: 900, speed: 24, dmg: 35, radius: 17, color: '#6E0D25', reward: 80 }
       }[type] || { hp: 40, speed: 45, dmg: 10, radius: 7, color: '#FF3333', reward: 5 };
 
       const esc = this.computeThreatMultipliers();
@@ -6639,6 +6896,207 @@
     }
 
     // --- TOOLS, SELECTION & INSPECTOR ---
+    isTowerType(type) {
+      return type === 'sentry' || type === 'cryo' || type === 'sniper' || type === 'tesla'
+        || type === 'mortar' || type === 'laser' || type === 'radar';
+    }
+
+    getRadarBuffAt(x, y) {
+      let maxPct = 0;
+      for (const st of this.structures.values()) {
+        if (st.type !== 'radar' || st.hp <= 0 || (st.moveCooldown || 0) > 0) continue;
+        const lv = STRUCTURE_SPECS.radar.levels[Math.max(0, (st.level || 1) - 1)];
+        const buffRange = (lv && (lv.buffRange || lv.range)) || 140;
+        if (Math.hypot(st.x - x, st.y - y) <= buffRange) {
+          maxPct = Math.max(maxPct, (lv && lv.buffPct) || 0.15);
+        }
+      }
+      return maxPct;
+    }
+
+    applyZombieDamage(z, rawDmg, ownerId = null, heavyArmorMult = 1.0) {
+      if (!z || z.hp <= 0) return false;
+      let dmg = rawDmg;
+      if (heavyArmorMult < 1.0 && (z.type === 'tank' || z.type === 'demolisher' || z.type === 'wrecker' || z.type === 'behemoth')) {
+        dmg *= heavyArmorMult;
+      }
+      if (z.broodBuffed && z.type !== 'behemoth') {
+        dmg *= 0.75;
+      }
+      const finalDmg = Math.max(1, Math.round(dmg));
+      if (ownerId) z.lastAttackerOwnerId = ownerId;
+      const wasAlive = z.hp > 0;
+      z.hp -= finalDmg;
+      return wasAlive && z.hp <= 0;
+    }
+
+    updateAbilityUI() {
+      if (!this.abilityBar) return;
+      if (!this.inPlay) {
+        hideEl(this.abilityBar);
+        return;
+      }
+      showEl(this.abilityBar, 'flex');
+      const ocCd = Math.ceil(Math.max(0, this.overchargeCooldown || 0));
+      const ocActive = (this.overchargeTimer || 0) > 0;
+      const npCd = Math.ceil(Math.max(0, this.napalmCooldown || 0));
+      if (this.btnAbilityOvercharge) {
+        this.btnAbilityOvercharge.classList.toggle('active-buff', ocActive);
+        this.btnAbilityOvercharge.disabled = ocCd > 0 || (!ocActive && this.scrap < 200);
+      }
+      if (this.valAbilityOvercharge) {
+        this.valAbilityOvercharge.innerText = ocActive
+          ? `${Math.ceil(this.overchargeTimer)}s ON`
+          : ocCd > 0
+          ? `${ocCd}s`
+          : '$200';
+      }
+      if (this.btnAbilityNapalm) {
+        this.btnAbilityNapalm.classList.toggle('armed', !!this.armingNapalm);
+        this.btnAbilityNapalm.disabled = npCd > 0 || this.scrap < 300;
+      }
+      if (this.valAbilityNapalm) {
+        this.valAbilityNapalm.innerText = this.armingNapalm
+          ? 'AIM'
+          : npCd > 0
+          ? `${npCd}s`
+          : '$300';
+      }
+    }
+
+    triggerOvercharge(actorId = null) {
+      if (!this.inPlay || this.modalBlocking) return;
+      if (this.isMultiplayer && !this.isMpHost) {
+        if (this.mp) this.mp.sendAction({ kind: 'overcharge' });
+        return;
+      }
+      if ((this.overchargeCooldown || 0) > 0) {
+        this.showStatus(`Overcharge recharging (${Math.ceil(this.overchargeCooldown)}s remaining).`);
+        this.sound.playHit();
+        return;
+      }
+      const effActor = this.getEffectiveActorId(actorId);
+      if (!this.spendPlayerScrap(effActor, 200)) {
+        this.showStatus('Insufficient Scrap: Overcharge requires $200.');
+        this.sound.playHit();
+        return;
+      }
+      this.overchargeTimer = 10.0;
+      this.overchargeCooldown = 25.0;
+      this.sound.playAbility();
+      this.addFloatingText('OVERCHARGE +50% ROF (10s)!', WIDTH / 2, 110, '#00E5FF');
+      for (const st of this.structures.values()) {
+        if (this.isTowerType(st.type) && st.type !== 'radar') {
+          this.pulseRings.push({ x: st.x, y: st.y, radius: 6, maxRadius: 34, color: '#00E5FF', life: 0.65, maxLife: 0.65 });
+        }
+      }
+      this.showStatus('Overcharge activated! +50% turret fire rate for 10s (25s cooldown).');
+      this.updateHUD();
+      this.updateAbilityUI();
+    }
+
+    triggerNapalmStrike(mx, my, actorId = null) {
+      if (!this.inPlay || this.modalBlocking) return;
+      if (this.isMultiplayer && !this.isMpHost) {
+        this.armingNapalm = false;
+        this.updateAbilityUI();
+        if (this.mp) this.mp.sendAction({ kind: 'napalm', x: Math.round(mx), y: Math.round(my) });
+        return;
+      }
+      if ((this.napalmCooldown || 0) > 0) {
+        this.armingNapalm = false;
+        this.updateAbilityUI();
+        this.showStatus(`Napalm Strike recharging (${Math.ceil(this.napalmCooldown)}s remaining).`);
+        this.sound.playHit();
+        return;
+      }
+      const effActor = this.getEffectiveActorId(actorId);
+      if (!this.spendPlayerScrap(effActor, 300)) {
+        this.armingNapalm = false;
+        this.updateAbilityUI();
+        this.showStatus('Insufficient Scrap: Napalm Strike requires $300.');
+        this.sound.playHit();
+        return;
+      }
+      this.armingNapalm = false;
+      this.napalmCooldown = 30.0;
+      const blastR = 110;
+      const baseDmg = Math.round(180 * this.getSafeZoneDmgMult());
+      let hits = 0;
+      for (const z of this.zombies) {
+        if (z.hp <= 0) continue;
+        if (Math.hypot(z.x - mx, z.y - my) <= blastR) {
+          this.applyZombieDamage(z, baseDmg, effActor, 0.35);
+          z.slowTimer = Math.max(z.slowTimer || 0, 2.5);
+          z.slowFactor = Math.max(z.slowFactor || 0, 0.3);
+          hits++;
+        }
+      }
+      this.projectiles.push({
+        id: this.nextProjId++,
+        type: 'napalmBlast',
+        x: mx,
+        y: my,
+        radius: blastR,
+        color: '#FF5511',
+        life: 0.7,
+        maxLife: 0.7
+      });
+      this.pulseRings.push({ x: mx, y: my, radius: 14, maxRadius: blastR, color: '#FF5511', life: 0.7, maxLife: 0.7 });
+      this.addParticles(mx, my, '#FF5511', 28, 110);
+      this.addParticles(mx, my, '#FFD23F', 18, 85);
+      this.sound.playExplosion();
+      this.addFloatingText('NAPALM STRIKE!', mx, my - 18, '#FF6B1A');
+      this.showStatus(`Napalm Strike detonated (110px firestorm, ${hits} hostiles scorched; 30s cooldown)!`);
+      this.updateHUD();
+      this.updateAbilityUI();
+    }
+
+    setBarracksStance(barracks, stance, col = null, row = null, actorId = null) {
+      if (!barracks || barracks.type !== 'barracks') return;
+      if (!this.canControlEntity(barracks)) {
+        this.showStatus('Cannot change stance on an ally Barracks.');
+        this.sound.playHit();
+        return;
+      }
+      if (this.isMultiplayer && !this.isMpHost) {
+        this.settingBarracksHoldPoint = null;
+        if (this.mp) {
+          this.mp.sendAction({ kind: 'set_stance', key: `${barracks.col},${barracks.row}`, stance, col, row });
+        }
+        return;
+      }
+      if (stance === 'hold') {
+        if (!inBounds(col, row) || this.commandoBlocked(col, row)) {
+          this.showStatus('Hold Position requires a walkable map tile (not rock or a building)! Choose another tile.');
+          this.sound.playHit();
+          return;
+        }
+        const pt = tileCenter(col, row);
+        barracks.stance = 'hold';
+        barracks.holdTile = { col, row, x: pt.x, y: pt.y };
+        this.settingBarracksHoldPoint = null;
+        this.addFloatingText('HOLD POINT SET!', pt.x, pt.y - 12, '#00E5FF');
+        this.pulseRings.push({ x: pt.x, y: pt.y, radius: 8, maxRadius: 42, color: '#00E5FF', life: 0.75, maxLife: 0.75 });
+        this.showStatus(`Barracks stance: Hold Position at (${col}, ${row}). Squads kite toward Barracks if pressed.`);
+      } else {
+        barracks.stance = 'kite';
+        barracks.holdTile = null;
+        this.settingBarracksHoldPoint = null;
+        this.addFloatingText('AGGRESSIVE KITE', barracks.x, barracks.y - 14, '#00E08A');
+        this.showStatus('Barracks stance: Aggressive Kite (3-tile Safe-Zone perimeter).');
+      }
+      for (const sol of this.soldiers) {
+        if (sol.homeHubId === barracks.id) {
+          sol.path = [];
+          sol.isIntercepting = false;
+          sol.aiTimer = 0;
+        }
+      }
+      this.sound.playClick();
+      if (this.selectedStructure === barracks) this.renderBuildingUnitFloatMenu(barracks, false);
+    }
+
     hasActiveSelection() {
       return !!(this.selectedBuildType || this.selectedCivilian || this.selectedSoldier || this.selectedEngineer || this.selectedStructure);
     }
@@ -6662,6 +7120,9 @@
         this.movingStructure = null;
         this.safeZoneDrag = null;
         this.wallDrag = null;
+        this.armingNapalm = false;
+        this.settingBarracksHoldPoint = null;
+        this.updateAbilityUI();
         if (this.selectedBuildType === type) {
           this.selectModeActive = false;
           this.selectedBuildType = null;
@@ -6764,7 +7225,7 @@
           if (this.tabBuildings) {
             this.tabBuildings.classList.toggle('active', this.activeMobileCategory === 'buildings' || isBuildingActive);
           }
-          const isTowerActive = this.selectedBuildType === 'sentry' || this.selectedBuildType === 'cryo' || this.selectedBuildType === 'sniper' || this.selectedBuildType === 'tesla';
+          const isTowerActive = this.isTowerType(this.selectedBuildType);
           if (this.tabTowers) {
             this.tabTowers.classList.toggle('active', this.activeMobileCategory === 'towers' || isTowerActive);
           }
@@ -6806,12 +7267,15 @@
         const isAllyReadOnly = !!(this.isMultiplayer && this.selectedStructure.ownerId && this.selectedStructure.ownerId !== this.localPlayerId);
         this.renderBuildingUnitFloatMenu(this.selectedStructure, isAllyReadOnly);
       }
+      this.updateAbilityUI();
     }
 
     clearSelection() {
       this.selectModeActive = false;
       this.selectedBuildType = null;
       this.movingStructure = null;
+      this.armingNapalm = false;
+      this.settingBarracksHoldPoint = null;
       this.safeZoneDrag = null;
       this.wallDrag = null;
       this.selectedCivilian = null;
@@ -6821,6 +7285,7 @@
       this.salvageConfirmUntil = 0;
       this.closeUpgradePanel();
       this.updateBuildPanelUI();
+      this.updateAbilityUI();
     }
 
     setPaused(p, allowMp = false) {
@@ -6849,6 +7314,21 @@
       const col = Math.floor(mx / TILE_SIZE);
       const row = Math.floor(my / TILE_SIZE);
       if (!inBounds(col, row)) return;
+
+      if (this.armingNapalm) {
+        this.triggerNapalmStrike(mx, my, this.localPlayerId);
+        return;
+      }
+
+      if (this.settingBarracksHoldPoint) {
+        const hk = `${this.settingBarracksHoldPoint.col},${this.settingBarracksHoldPoint.row}`;
+        if (this.structures.get(hk) !== this.settingBarracksHoldPoint) {
+          this.settingBarracksHoldPoint = null;
+        } else {
+          this.setBarracksStance(this.settingBarracksHoldPoint, 'hold', col, row, this.localPlayerId);
+          return;
+        }
+      }
 
       if (this.movingStructure) {
         const mk = `${this.movingStructure.col},${this.movingStructure.row}`;
@@ -7729,6 +8209,38 @@
     }
 
     createCommando(x, y, baseSoldier = null, level = 1, homeHubId = null, unitKind = 'commando') {
+      if (unitKind === 'gunner') {
+        return {
+          id: baseSoldier ? baseSoldier.id : Math.random().toString(36).slice(2, 11),
+          level: GUNNER_SPEC.level,
+          unitKind: 'gunner',
+          name: GUNNER_SPEC.name,
+          homeHubId,
+          isCommando: true,
+          x,
+          y,
+          radius: 9,
+          speed: GUNNER_SPEC.speed,
+          hp: GUNNER_SPEC.maxHp,
+          maxHp: GUNNER_SPEC.maxHp,
+          range: GUNNER_SPEC.range,
+          dmg: GUNNER_SPEC.dmg,
+          rate: GUNNER_SPEC.rate,
+          color: GUNNER_SPEC.color,
+          cooldown: 0,
+          kills: baseSoldier ? (baseSoldier.kills || 0) : 0,
+          angle: -Math.PI / 2,
+          path: [],
+          dest: null,
+          targetBunker: null,
+          targetBarracks: null,
+          targetEngineering: null,
+          manualOrder: false,
+          manualMoveOrder: false,
+          reenterCooldown: 1.8,
+          aiTimer: 0.2
+        };
+      }
       if (unitKind === 'flamethrower') {
         return {
           id: baseSoldier ? baseSoldier.id : Math.random().toString(36).slice(2, 11),
@@ -7841,7 +8353,7 @@
       if (hub.type === 'barracks') {
         const spec = COMMANDO_SPECS[lvl - 1];
         const apply = (u) => {
-          if (u && u.hp > 0 && u.isCommando && u.unitKind !== 'flamethrower' && u.homeHubId === hub.id) {
+          if (u && u.hp > 0 && u.isCommando && (!u.unitKind || u.unitKind === 'commando') && u.homeHubId === hub.id) {
             u.level = spec.level;
             u.name = spec.name;
             u.maxHp = spec.maxHp;
@@ -7866,7 +8378,7 @@
       } else if (hub.type === 'engineering') {
         const spec = ENGINEER_SPECS[lvl - 1];
         const apply = (u) => {
-          if (u && u.hp > 0 && u.unitType === 'engineer' && u.homeHubId === hub.id) {
+          if (u && u.hp > 0 && u.unitType === 'engineer' && (!u.unitKind || u.unitKind === 'engineer') && u.homeHubId === hub.id) {
             u.level = spec.level;
             u.name = spec.name;
             u.maxHp = spec.maxHp;
@@ -7925,7 +8437,7 @@
             dispatched.path = [];
           }
         }
-        hub.activeTrainers.push({ id: order.id, unit: recruit, unitKind: order.unitKind || 'commando', timer: dur, duration: dur, cost: order.cost });
+        hub.activeTrainers.push({ id: order.id, unit: recruit, unitKind: order.unitKind || (hub.type === 'engineering' ? 'engineer' : 'commando'), timer: dur, duration: dur, cost: order.cost });
       }
       hub.trainTimer = hub.activeTrainers.length > 0 ? Math.min(...hub.activeTrainers.map((t) => t.timer)) : 0;
 
@@ -8247,7 +8759,8 @@
         soldier.x = engBld.x;
         soldier.y = engBld.y;
         const dur = STRUCTURE_SPECS.engineering.trainDuration || 4.0;
-        engBld.activeTrainers.push({ id: order.id, unit: soldier, timer: dur, duration: dur, cost: order.cost });
+        const uKind = order.unitKind || 'engineer';
+        engBld.activeTrainers.push({ id: order.id, unit: soldier, unitKind: uKind, timer: dur, duration: dur, cost: order.cost });
         engBld.trainTimer = Math.min(...engBld.activeTrainers.map((t) => t.timer));
 
         if (this.selectedSoldier === soldier) {
@@ -8257,7 +8770,8 @@
           this.renderUpgradePanel(engBld);
         }
         this.sound.playClick();
-        this.addFloatingText('Training Engineer (4.0s)...', engBld.x, engBld.y - 12, '#FFD23F');
+        const uLabel = uKind === 'medic' ? 'Medic' : uKind === 'sapper' ? 'Sapper' : 'Engineer';
+        this.addFloatingText(`Training ${uLabel} (4.0s)...`, engBld.x, engBld.y - 12, '#FFD23F');
         this.updateHUD();
         return true;
       }
@@ -8321,6 +8835,9 @@
     }
 
     tryEnterEngineeringEngineer(eng, engIndex) {
+      if (eng.unitKind === 'medic' || eng.unitKind === 'sapper') {
+        if (!eng.manualOrder || !eng.targetEngineering) return false;
+      }
       if ((eng.reenterCooldown || 0) > 0) return false;
       const col = Math.floor(eng.x / TILE_SIZE);
       const row = Math.floor(eng.y / TILE_SIZE);
@@ -8424,7 +8941,7 @@
         return;
       }
       if (struct.type === 'barracks') this.trainUnitFromBarracks(struct, effActor, unitKind || 'commando');
-      else if (struct.type === 'engineering') this.trainUnitFromEngineering(struct, effActor);
+      else if (struct.type === 'engineering') this.trainUnitFromEngineering(struct, effActor, unitKind || 'engineer');
       else if (struct.type === 'habitat') this.trainUnitFromHabitat(struct, effActor);
     }
 
@@ -8435,7 +8952,13 @@
     trainUnitFromBarracks(barracks, actorId = null, unitKind = 'commando') {
       if (!this.inPlay || !barracks || barracks.type !== 'barracks') return;
       const effActor = this.getEffectiveActorId(actorId || barracks.ownerId);
-      const reqKind = unitKind === 'flamethrower' ? 'flamethrower' : 'commando';
+      const reqKind = (unitKind === 'flamethrower' || unitKind === 'gunner') ? unitKind : 'commando';
+      if (reqKind === 'gunner' && (barracks.level || 1) < 2) {
+        this.showStatus('Gunner requires Barracks Lv2!');
+        this.addFloatingText('Requires Lv2!', barracks.x, barracks.y - 12, '#FF9A1F');
+        this.sound.playHit();
+        return;
+      }
       if (reqKind === 'flamethrower' && (barracks.level || 1) < 3) {
         this.showStatus('Flamethrower requires Barracks Lv3!');
         this.addFloatingText('Requires Lv3!', barracks.x, barracks.y - 12, '#FF9A1F');
@@ -8458,8 +8981,12 @@
         this.sound.playHit();
         return;
       }
-      const trainCost = reqKind === 'flamethrower' ? (FLAMETHROWER_SPEC.trainCost || 100) : (STRUCTURE_SPECS.barracks.trainCost || 75);
-      const unitLabel = reqKind === 'flamethrower' ? 'Flamethrower' : 'Commando';
+      const trainCost = reqKind === 'flamethrower'
+        ? (FLAMETHROWER_SPEC.trainCost || 100)
+        : reqKind === 'gunner'
+        ? (GUNNER_SPEC.trainCost || 110)
+        : (STRUCTURE_SPECS.barracks.trainCost || 75);
+      const unitLabel = reqKind === 'flamethrower' ? 'Flamethrower' : reqKind === 'gunner' ? 'Gunner' : 'Commando';
       if (!this.spendPlayerScrap(effActor, trainCost)) {
         this.showStatus(`Insufficient Scrap: training a ${unitLabel} requires $${trainCost}.`);
         this.addFloatingText('Insufficient Scrap', barracks.x, barracks.y - 12, '#FF3333');
@@ -8477,7 +9004,7 @@
 
       const runningNow = barracks.activeTrainers.length;
       const waitingNow = barracks.trainQueue.length;
-      const cueColor = reqKind === 'flamethrower' ? '#FF6B1A' : '#00E5FF';
+      const cueColor = reqKind === 'flamethrower' ? '#FF6B1A' : reqKind === 'gunner' ? '#38B6FF' : '#00E5FF';
       this.sound.playClick();
       this.addFloatingText(runningNow > 0 ? `Training ${unitLabel} (4.0s)...` : `Queued ${unitLabel}!`, barracks.x, barracks.y - 14, cueColor);
       this.addParticles(barracks.x, barracks.y, cueColor, 10, 42);
@@ -8522,9 +9049,22 @@
       if (this.selectedStructure === barracks) this.renderUpgradePanel(barracks);
     }
 
-    trainUnitFromEngineering(engBld, actorId = null) {
+    trainUnitFromEngineering(engBld, actorId = null, unitKind = 'engineer') {
       if (!this.inPlay || !engBld || engBld.type !== 'engineering') return;
       const effActor = this.getEffectiveActorId(actorId || engBld.ownerId);
+      const reqKind = (unitKind === 'medic' || unitKind === 'sapper') ? unitKind : 'engineer';
+      if (reqKind === 'medic' && (engBld.level || 1) < 2) {
+        this.showStatus('Medic requires Engineering Lv2!');
+        this.addFloatingText('Requires Lv2!', engBld.x, engBld.y - 12, '#FF9A1F');
+        this.sound.playHit();
+        return;
+      }
+      if (reqKind === 'sapper' && (engBld.level || 1) < 3) {
+        this.showStatus('Sapper requires Engineering Lv3!');
+        this.addFloatingText('Requires Lv3!', engBld.x, engBld.y - 12, '#FF9A1F');
+        this.sound.playHit();
+        return;
+      }
       if (!engBld.trainQueue) engBld.trainQueue = [];
       if (!engBld.activeTrainers) engBld.activeTrainers = [];
       const maxRoster = this.getHubCapacity(engBld);
@@ -8541,9 +9081,14 @@
         this.sound.playHit();
         return;
       }
-      const trainCost = STRUCTURE_SPECS.engineering.trainCost || 50;
+      const trainCost = reqKind === 'medic'
+        ? (MEDIC_SPEC.trainCost || 85)
+        : reqKind === 'sapper'
+        ? (SAPPER_SPEC.trainCost || 90)
+        : (STRUCTURE_SPECS.engineering.trainCost || 50);
+      const unitLabel = reqKind === 'medic' ? 'Medic' : reqKind === 'sapper' ? 'Sapper' : 'Engineer';
       if (!this.spendPlayerScrap(effActor, trainCost)) {
-        this.showStatus(`Insufficient Scrap: training an Engineer requires $${trainCost}.`);
+        this.showStatus(`Insufficient Scrap: training a ${unitLabel} requires $${trainCost}.`);
         this.addFloatingText('Insufficient Scrap', engBld.x, engBld.y - 12, '#FF3333');
         this.sound.playHit();
         return;
@@ -8551,6 +9096,7 @@
 
       engBld.trainQueue.push({
         id: Math.random().toString(36).slice(2, 11),
+        unitKind: reqKind,
         cost: trainCost,
         assignedRecruitId: null
       });
@@ -8558,13 +9104,14 @@
 
       const runningNow = engBld.activeTrainers.length;
       const waitingNow = engBld.trainQueue.length;
+      const cueColor = reqKind === 'medic' ? MEDIC_SPEC.color : reqKind === 'sapper' ? SAPPER_SPEC.color : '#FFD23F';
       this.sound.playClick();
-      this.addFloatingText(runningNow > 0 ? 'Training Engineer (4.0s)...' : 'Queued Engineer!', engBld.x, engBld.y - 14, '#FFD23F');
-      this.addParticles(engBld.x, engBld.y, '#FFD23F', 10, 42);
+      this.addFloatingText(runningNow > 0 ? `Training ${unitLabel} (4.0s)...` : `Queued ${unitLabel}!`, engBld.x, engBld.y - 14, cueColor);
+      this.addParticles(engBld.x, engBld.y, cueColor, 10, 42);
       this.showStatus(
         runningNow > 0
-          ? `Engineering training ${runningNow} Engineer(s) (${waitingNow} queued).`
-          : `Engineer order queued (${waitingNow} pending) — auto-dispatching closest Lv1 Recruit.`
+          ? `Engineering training ${runningNow} ${unitLabel}(s) (${waitingNow} queued).`
+          : `${unitLabel} order queued (${waitingNow} pending) — auto-dispatching closest Lv1 Recruit.`
       );
       this.updateHUD();
       if (this.selectedStructure === engBld) this.renderUpgradePanel(engBld);
@@ -8586,43 +9133,120 @@
 
       this.score += 150;
       const spawnPos = this.findSafeExitPos(engBld, false, true);
-      const lvl = Math.max(1, Math.min(3, engBld.level || 1));
-      const lvSpec = ENGINEER_SPECS[lvl - 1];
-      const eng = {
-        id: Math.random().toString(36).slice(2, 11),
-        unitType: 'engineer',
-        level: lvSpec.level,
-        name: lvSpec.name,
-        homeHubId: engBld.id,
-        ownerId: engBld.ownerId || recruit.ownerId || null,
-        x: spawnPos.x,
-        y: spawnPos.y,
-        radius: 7,
-        speed: lvSpec.speed,
-        hp: lvSpec.maxHp,
-        maxHp: lvSpec.maxHp,
-        repairRate: lvSpec.repairRate,
-        color: lvSpec.color,
-        repairedTotal: 0,
-        angle: 0,
-        path: [],
-        dest: null,
-        manualOrder: false,
-        manualMoveOrder: false,
-        repairTarget: null,
-        targetEngineering: null,
-        reenterCooldown: 1.8,
-        scanTimer: 0.1
-      };
+      const unitKind = (trainer && trainer.unitKind) || 'engineer';
+      let eng;
+      if (unitKind === 'medic') {
+        eng = {
+          id: Math.random().toString(36).slice(2, 11),
+          unitType: 'engineer',
+          unitKind: 'medic',
+          level: MEDIC_SPEC.level,
+          name: MEDIC_SPEC.name,
+          homeHubId: engBld.id,
+          ownerId: engBld.ownerId || recruit.ownerId || null,
+          x: spawnPos.x,
+          y: spawnPos.y,
+          radius: 7,
+          speed: MEDIC_SPEC.speed,
+          hp: MEDIC_SPEC.maxHp,
+          maxHp: MEDIC_SPEC.maxHp,
+          healRange: MEDIC_SPEC.healRange,
+          healRate: MEDIC_SPEC.healRate,
+          repairRate: 0,
+          healBeamTarget: null,
+          color: MEDIC_SPEC.color,
+          repairedTotal: 0,
+          curedCount: 0,
+          angle: 0,
+          path: [],
+          dest: null,
+          manualOrder: false,
+          manualMoveOrder: false,
+          repairTarget: null,
+          targetEngineering: null,
+          reenterCooldown: 1.8,
+          scanTimer: 0.1
+        };
+      } else if (unitKind === 'sapper') {
+        eng = {
+          id: Math.random().toString(36).slice(2, 11),
+          unitType: 'engineer',
+          unitKind: 'sapper',
+          level: SAPPER_SPEC.level,
+          name: SAPPER_SPEC.name,
+          homeHubId: engBld.id,
+          ownerId: engBld.ownerId || recruit.ownerId || null,
+          x: spawnPos.x,
+          y: spawnPos.y,
+          radius: 7,
+          speed: SAPPER_SPEC.speed,
+          hp: SAPPER_SPEC.maxHp,
+          maxHp: SAPPER_SPEC.maxHp,
+          mineCooldown: SAPPER_SPEC.mineCooldown,
+          mineTimer: 0.8,
+          mineDmg: SAPPER_SPEC.mineDmg,
+          mineRadius: SAPPER_SPEC.mineRadius,
+          maxMines: SAPPER_SPEC.maxMines,
+          repairRate: 0,
+          color: SAPPER_SPEC.color,
+          repairedTotal: 0,
+          minesPlanted: 0,
+          angle: 0,
+          path: [],
+          dest: null,
+          manualOrder: false,
+          manualMoveOrder: false,
+          repairTarget: null,
+          targetEngineering: null,
+          reenterCooldown: 1.8,
+          scanTimer: 0.1
+        };
+      } else {
+        const lvl = Math.max(1, Math.min(3, engBld.level || 1));
+        const lvSpec = ENGINEER_SPECS[lvl - 1];
+        eng = {
+          id: Math.random().toString(36).slice(2, 11),
+          unitType: 'engineer',
+          unitKind: 'engineer',
+          level: lvSpec.level,
+          name: lvSpec.name,
+          homeHubId: engBld.id,
+          ownerId: engBld.ownerId || recruit.ownerId || null,
+          x: spawnPos.x,
+          y: spawnPos.y,
+          radius: 7,
+          speed: lvSpec.speed,
+          hp: lvSpec.maxHp,
+          maxHp: lvSpec.maxHp,
+          repairRate: lvSpec.repairRate,
+          color: lvSpec.color,
+          repairedTotal: 0,
+          angle: 0,
+          path: [],
+          dest: null,
+          manualOrder: false,
+          manualMoveOrder: false,
+          repairTarget: null,
+          targetEngineering: null,
+          reenterCooldown: 1.8,
+          scanTimer: 0.1
+        };
+      }
       this.engineers.push(eng);
       engBld.trainTimer = engBld.activeTrainers && engBld.activeTrainers.length > 0
         ? Math.min(...engBld.activeTrainers.map((t) => t.timer))
         : 0;
 
       this.sound.playUpgrade();
-      this.addFloatingText(`${eng.name} Deployed!`, eng.x, eng.y - 14, '#FFD23F');
-      this.addParticles(eng.x, eng.y, '#FFD23F', 14, 55);
-      this.showStatus(`Deployed ${eng.name} (+${eng.repairRate} HP/s $0 welding inside Safe Zones & connected Barricades)!`);
+      this.addFloatingText(`${eng.name} Deployed!`, eng.x, eng.y - 14, eng.color || '#FFD23F');
+      this.addParticles(eng.x, eng.y, eng.color || '#FFD23F', 14, 55);
+      this.showStatus(
+        unitKind === 'medic'
+          ? `Deployed ${eng.name} (+${eng.healRate} HP/s squad heal & infection cure)!`
+          : unitKind === 'sapper'
+          ? `Deployed ${eng.name} (plants up to ${eng.maxMines} proximity mines every ${eng.mineCooldown}s)!`
+          : `Deployed ${eng.name} (+${eng.repairRate} HP/s $0 welding inside Safe Zones & connected Barricades)!`
+      );
       this.updateHUD();
       if (this.selectedStructure === engBld) this.renderUpgradePanel(engBld);
     }
@@ -9054,7 +9678,7 @@
         const spec = STRUCTURE_SPECS[struct.type];
         const cur = spec && spec.levels ? spec.levels[Math.min(struct.level - 1, spec.levels.length - 1)] : null;
         const label = (cur && cur.name) || (spec && spec.name) || struct.type;
-        const isTurret = struct.type === 'sentry' || struct.type === 'cryo' || struct.type === 'sniper' || struct.type === 'tesla';
+        const isTurret = this.isTowerType(struct.type);
         const killsTxt = (isTurret && struct.kills !== undefined) ? ` • Kills: ${struct.kills}` : '';
         this.showStatus(
           `Ally ${label} Lv${struct.level} (Owner: ${struct.ownerName || 'Ally'}) — HP ${Math.ceil(struct.hp)}/${struct.maxHp}${killsTxt} [View-Only]`
@@ -9225,6 +9849,10 @@
         if (this.inspectStatRange) {
           this.inspectStatRange.innerText = struct.type === 'tesla' && cur.chainCount
             ? `Range: ${cur.range}px • Chain: ${cur.chainCount}`
+            : struct.type === 'mortar' && cur.aoe
+            ? `Range: ${cur.minRange || 80}-${cur.range}px • AoE: ${cur.aoe}px`
+            : struct.type === 'radar'
+            ? `Aura Range: ${cur.buffRange || cur.range}px`
             : cur.range ? `Range: ${cur.range}px` : 'Role: Barricade';
         }
         if (this.inspectStatDmg) {
@@ -9232,13 +9860,23 @@
           const devMult = this.devTowerStrengthMult || 1.0;
           this.inspectStatDmg.innerText = struct.type === 'tesla' && cur.dmg
             ? `Lightning: ${Math.round(cur.dmg * mult * devMult)} (35% Heavy)`
+            : struct.type === 'mortar' && cur.dmg
+            ? `Shell AoE: ${Math.round(cur.dmg * mult * devMult)} (35% Heavy)`
+            : struct.type === 'laser' && cur.dmg
+            ? `Prism: ${Math.round(cur.dmg * mult * devMult)}/tick (1x->3x Lock)`
+            : struct.type === 'radar'
+            ? `Buff: +${Math.round((cur.buffPct || 0.15) * 100)}% Range & ROF`
             : cur.dmg
             ? `Damage: ${Math.round(cur.dmg * mult * devMult)}${devMult !== 1.0 ? ` (${devMult}x dev)` : ` (${cur.dmg} base)`}`
             : struct.type === 'cryo'
             ? `Slow: ${Math.round(cur.slow * 100)}%${devMult !== 1.0 ? ` (Pulse: ${Math.round(8 * mult * devMult)}dmg)` : ''}`
             : 'Armor: Block';
         }
-        if (this.inspectStatKills) this.inspectStatKills.innerText = `Kills: ${struct.kills || 0}`;
+        if (this.inspectStatKills) {
+          this.inspectStatKills.innerText = struct.type === 'radar'
+            ? 'Buffs Turrets & Squads'
+            : `Kills: ${struct.kills || 0}`;
+        }
       }
 
       if (this.inspectRepairStatus) {
@@ -9338,6 +9976,7 @@
       }
 
       let headerTitle = 'Train Unit';
+      let extraHeaderHtml = '';
       const buttons = [];
       if (struct.type === 'barracks') {
         const cap = this.getHubCapacity(struct);
@@ -9347,14 +9986,29 @@
         const globalFull = this.getTotalQueuedTrainOrders() >= 20;
         const capFull = committed >= cap || globalFull;
         const commandoCost = STRUCTURE_SPECS.barracks.trainCost || 75;
+        const gunnerCost = GUNNER_SPEC.trainCost || 110;
         const flameCost = FLAMETHROWER_SPEC.trainCost || 100;
+        const gunnerUnlocked = (struct.level || 1) >= 2;
         const flameUnlocked = (struct.level || 1) >= 3;
+        const isHold = struct.stance === 'hold';
         headerTitle = `Train Unit ${committed}/${cap}`;
+        extraHeaderHtml =
+          `<div class="stance-toggle-row">` +
+            `<button type="button" class="stance-btn${!isHold ? ' active' : ''}" data-stance="kite" title="Patrol and kite within 3 tiles of Safe Zones">Aggressive Kite</button>` +
+            `<button type="button" class="stance-btn${isHold ? ' active' : ''}" data-stance="hold" title="Pick a rally tile to hold and kite back toward Barracks">${isHold && struct.holdTile ? `Hold (${struct.holdTile.col},${struct.holdTile.row})` : 'Hold Position'}</button>` +
+          `</div>`;
 
         buttons.push(
           `<button type="button" class="float-unit-btn" data-unit-kind="commando" ${capFull || this.scrap < commandoCost ? 'disabled' : ''}>` +
             `<span class="float-unit-cost">$${commandoCost}</span>` +
             `<span class="float-unit-name">Commando</span>` +
+          `</button>`
+        );
+        buttons.push(
+          `<button type="button" class="float-unit-btn${gunnerUnlocked ? '' : ' locked'}" data-unit-kind="gunner" ${!gunnerUnlocked || capFull || this.scrap < gunnerCost ? 'disabled' : ''}>` +
+            `<span class="float-unit-cost">$${gunnerCost}</span>` +
+            `<span class="float-unit-name">Gunner</span>` +
+            (gunnerUnlocked ? '' : `<span class="float-unit-lock">Lv2</span>`) +
           `</button>`
         );
         buttons.push(
@@ -9369,13 +10023,32 @@
         const q = struct.trainQueue || [];
         const activeLen = struct.activeTrainers ? struct.activeTrainers.length : 0;
         const committed = this.getHubRosterCount(struct) + activeLen + q.length;
+        const globalFull = this.getTotalQueuedTrainOrders() >= 20;
+        const capFull = committed >= cap || globalFull;
         const engCost = STRUCTURE_SPECS.engineering.trainCost || 50;
-        const disabled = committed >= cap || this.getTotalQueuedTrainOrders() >= 20 || this.scrap < engCost;
+        const medicCost = MEDIC_SPEC.trainCost || 85;
+        const sapperCost = SAPPER_SPEC.trainCost || 90;
+        const medicUnlocked = (struct.level || 1) >= 2;
+        const sapperUnlocked = (struct.level || 1) >= 3;
         headerTitle = `Train Unit ${committed}/${cap}`;
         buttons.push(
-          `<button type="button" class="float-unit-btn" data-unit-kind="engineer" ${disabled ? 'disabled' : ''}>` +
+          `<button type="button" class="float-unit-btn" data-unit-kind="engineer" ${capFull || this.scrap < engCost ? 'disabled' : ''}>` +
             `<span class="float-unit-cost">$${engCost}</span>` +
             `<span class="float-unit-name">Engineer</span>` +
+          `</button>`
+        );
+        buttons.push(
+          `<button type="button" class="float-unit-btn${medicUnlocked ? '' : ' locked'}" data-unit-kind="medic" ${!medicUnlocked || capFull || this.scrap < medicCost ? 'disabled' : ''}>` +
+            `<span class="float-unit-cost">$${medicCost}</span>` +
+            `<span class="float-unit-name">Medic</span>` +
+            (medicUnlocked ? '' : `<span class="float-unit-lock">Lv2</span>`) +
+          `</button>`
+        );
+        buttons.push(
+          `<button type="button" class="float-unit-btn${sapperUnlocked ? '' : ' locked'}" data-unit-kind="sapper" ${!sapperUnlocked || capFull || this.scrap < sapperCost ? 'disabled' : ''}>` +
+            `<span class="float-unit-cost">$${sapperCost}</span>` +
+            `<span class="float-unit-name">Sapper</span>` +
+            (sapperUnlocked ? '' : `<span class="float-unit-lock">Lv3</span>`) +
           `</button>`
         );
       } else if (struct.type === 'habitat') {
@@ -9392,7 +10065,7 @@
         );
       }
 
-      this.buildingUnitFloatMenu.innerHTML = `<div class="float-unit-title">${headerTitle}</div>` + buttons.join('');
+      this.buildingUnitFloatMenu.innerHTML = `<div class="float-unit-title">${headerTitle}</div>` + extraHeaderHtml + buttons.join('');
       showEl(this.buildingUnitFloatMenu, 'flex');
     }
 
@@ -9425,10 +10098,29 @@
       if (this.inspectIcon) this.inspectIcon.innerHTML = STRUCT_ICONS.soldier;
       if (soldier.isCommando) {
         const isFlame = soldier.unitKind === 'flamethrower';
-        if (this.inspectName) this.inspectName.innerText = isFlame ? 'Flamethrower (AoE Perimeter)' : `${soldier.name || 'Commando'} (Territory Guard)`;
-        if (this.inspectTier) this.inspectTier.innerText = isFlame ? 'Lv3/3 • Barracks AoE (35% Heavy)' : `Lv${soldier.level}/3 \u2022 Linked to Barracks`;
-        if (this.inspectStatRange) this.inspectStatRange.innerText = isFlame ? `Range: ${soldier.range}px (AoE ${soldier.aoeRadius || 46}px)` : `Range: ${soldier.range}px (Kite)`;
-        if (this.inspectStatDmg) this.inspectStatDmg.innerText = isFlame ? `Flame Dmg: ${soldier.dmg} (35% Armor)` : `Damage: ${soldier.dmg}`;
+        const isGunner = soldier.unitKind === 'gunner';
+        if (this.inspectName) {
+          this.inspectName.innerText = isFlame
+            ? 'Flamethrower (AoE Perimeter)'
+            : isGunner
+            ? 'Gunner (Heavy Frontline)'
+            : `${soldier.name || 'Commando'} (Territory Guard)`;
+        }
+        if (this.inspectTier) {
+          this.inspectTier.innerText = isFlame
+            ? 'Lv3/3 • Barracks AoE (35% Heavy)'
+            : isGunner
+            ? 'Lv2/3 • Heavy Riot Tank'
+            : `Lv${soldier.level}/3 \u2022 Linked to Barracks`;
+        }
+        if (this.inspectStatRange) {
+          this.inspectStatRange.innerText = isFlame
+            ? `Range: ${soldier.range}px (AoE ${soldier.aoeRadius || 46}px)`
+            : `Range: ${soldier.range}px (Kite)`;
+        }
+        if (this.inspectStatDmg) {
+          this.inspectStatDmg.innerText = isFlame ? `Flame Dmg: ${soldier.dmg} (35% Armor)` : `Damage: ${soldier.dmg}`;
+        }
         if (this.inspectStatKills) this.inspectStatKills.innerText = `Kills: ${soldier.kills || 0}`;
         if (this.upgradeCostLabel) this.upgradeCostLabel.innerText = 'HUB';
         if (this.btnUpgrade) this.btnUpgrade.disabled = true;
@@ -9479,9 +10171,15 @@
       if (salvageBtnLabel) salvageBtnLabel.innerText = this.isMobileTouch ? 'Salvage' : 'Salvage [S]';
       if (this.btnSalvage) this.btnSalvage.classList.remove('confirming');
       if (this.inspectIcon) this.inspectIcon.innerHTML = STRUCT_ICONS.engineer;
-      if (this.inspectName) this.inspectName.innerText = cur.name;
+      const isMedic = engineer.unitKind === 'medic';
+      const isSapper = engineer.unitKind === 'sapper';
+      if (this.inspectName) this.inspectName.innerText = isMedic ? MEDIC_SPEC.name : isSapper ? SAPPER_SPEC.name : cur.name;
       if (this.inspectTier) {
-        this.inspectTier.innerText = engineer.homeHubId
+        this.inspectTier.innerText = isMedic
+          ? 'Lv2/3 • Field Support & Cure'
+          : isSapper
+          ? 'Lv3/3 • Proximity Mine Layer'
+          : engineer.homeHubId
           ? `Lv${engineer.level}/3 \u2022 Linked to Engineering`
           : `Lv${engineer.level}/3 \u2022 Auto-Repair Corps`;
       }
@@ -9489,9 +10187,20 @@
       if (this.inspectHpBar) {
         this.inspectHpBar.style.width = `${Math.max(0, Math.min(100, (engineer.hp / engineer.maxHp) * 100))}%`;
       }
-      if (this.inspectStatRange) this.inspectStatRange.innerText = `Weld Rate: +${cur.repairRate} HP/s`;
-      if (this.inspectStatDmg) this.inspectStatDmg.innerText = 'Repair Cost: $0 Scrap';
-      if (this.inspectStatKills) this.inspectStatKills.innerText = `HP Repaired: ${Math.floor(engineer.repairedTotal || 0)}`;
+      if (isMedic) {
+        if (this.inspectStatRange) this.inspectStatRange.innerText = `Heal: +${engineer.healRate || 18} HP/s (${engineer.healRange || 110}px)`;
+        if (this.inspectStatDmg) this.inspectStatDmg.innerText = 'Cures Infected Civilians';
+        if (this.inspectStatKills) this.inspectStatKills.innerText = `Healed: ${Math.floor(engineer.repairedTotal || 0)} • Cured: ${engineer.curedCount || 0}`;
+      } else if (isSapper) {
+        const activeMines = this.mines ? this.mines.filter((m) => m.ownerUnitId === engineer.id).length : 0;
+        if (this.inspectStatRange) this.inspectStatRange.innerText = `Mines: ${activeMines}/${engineer.maxMines || 6}`;
+        if (this.inspectStatDmg) this.inspectStatDmg.innerText = `Mine AoE: ${engineer.mineDmg || 75} (${engineer.mineRadius || 48}px)`;
+        if (this.inspectStatKills) this.inspectStatKills.innerText = `Planted: ${engineer.minesPlanted || 0}`;
+      } else {
+        if (this.inspectStatRange) this.inspectStatRange.innerText = `Weld Rate: +${cur.repairRate} HP/s`;
+        if (this.inspectStatDmg) this.inspectStatDmg.innerText = 'Repair Cost: $0 Scrap';
+        if (this.inspectStatKills) this.inspectStatKills.innerText = `HP Repaired: ${Math.floor(engineer.repairedTotal || 0)}`;
+      }
 
       if (this.upgradeCostLabel) this.upgradeCostLabel.innerText = engineer.homeHubId ? 'HUB' : (next ? `$${next.upgradeCost}` : 'MAX');
       if (this.btnUpgrade) this.btnUpgrade.disabled = !!engineer.homeHubId || !next || this.scrap < next.upgradeCost;
@@ -9695,6 +10404,7 @@
       this.selectedSoldier = null;
       this.selectedEngineer = null;
       this.movingStructure = null;
+      this.settingBarracksHoldPoint = null;
       this.salvageConfirmId = null;
       this.salvageConfirmUntil = 0;
       if (this.btnSalvage) this.btnSalvage.classList.remove('confirming');
@@ -9708,7 +10418,7 @@
     isMovableStructure(struct) {
       if (!struct) return false;
       return struct.type === 'barracks' || struct.type === 'engineering' || struct.type === 'habitat'
-        || struct.type === 'sentry' || struct.type === 'cryo' || struct.type === 'sniper' || struct.type === 'tesla';
+        || this.isTowerType(struct.type);
     }
 
     toggleMoveSelectedStructure() {
@@ -9881,7 +10591,7 @@
         let totalEng = this.engineers.length;
         let totalTowers = 0;
         for (const st of this.structures.values()) {
-          if (st.type === 'sentry' || st.type === 'cryo' || st.type === 'sniper' || st.type === 'tesla') totalTowers++;
+          if (this.isTowerType(st.type)) totalTowers++;
           if (st.occupants) {
             for (const u of st.occupants) {
               if (u.unitType === 'engineer') totalEng++;
@@ -9893,7 +10603,7 @@
         parts.push(`Engineers: ${totalEng}`);
         parts.push(`Civilians: ${this.civilians.length}`);
         parts.push(`Towers: ${totalTowers}`);
-      } else if (entity.type === 'sentry' || entity.type === 'cryo' || entity.type === 'sniper' || entity.type === 'tesla') {
+      } else if (this.isTowerType(entity.type)) {
         if (entity.hp !== undefined && entity.maxHp !== undefined) {
           parts.push(`HP: ${Math.ceil(entity.hp)}/${entity.maxHp}`);
         }
@@ -9907,6 +10617,12 @@
           if (entity.type === 'tesla' && cur.chainCount) {
             parts.push(`Chain: ${cur.chainCount}`);
           }
+          if (entity.type === 'mortar' && cur.aoe) {
+            parts.push(`AoE: ${cur.aoe}px`);
+          }
+          if (entity.type === 'radar') {
+            parts.push(`Buff: +${Math.round((cur.buffPct || 0.15) * 100)}%`);
+          }
           if (cur.dmg) {
             const mult = this.getSafeZoneDmgMult();
             const devMult = this.devTowerStrengthMult || 1.0;
@@ -9916,7 +10632,7 @@
             const devMult = this.devTowerStrengthMult || 1.0;
             parts.push(`Slow: ${Math.round(cur.slow * 100)}%${devMult !== 1.0 ? ` (${Math.round(8 * mult * devMult)}dmg)` : ''}`);
           }
-          if (entity.kills !== undefined) parts.push(`Kills: ${entity.kills}`);
+          if (entity.kills !== undefined && entity.type !== 'radar') parts.push(`Kills: ${entity.kills}`);
         }
       } else {
         if (entity.hp !== undefined && entity.maxHp !== undefined) {
@@ -10159,6 +10875,9 @@
 
     update(dt) {
       this.elapsedTime += dt;
+      if (this.overchargeTimer > 0) this.overchargeTimer = Math.max(0, this.overchargeTimer - dt);
+      if (this.overchargeCooldown > 0) this.overchargeCooldown = Math.max(0, this.overchargeCooldown - dt);
+      if (this.napalmCooldown > 0) this.napalmCooldown = Math.max(0, this.napalmCooldown - dt);
 
       // Periodic stranded civilian breach spawns (every 15s-22s while active breaches exist)
       if ((this.waveState === STATE.PREPARE || this.waveState === STATE.ACTIVE) && this.spawns.size > 0) {
@@ -10264,9 +10983,11 @@
       this.updateCivilians(dt);
       this.updateSoldiers(dt);
       this.updateEngineers(dt);
+      this.updateMines(dt);
       this.updateZombies(dt);
       this.updateStructures(dt);
       this.updateProjectiles(dt);
+      this.updateAbilityUI();
 
       if (this.isMultiplayer && this.isMpHost && dt > 0) {
         const postEntities = [this.civilians, this.soldiers, this.engineers, this.zombies];
@@ -10487,9 +11208,22 @@
         // 4) Recall to Barracks only when zero zombies & zero breaches threaten the 3-tile Safe Zone perimeter
         if (sol.isCommando && !sol.manualOrder && !sol.manualMoveOrder && !sol.targetBarracks) {
           const isFlame = sol.unitKind === 'flamethrower';
-          const kiteDist = isFlame ? 36 : 120;
-          const interceptRange = isFlame ? Math.max(40, sol.range - 8) : sol.range;
-          const maxStandoff = isFlame ? 68 : 115;
+          const isGunner = sol.unitKind === 'gunner';
+          const radarBonus = this.getRadarBuffAt(sol.x, sol.y);
+          const effSolRange = Math.round(sol.range * (1 + radarBonus));
+          const kiteDist = isFlame ? 36 : isGunner ? 42 : 120;
+          const interceptRange = (isFlame || isGunner) ? Math.max(40, effSolRange - 8) : effSolRange;
+          const maxStandoff = isFlame ? 68 : isGunner ? 84 : 115;
+          let homeBar = null;
+          if (sol.homeHubId) {
+            for (const st of this.structures.values()) {
+              if (st.id === sol.homeHubId && st.type === 'barracks') {
+                homeBar = st;
+                break;
+              }
+            }
+          }
+          const isHoldStance = !!(homeBar && homeBar.stance === 'hold' && homeBar.holdTile);
           let nearestZ = null;
           let nearestD = Infinity;
           for (const z of this.zombies) {
@@ -10505,7 +11239,7 @@
             sol.path = [];
             sol.isIntercepting = false;
             sol.aiTimer = 0;
-          } else if (nearestZ && nearestD >= kiteDist && nearestD <= sol.range && sol.isIntercepting && sol.path.length > 0) {
+          } else if (nearestZ && nearestD >= kiteDist && nearestD <= effSolRange && sol.isIntercepting && sol.path.length > 0) {
             sol.path = [];
             sol.isIntercepting = false;
           }
@@ -10529,6 +11263,7 @@
                 sol.aiTimer = 0.20;
                 const strandedOut = this.commandoBlocked(scNow, srNow);
                 const curSzDist = this.minChebyshevDistToSafeZone(scNow, srNow);
+                const retreatAnchor = isHoldStance ? homeBar : nearestSz;
                 let bestScore = -Infinity;
                 let pick = null;
                 for (let k = 0; k < DIRS_8.length; k++) {
@@ -10536,17 +11271,17 @@
                   const nr = srNow + DIRS_8[k][1];
                   if (strandedOut) {
                     if (this.unitBlocked(nc, nr)) continue;
-                    if (this.safeZones.size > 0 && this.minChebyshevDistToSafeZone(nc, nr) > curSzDist) continue;
+                    if (!isHoldStance && this.safeZones.size > 0 && this.minChebyshevDistToSafeZone(nc, nr) > curSzDist) continue;
                   } else if (this.commandoBlocked(nc, nr)) {
                     continue;
                   }
                   const cPos = tileCenter(nc, nr);
                   const dz = Math.hypot(cPos.x - nearestZ.x, cPos.y - nearestZ.y);
                   if (dz <= nearestD) continue;
-                  const inFireBonus = dz <= sol.range ? 400 : 0;
+                  const inFireBonus = dz <= effSolRange ? 400 : 0;
                   const onSafeBonus = this.grid[nr][nc] === 2 ? 120 : 0;
-                  const szBonus = nearestSz ? -Math.hypot(cPos.x - nearestSz.x, cPos.y - nearestSz.y) * 0.65 : 0;
-                  const score = inFireBonus + onSafeBonus + dz + szBonus;
+                  const anchorBonus = retreatAnchor ? -Math.hypot(cPos.x - retreatAnchor.x, cPos.y - retreatAnchor.y) * (isHoldStance ? 0.95 : 0.65) : 0;
+                  const score = inFireBonus + onSafeBonus + dz + anchorBonus;
                   if (score > bestScore) {
                     bestScore = score;
                     pick = [nc, nr];
@@ -10557,8 +11292,18 @@
                   sol.isIntercepting = false;
                 }
               }
-            } else if (nearestZ && nearestD <= sol.range) {
+            } else if (nearestZ && nearestD <= effSolRange) {
               // Zombie already within firing range (>= kiteDist) -> hold ground & shoot cleanly
+            } else if (isHoldStance && sol.aiTimer <= 0) {
+              sol.aiTimer = 0.35;
+              const ht = homeBar.holdTile;
+              if (Math.hypot(sol.x - ht.x, sol.y - ht.y) > TILE_SIZE * 0.85) {
+                const p = findPath(scNow, srNow, ht.col, ht.row, (c, r) => this.commandoBlocked(c, r));
+                if (p && p.length > 0) {
+                  sol.path = p.map(([c, r]) => tileCenter(c, r));
+                  sol.isIntercepting = false;
+                }
+              }
             } else if (sol.aiTimer <= 0) {
               sol.aiTimer = 0.35;
               const perimZ = this.findNearestZombieNearSafeZone(sol.x, sol.y, 120);
@@ -10663,14 +11408,17 @@
           sol.hp = Math.min(sol.maxHp, sol.hp + 3 * dt);
         }
 
-        // Auto-fire at zombies within range (Commandos prioritize Runners first); ONLY Commandos assault Spawn Breaches (1.25x dmg)
-        const effectiveRate = (sol.isCommando && onSafeZone) ? sol.rate * 0.85 : sol.rate;
+        // Auto-fire at zombies within range (Commandos prioritize Runners first); ONLY Commandos/Gunners assault non-Survival Spawn Breaches
+        const radarFireBonus = this.getRadarBuffAt(sol.x, sol.y);
+        const effFireRange = Math.round(sol.range * (1 + radarFireBonus));
+        const baseSolRate = (sol.isCommando && onSafeZone) ? sol.rate * 0.85 : sol.rate;
+        const effectiveRate = baseSolRate / (1 + radarFireBonus);
         sol.cooldown = Math.max(0, sol.cooldown - dt);
         if (sol.cooldown <= 0) {
           let bestRunner = null;
-          let bestRunnerD = sol.range;
+          let bestRunnerD = effFireRange;
           let bestZ = null;
-          let bestD = sol.range;
+          let bestD = effFireRange;
           for (const z of this.zombies) {
             if (z.hp <= 0) continue;
             const d = Math.hypot(z.x - sol.x, z.y - sol.y);
@@ -10707,11 +11455,7 @@
               for (const z of this.zombies) {
                 if (z.hp <= 0) continue;
                 if (Math.hypot(z.x - fireTarget.x, z.y - fireTarget.y) > aoeR) continue;
-                const isHeavy = z.type === 'tank' || z.type === 'demolisher' || z.type === 'wrecker';
-                const dmg = isHeavy ? Math.max(1, Math.round(hitDmg * armorMult)) : hitDmg;
-                z.lastAttackerOwnerId = sol.ownerId || z.lastAttackerOwnerId || null;
-                z.hp -= dmg;
-                if (z.hp <= 0) {
+                if (this.applyZombieDamage(z, hitDmg, sol.ownerId || z.lastAttackerOwnerId || null, armorMult)) {
                   sol.kills = (sol.kills || 0) + 1;
                   this.totalCommandoKills = (this.totalCommandoKills || 0) + 1;
                 }
@@ -10719,6 +11463,7 @@
               this.addParticles(fireTarget.x, fireTarget.y, '#FF6B1A', 6, 44);
               this.addParticles(fireTarget.x, fireTarget.y, '#FFD23F', 4, 34);
             } else {
+              const shotCol = sol.unitKind === 'gunner' ? '#38B6FF' : '#38E8FF';
               this.sound.playLaser(720, 340, 0.05);
               this.projectiles.push({
                 id: this.nextProjId++,
@@ -10727,20 +11472,18 @@
                 y1: sol.y,
                 x2: fireTarget.x,
                 y2: fireTarget.y,
-                color: '#38E8FF',
+                color: shotCol,
                 life: 0.1,
                 maxLife: 0.1
               });
-              fireTarget.lastAttackerOwnerId = sol.ownerId || fireTarget.lastAttackerOwnerId || null;
-              fireTarget.hp -= hitDmg;
-              if (fireTarget.hp <= 0) {
+              if (this.applyZombieDamage(fireTarget, hitDmg, sol.ownerId || fireTarget.lastAttackerOwnerId || null, 1.0)) {
                 sol.kills = (sol.kills || 0) + 1;
                 if (sol.isCommando) this.totalCommandoKills = (this.totalCommandoKills || 0) + 1;
               }
-              this.addParticles(fireTarget.x, fireTarget.y, '#38E8FF', 3, 28);
+              this.addParticles(fireTarget.x, fireTarget.y, shotCol, 3, 28);
             }
           } else if (sol.isCommando) {
-            const breach = this.findSpawnBreachInRange(sol.x, sol.y, sol.range);
+            const breach = this.findSpawnBreachInRange(sol.x, sol.y, effFireRange);
             if (breach) {
               sol.cooldown = effectiveRate;
               sol.angle = Math.atan2(breach.y - sol.y, breach.x - sol.x);
@@ -10946,6 +11689,139 @@
 
         if (this.tryEnterEngineeringEngineer(eng, i)) continue;
 
+        // Specialist Engineer Branch: Medic (heals wounded teammates + cures infected civilians) & Sapper (plants proximity mines)
+        if (eng.unitKind === 'medic') {
+          const hRange = eng.healRange || 110;
+          const hRate = eng.healRate || 18;
+          let curedAny = false;
+          for (const civ of this.civilians) {
+            if (civ.isIncubating && Math.hypot(civ.x - eng.x, civ.y - eng.y) <= hRange) {
+              civ.isIncubating = false;
+              civ.incubationTimer = 0;
+              eng.curedCount = (eng.curedCount || 0) + 1;
+              this.sound.playRescue();
+              this.addFloatingText('CURED!', civ.x, civ.y - 14, '#00FF9D');
+              this.addParticles(civ.x, civ.y, '#00FF9D', 10, 40);
+              eng.healBeamTarget = { x: civ.x, y: civ.y };
+              curedAny = true;
+              break;
+            }
+          }
+          let bestMate = null;
+          let lowestRatio = 0.999;
+          for (const sol of this.soldiers) {
+            if (sol.hp > 0 && sol.hp < sol.maxHp && Math.hypot(sol.x - eng.x, sol.y - eng.y) <= hRange) {
+              const r = sol.hp / sol.maxHp;
+              if (r < lowestRatio) { lowestRatio = r; bestMate = sol; }
+            }
+          }
+          for (const e2 of this.engineers) {
+            if (e2.hp > 0 && e2.hp < e2.maxHp && Math.hypot(e2.x - eng.x, e2.y - eng.y) <= hRange) {
+              const r = e2.hp / e2.maxHp;
+              if (r < lowestRatio) { lowestRatio = r; bestMate = e2; }
+            }
+          }
+          if (bestMate) {
+            const before = bestMate.hp;
+            bestMate.hp = Math.min(bestMate.maxHp, bestMate.hp + hRate * dt);
+            eng.repairedTotal = (eng.repairedTotal || 0) + (bestMate.hp - before);
+            eng.healBeamTarget = { x: bestMate.x, y: bestMate.y };
+            eng.angle = Math.atan2(bestMate.y - eng.y, bestMate.x - eng.x);
+            if (Math.random() < 0.18) {
+              this.addParticles(bestMate.x, bestMate.y, '#00FF9D', 1, 20);
+            }
+          } else if (!curedAny) {
+            eng.healBeamTarget = null;
+          }
+
+          if (!eng.manualOrder && !eng.manualMoveOrder && eng.path.length === 0) {
+            eng.scanTimer = (eng.scanTimer || 0) - dt;
+            if (eng.scanTimer <= 0) {
+              eng.scanTimer = 0.7;
+              let needTarget = null;
+              let minNeedD = Infinity;
+              for (const civ of this.civilians) {
+                if (civ.isIncubating) {
+                  const d = Math.hypot(civ.x - eng.x, civ.y - eng.y);
+                  if (d < minNeedD) { minNeedD = d; needTarget = civ; }
+                }
+              }
+              if (!needTarget) {
+                for (const sol of this.soldiers) {
+                  if (sol.hp > 0 && sol.hp < sol.maxHp) {
+                    const d = Math.hypot(sol.x - eng.x, sol.y - eng.y);
+                    if (d < minNeedD) { minNeedD = d; needTarget = sol; }
+                  }
+                }
+              }
+              if (needTarget) {
+                const tc = Math.floor(needTarget.x / TILE_SIZE);
+                const tr = Math.floor(needTarget.y / TILE_SIZE);
+                const p = this.findPathToAdjacentTile(ec, er, tc, tr, (c, r) => this.commandoBlocked(c, r));
+                if (p && p.length > 0) {
+                  eng.path = p.map(([c, r]) => tileCenter(c, r));
+                }
+              }
+            }
+          }
+          continue;
+        }
+
+        if (eng.unitKind === 'sapper') {
+          eng.mineTimer = Math.max(0, (eng.mineTimer || 0) - dt);
+          const ownMines = this.mines ? this.mines.filter((m) => m.ownerUnitId === eng.id).length : 0;
+          const eKey = `${ec},${er}`;
+          const canPlantHere = inBounds(ec, er) && this.grid[er][ec] === 0
+            && !this.structures.has(eKey) && !this.safeZones.has(eKey) && !this.spawns.has(eKey)
+            && this.minChebyshevDistToSafeZone(ec, er) <= 3
+            && !this.mines.some((m) => Math.hypot(m.x - eng.x, m.y - eng.y) < 24);
+          if (eng.mineTimer <= 0 && ownMines < (eng.maxMines || 6) && canPlantHere) {
+            const mp = tileCenter(ec, er);
+            this.mines.push({
+              id: Math.random().toString(36).slice(2, 11),
+              col: ec,
+              row: er,
+              x: mp.x,
+              y: mp.y,
+              dmg: eng.mineDmg || 75,
+              radius: eng.mineRadius || 48,
+              armorMult: 0.35,
+              ownerId: eng.ownerId || null,
+              ownerUnitId: eng.id
+            });
+            eng.minesPlanted = (eng.minesPlanted || 0) + 1;
+            eng.mineTimer = eng.mineCooldown || 5.5;
+            this.sound.playClick();
+            this.addFloatingText('MINE SET', mp.x, mp.y - 10, '#FFAE00');
+          } else if (!eng.manualOrder && !eng.manualMoveOrder && eng.path.length === 0 && eng.mineTimer <= 1.0 && ownMines < (eng.maxMines || 6)) {
+            eng.scanTimer = (eng.scanTimer || 0) - dt;
+            if (eng.scanTimer <= 0) {
+              eng.scanTimer = 0.85;
+              const openTiles = [];
+              for (let r = 1; r < ROWS - 1; r++) {
+                for (let c = 1; c < COLS - 1; c++) {
+                  const k = `${c},${r}`;
+                  if (this.grid[r][c] !== 0 || this.structures.has(k) || this.safeZones.has(k) || this.spawns.has(k)) continue;
+                  const cheb = this.minChebyshevDistToSafeZone(c, r);
+                  if (cheb < 1 || cheb > 3) continue;
+                  const tp = tileCenter(c, r);
+                  if (this.mines.some((m) => Math.hypot(m.x - tp.x, m.y - tp.y) < 24)) continue;
+                  openTiles.push({ c, r, d: Math.hypot(tp.x - eng.x, tp.y - eng.y) });
+                }
+              }
+              if (openTiles.length > 0) {
+                openTiles.sort((a, b) => a.d - b.d);
+                const pick = openTiles[Math.floor(Math.random() * Math.min(4, openTiles.length))];
+                const p = findPath(ec, er, pick.c, pick.r, (c, r) => this.commandoBlocked(c, r));
+                if (p && p.length > 0) {
+                  eng.path = p.map(([c, r]) => tileCenter(c, r));
+                }
+              }
+            }
+          }
+          continue;
+        }
+
         // Validate current repairTarget (checks eligibility too)
         if (eng.repairTarget) {
           const k = `${eng.repairTarget.col},${eng.repairTarget.row}`;
@@ -11118,6 +11994,34 @@
       this.updateHUD();
     }
 
+    updateMines(dt) {
+      if (!this.mines || this.mines.length === 0) return;
+      for (let i = this.mines.length - 1; i >= 0; i--) {
+        const m = this.mines[i];
+        let triggered = false;
+        for (const z of this.zombies) {
+          if (z.hp > 0 && Math.hypot(z.x - m.x, z.y - m.y) <= 24) {
+            triggered = true;
+            break;
+          }
+        }
+        if (!triggered) continue;
+        this.mines.splice(i, 1);
+        const radius = m.radius || 48;
+        const armorMult = m.armorMult || 0.35;
+        for (const z of this.zombies) {
+          if (z.hp <= 0) continue;
+          if (Math.hypot(z.x - m.x, z.y - m.y) <= radius) {
+            this.applyZombieDamage(z, m.dmg || 75, m.ownerId || null, armorMult);
+          }
+        }
+        this.sound.playExplosion();
+        this.pulseRings.push({ x: m.x, y: m.y, radius: 6, maxRadius: radius, color: '#FF9A1F', life: 0.45, maxLife: 0.45 });
+        this.addParticles(m.x, m.y, '#FF9A1F', 18, 80);
+        this.addFloatingText('BOOM!', m.x, m.y - 12, '#FFAE00');
+      }
+    }
+
     findWreckerTargetStructure(z) {
       let bestPrimary = null;
       let bestPrimaryD = Infinity;
@@ -11192,6 +12096,10 @@
     }
 
     updateZombies(dt) {
+      const behemoths = [];
+      for (const zb of this.zombies) {
+        if (zb.type === 'behemoth' && zb.hp > 0) behemoths.push(zb);
+      }
       let activeOwners = [];
       const ownerCounts = new Map();
       let maxFairShare = Infinity;
@@ -11233,17 +12141,19 @@
         }
 
         let activeSlowFactor = 0;
+        z.broodBuffed = z.type !== 'behemoth' && behemoths.some((b) => Math.hypot(b.x - z.x, b.y - z.y) <= 120);
+        const broodSpeedMult = z.broodBuffed ? 1.20 : 1.0;
         if (z.slowTimer > 0) {
           z.slowTimer -= dt;
           activeSlowFactor = z.slowFactor || 0;
-          z.speed = z.baseSpeed * (1 - z.slowFactor);
+          z.speed = z.baseSpeed * broodSpeedMult * (1 - z.slowFactor);
           if (z.slowTimer <= 0) {
-            z.speed = z.baseSpeed;
+            z.speed = z.baseSpeed * broodSpeedMult;
             z.slowFactor = 0;
             activeSlowFactor = 0;
           }
         } else {
-          z.speed = z.baseSpeed;
+          z.speed = z.baseSpeed * broodSpeedMult;
         }
         const attackInterval = activeSlowFactor > 0 ? (0.5 / Math.max(0.2, 1 - activeSlowFactor)) : 0.5;
 
@@ -11640,7 +12550,7 @@
           }
           continue;
         }
-        if (struct.type === 'wall' || struct.type === 'gate') continue;
+        if (struct.type === 'wall' || struct.type === 'gate' || struct.type === 'radar') continue;
 
         // Safe-Zone Barracks: heals occupants (+6 HP/s), fires out (aura-scaled), processes 4 parallel activeTrainers & auto-dispatches queued orders
         if (struct.type === 'barracks') {
@@ -11703,11 +12613,7 @@
                   for (const z of this.zombies) {
                     if (z.hp <= 0) continue;
                     if (Math.hypot(z.x - fireTarget.x, z.y - fireTarget.y) > aoeR) continue;
-                    const isHeavy = z.type === 'tank' || z.type === 'demolisher' || z.type === 'wrecker';
-                    const dmg = isHeavy ? Math.max(1, Math.round(sDmg * armorMult)) : sDmg;
-                    z.lastAttackerOwnerId = sol.ownerId || struct.ownerId || z.lastAttackerOwnerId || null;
-                    z.hp -= dmg;
-                    if (z.hp <= 0) {
+                    if (this.applyZombieDamage(z, sDmg, sol.ownerId || struct.ownerId || z.lastAttackerOwnerId || null, armorMult)) {
                       sol.kills = (sol.kills || 0) + 1;
                       struct.kills = (struct.kills || 0) + 1;
                       this.totalCommandoKills = (this.totalCommandoKills || 0) + 1;
@@ -11715,6 +12621,7 @@
                   }
                   this.addParticles(fireTarget.x, fireTarget.y, '#FF6B1A', 5, 40);
                 } else {
+                  const shotCol = sol.unitKind === 'gunner' ? '#38B6FF' : (sol.isCommando ? '#00E5FF' : '#38E8FF');
                   this.sound.playLaser(720, 340, 0.05);
                   this.projectiles.push({
                     id: this.nextProjId++,
@@ -11723,18 +12630,16 @@
                     y1: struct.y,
                     x2: fireTarget.x,
                     y2: fireTarget.y,
-                    color: sol.isCommando ? '#00E5FF' : '#38E8FF',
+                    color: shotCol,
                     life: 0.1,
                     maxLife: 0.1
                   });
-                  fireTarget.lastAttackerOwnerId = sol.ownerId || struct.ownerId || fireTarget.lastAttackerOwnerId || null;
-                  fireTarget.hp -= sDmg;
-                  if (fireTarget.hp <= 0) {
+                  if (this.applyZombieDamage(fireTarget, sDmg, sol.ownerId || struct.ownerId || fireTarget.lastAttackerOwnerId || null, 1.0)) {
                     sol.kills = (sol.kills || 0) + 1;
                     struct.kills = (struct.kills || 0) + 1;
                     if (sol.isCommando) this.totalCommandoKills = (this.totalCommandoKills || 0) + 1;
                   }
-                  this.addParticles(fireTarget.x, fireTarget.y, sol.isCommando ? '#00E5FF' : '#38E8FF', 3, 28);
+                  this.addParticles(fireTarget.x, fireTarget.y, shotCol, 3, 28);
                 }
               }
             }
@@ -11800,7 +12705,7 @@
             struct._deployCd = Math.max(0, (struct._deployCd || 0) - dt);
             if (struct._deployCd <= 0) {
               struct._deployCd = 0.5;
-              const eIdx = struct.occupants.findIndex((u) => u.unitType === 'engineer');
+              const eIdx = struct.occupants.findIndex((u) => u.unitType === 'engineer' && (!u.unitKind || u.unitKind === 'engineer'));
               if (eIdx !== -1) {
                 const damagedTarget = this.findNearestDamagedStructureOrSafeZone(struct.x, struct.y);
                 if (damagedTarget) {
@@ -11864,9 +12769,13 @@
         struct.cooldown = (struct.cooldown || 0) - dt;
         if (struct.cooldown > 0) continue;
 
+        const radarBuff = this.getRadarBuffAt(struct.x, struct.y);
+        const effRange = lv.range ? Math.round(lv.range * (1 + radarBuff)) : 0;
+        const rofMult = (1 + radarBuff) * ((this.overchargeTimer || 0) > 0 ? 1.5 : 1.0);
+
         if (struct.type === 'sentry') {
           let best = null;
-          let bestD = lv.range;
+          let bestD = effRange;
           for (const z of this.zombies) {
             if (z.hp <= 0) continue;
             const d = Math.hypot(z.x - struct.x, z.y - struct.y);
@@ -11876,20 +12785,20 @@
             }
           }
           if (best) {
-            struct.cooldown = lv.rate;
+            struct.cooldown = lv.rate / rofMult;
             this.fireSentry(struct, best, lv);
           }
         } else if (struct.type === 'cryo') {
           let any = false;
           for (const z of this.zombies) {
-            if (z.hp > 0 && Math.hypot(z.x - struct.x, z.y - struct.y) <= lv.range) {
+            if (z.hp > 0 && Math.hypot(z.x - struct.x, z.y - struct.y) <= effRange) {
               any = true;
               break;
             }
           }
           if (any) {
-            struct.cooldown = 1.6;
-            this.fireCryo(struct, lv);
+            struct.cooldown = 1.6 / rofMult;
+            this.fireCryo(struct, lv, effRange);
           }
         } else if (struct.type === 'sniper') {
           // Priority: Demolisher/Wrecker -> Brute-Breach -> Highest-HP zombie (never targets Spawn Breaches)
@@ -11903,8 +12812,8 @@
           for (const z of this.zombies) {
             if (z.hp <= 0) continue;
             const d = Math.hypot(z.x - struct.x, z.y - struct.y);
-            if (d > lv.range) continue;
-            if (z.type === 'demolisher' || z.type === 'wrecker') {
+            if (d > effRange) continue;
+            if (z.type === 'demolisher' || z.type === 'wrecker' || z.type === 'behemoth') {
               if (z.hp > maxSiegeHp) {
                 maxSiegeHp = z.hp;
                 bestSiege = z;
@@ -11922,12 +12831,12 @@
 
           const target = bestSiege || bestBrute || bestRegular;
           if (target) {
-            struct.cooldown = lv.rate;
+            struct.cooldown = lv.rate / rofMult;
             this.fireSniper(struct, target, lv);
           }
         } else if (struct.type === 'tesla') {
           let best = null;
-          let bestD = lv.range;
+          let bestD = effRange;
           for (const z of this.zombies) {
             if (z.hp <= 0) continue;
             const d = Math.hypot(z.x - struct.x, z.y - struct.y);
@@ -11937,8 +12846,50 @@
             }
           }
           if (best) {
-            struct.cooldown = lv.rate;
+            struct.cooldown = lv.rate / rofMult;
             this.fireTesla(struct, best, lv);
+          }
+        } else if (struct.type === 'mortar') {
+          const minR = lv.minRange || 80;
+          let best = null;
+          let bestD = effRange;
+          for (const z of this.zombies) {
+            if (z.hp <= 0) continue;
+            const d = Math.hypot(z.x - struct.x, z.y - struct.y);
+            if (d >= minR && d <= bestD) {
+              bestD = d;
+              best = z;
+            }
+          }
+          if (best) {
+            struct.cooldown = lv.rate / rofMult;
+            this.fireMortar(struct, best, lv);
+          }
+        } else if (struct.type === 'laser') {
+          // Priority: Behemoth -> Demolisher/Wrecker -> Tank -> Brute-Breach -> Highest HP
+          let best = null;
+          let bestScore = -1;
+          for (const z of this.zombies) {
+            if (z.hp <= 0) continue;
+            const d = Math.hypot(z.x - struct.x, z.y - struct.y);
+            if (d > effRange) continue;
+            const prio = z.type === 'behemoth' ? 5e6
+              : (z.type === 'demolisher' || z.type === 'wrecker') ? 4e6
+              : z.type === 'tank' ? 3e6
+              : z.bruteBreach ? 2e6
+              : 1e6;
+            const sc = prio + z.hp;
+            if (sc > bestScore) {
+              bestScore = sc;
+              best = z;
+            }
+          }
+          if (best) {
+            struct.cooldown = lv.rate / rofMult;
+            this.fireLaser(struct, best, lv);
+          } else {
+            struct.laserTargetId = null;
+            struct.laserTicks = 0;
           }
         }
       }
@@ -11959,20 +12910,20 @@
         maxLife: 0.11
       });
       const hitDmg = Math.round(lv.dmg * this.getSafeZoneDmgMult() * (this.devTowerStrengthMult || 1.0));
-      target.lastAttackerOwnerId = t.ownerId || target.lastAttackerOwnerId || null;
-      target.hp -= hitDmg;
-      if (target.hp <= 0) t.kills = (t.kills || 0) + 1;
+      if (this.applyZombieDamage(target, hitDmg, t.ownerId || target.lastAttackerOwnerId || null, 1.0)) {
+        t.kills = (t.kills || 0) + 1;
+      }
       this.addParticles(target.x, target.y, '#FFD23F', 4, 35);
     }
 
-    fireCryo(t, lv) {
+    fireCryo(t, lv, effRange = lv.range) {
       this.sound.playCryoPulse();
       this.projectiles.push({
         id: this.nextProjId++,
         type: 'cryoWave',
         x: t.x,
         y: t.y,
-        maxRadius: lv.range,
+        maxRadius: effRange,
         radius: 10,
         color: '#00FFFF',
         life: 0.35,
@@ -11981,12 +12932,12 @@
       const mult = this.getSafeZoneDmgMult();
       const chipZ = Math.round(8 * mult * (this.devTowerStrengthMult || 1.0));
       for (const z of this.zombies) {
-        if (z.hp <= 0 || Math.hypot(z.x - t.x, z.y - t.y) > lv.range) continue;
+        if (z.hp <= 0 || Math.hypot(z.x - t.x, z.y - t.y) > effRange) continue;
         z.slowTimer = lv.slowDur;
         z.slowFactor = Math.max(z.slowFactor, lv.slow);
-        z.lastAttackerOwnerId = t.ownerId || z.lastAttackerOwnerId || null;
-        z.hp -= chipZ;
-        if (z.hp <= 0) t.kills = (t.kills || 0) + 1;
+        if (this.applyZombieDamage(z, chipZ, t.ownerId || z.lastAttackerOwnerId || null, 1.0)) {
+          t.kills = (t.kills || 0) + 1;
+        }
         this.addParticles(z.x, z.y, '#00FFFF', 4, 30);
       }
     }
@@ -12013,8 +12964,9 @@
         this.addParticles(target.x, target.y, '#FF00FF', 18, 85);
       } else {
         const hitDmg = Math.round(lv.dmg * this.getSafeZoneDmgMult() * (this.devTowerStrengthMult || 1.0));
-        target.hp -= hitDmg;
-        if (target.hp <= 0) t.kills = (t.kills || 0) + 1;
+        if (this.applyZombieDamage(target, hitDmg, t.ownerId || target.lastAttackerOwnerId || null, 1.0)) {
+          t.kills = (t.kills || 0) + 1;
+        }
         this.addParticles(target.x, target.y, '#FF00FF', 10, 70);
       }
     }
@@ -12050,11 +13002,9 @@
 
       for (const z of hitZombies) {
         points.push({ x: z.x, y: z.y });
-        const isHeavy = z.type === 'tank' || z.type === 'demolisher' || z.type === 'wrecker';
-        const dmg = isHeavy ? Math.max(1, Math.round(baseDmg * armorMult)) : baseDmg;
-        z.lastAttackerOwnerId = t.ownerId || z.lastAttackerOwnerId || null;
-        z.hp -= dmg;
-        if (z.hp <= 0) t.kills = (t.kills || 0) + 1;
+        if (this.applyZombieDamage(z, baseDmg, t.ownerId || z.lastAttackerOwnerId || null, armorMult)) {
+          t.kills = (t.kills || 0) + 1;
+        }
         this.addParticles(z.x, z.y, '#5CEEFF', 4, 42);
       }
 
@@ -12068,6 +13018,64 @@
       });
     }
 
+    fireMortar(t, target, lv) {
+      this.sound.playMortarLaunch();
+      t.angle = Math.atan2(target.y - t.y, target.x - t.x);
+      const baseDmg = Math.round(lv.dmg * this.getSafeZoneDmgMult() * (this.devTowerStrengthMult || 1.0));
+      this.projectiles.push({
+        id: this.nextProjId++,
+        type: 'mortarShell',
+        x1: t.x,
+        y1: t.y,
+        x: t.x,
+        y: t.y,
+        x2: target.x,
+        y2: target.y,
+        aoe: lv.aoe || 56,
+        dmg: baseDmg,
+        ownerId: t.ownerId || null,
+        structRef: t,
+        color: '#FF9A1F',
+        life: 0.55,
+        maxLife: 0.55
+      });
+    }
+
+    fireLaser(t, target, lv) {
+      if (t.laserTargetId === target.id) {
+        t.laserTicks = (t.laserTicks || 0) + 1;
+      } else {
+        t.laserTargetId = target.id;
+        t.laserTicks = 0;
+      }
+      const step = Math.min(3, Math.floor((t.laserTicks || 0) / 2));
+      const rampMult = [1.0, 1.5, 2.0, 3.0][step];
+      const beamWidth = 2.0 + step * 1.5;
+      t.angle = Math.atan2(target.y - t.y, target.x - t.x);
+      if (step === 0 || t.laserTicks % 2 === 0) {
+        this.sound.playLaser(460 + step * 140, 620 + step * 160, 0.06);
+      }
+      this.projectiles.push({
+        id: this.nextProjId++,
+        type: 'laserBeam',
+        x1: t.x,
+        y1: t.y,
+        x2: target.x,
+        y2: target.y,
+        width: beamWidth,
+        color: step >= 3 ? '#FFD23F' : step >= 2 ? '#FF8844' : '#FF2A55',
+        life: 0.24,
+        maxLife: 0.24
+      });
+      const baseDmg = lv.dmg * rampMult * this.getSafeZoneDmgMult() * (this.devTowerStrengthMult || 1.0);
+      if (this.applyZombieDamage(target, baseDmg, t.ownerId || target.lastAttackerOwnerId || null, 1.0)) {
+        t.kills = (t.kills || 0) + 1;
+        t.laserTargetId = null;
+        t.laserTicks = 0;
+      }
+      this.addParticles(target.x, target.y, '#FF2A55', 2 + step, 28);
+    }
+
     updateProjectiles(dt) {
       for (let i = this.projectiles.length - 1; i >= 0; i--) {
         const p = this.projectiles[i];
@@ -12075,6 +13083,26 @@
         if (p.type === 'cryoWave') {
           const prog = 1 - Math.max(0, p.life / p.maxLife);
           p.radius = 10 + (p.maxRadius - 10) * prog;
+        } else if (p.type === 'mortarShell') {
+          const prog = 1 - Math.max(0, p.life / p.maxLife);
+          p.x = p.x1 + (p.x2 - p.x1) * prog;
+          p.y = p.y1 + (p.y2 - p.y1) * prog;
+          if (p.life <= 0) {
+            const aoe = p.aoe || 56;
+            const armorMult = (STRUCTURE_SPECS.mortar && STRUCTURE_SPECS.mortar.armorMult) || 0.35;
+            for (const z of this.zombies) {
+              if (z.hp <= 0) continue;
+              if (Math.hypot(z.x - p.x2, z.y - p.y2) <= aoe) {
+                if (this.applyZombieDamage(z, p.dmg || 45, p.ownerId || z.lastAttackerOwnerId || null, armorMult)) {
+                  if (p.structRef) p.structRef.kills = (p.structRef.kills || 0) + 1;
+                }
+              }
+            }
+            this.sound.playExplosion();
+            this.pulseRings.push({ x: p.x2, y: p.y2, radius: 6, maxRadius: aoe, color: '#FF9A1F', life: 0.4, maxLife: 0.4 });
+            this.addParticles(p.x2, p.y2, '#FF9A1F', 16, 78);
+            this.addParticles(p.x2, p.y2, '#FFD23F', 8, 52);
+          }
         }
         if (p.life <= 0) this.projectiles.splice(i, 1);
       }
@@ -12215,6 +13243,7 @@
 
       this.renderTiles(ctx, t);
       this.renderSafeZones(ctx, t);
+      this.renderMines(ctx, t);
       this.renderSpawnBreaches(ctx, t);
       this.renderHoverRanges(ctx);
       for (const s of this.structures.values()) this.renderStructure(ctx, s, t);
@@ -12228,7 +13257,50 @@
       this.renderMpPings(ctx, t);
       this.renderTutorialHighlights(ctx, t);
       this.renderBuildPreview(ctx);
+      if (this.armingNapalm && inBounds(this.mouseTile.col, this.mouseTile.row)) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 85, 17, 0.16)';
+        ctx.strokeStyle = '#FF6B1A';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.arc(this.mousePos.x, this.mousePos.y, 110, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      } else if (this.settingBarracksHoldPoint && inBounds(this.mouseTile.col, this.mouseTile.row)) {
+        const hp = tileCenter(this.mouseTile.col, this.mouseTile.row);
+        const validHold = !this.commandoBlocked(this.mouseTile.col, this.mouseTile.row);
+        ctx.save();
+        ctx.strokeStyle = validHold ? '#00E5FF' : '#FF3B3B';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(hp.x - TILE_SIZE / 2 + 2, hp.y - TILE_SIZE / 2 + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+        ctx.beginPath();
+        ctx.arc(hp.x, hp.y, 10, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
       this.renderFloatingTexts(ctx);
+    }
+
+    renderMines(ctx, t) {
+      if (!this.mines || this.mines.length === 0) return;
+      const blink = Math.sin(t * 7) > 0;
+      for (const m of this.mines) {
+        ctx.fillStyle = '#332610';
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#FFAE00';
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+        ctx.fillStyle = blink ? '#FF3B3B' : '#FFAE00';
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.lineWidth = 1;
+      }
     }
 
     renderMpPings(ctx, t) {
@@ -12469,8 +13541,10 @@
       for (const s of targets) {
         if (s.type === 'wall' || s.type === 'gate' || s.type === 'safezone' || s.type === 'engineering' || s.type === 'habitat' || s.type === 'barracks') continue;
         const lv = STRUCTURE_SPECS[s.type]?.levels[s.level - 1];
-        const range = lv ? lv.range : 0;
-        if (!range) continue;
+        const baseRange = lv ? (lv.buffRange || lv.range) : 0;
+        if (!baseRange) continue;
+        const rBuff = s.type === 'radar' ? 0 : this.getRadarBuffAt(s.x, s.y);
+        const range = Math.round(baseRange * (1 + rBuff));
 
         ctx.fillStyle = s === this.selectedStructure ? 'rgba(0,255,255,0.07)' : 'rgba(255,255,255,0.04)';
         ctx.strokeStyle = s === this.selectedStructure ? 'rgba(0,255,255,0.55)' : 'rgba(255,255,255,0.3)';
@@ -12479,6 +13553,12 @@
         ctx.arc(s.x, s.y, range, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
+        if (s.type === 'mortar' && lv && lv.minRange) {
+          ctx.strokeStyle = 'rgba(255, 154, 31, 0.55)';
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, lv.minRange, 0, Math.PI * 2);
+          ctx.stroke();
+        }
         ctx.setLineDash([]);
       }
     }
@@ -12715,6 +13795,73 @@
         ctx.beginPath();
         ctx.arc(s.x, s.y, 2.2, 0, Math.PI * 2);
         ctx.fill();
+      } else if (s.type === 'mortar') {
+        ctx.fillStyle = '#1b1612';
+        ctx.fillRect(x + 4, y + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+        ctx.strokeStyle = lv.border || '#FFB800';
+        ctx.lineWidth = 1.6;
+        ctx.strokeRect(x + 4, y + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.rotate(s.angle || 0);
+        ctx.fillStyle = flash ? '#FFFFFF' : lv.color;
+        ctx.fillRect(-3, -5, 16, 10);
+        ctx.fillStyle = '#2A1D12';
+        ctx.beginPath();
+        ctx.arc(0, 0, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      } else if (s.type === 'laser') {
+        ctx.fillStyle = '#200c14';
+        ctx.fillRect(x + 4, y + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+        ctx.strokeStyle = lv.border || '#FF5C77';
+        ctx.lineWidth = 1.6;
+        ctx.strokeRect(x + 4, y + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.rotate(s.angle || 0);
+        ctx.fillStyle = flash ? '#FFFFFF' : lv.color;
+        ctx.fillRect(2, -2.5, 14, 5);
+        ctx.fillStyle = '#FF88AA';
+        ctx.beginPath();
+        ctx.arc(0, 0, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      } else if (s.type === 'radar') {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(0, 229, 255, 0.14)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, lv.buffRange || lv.range || 140, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.fillStyle = '#0d1e28';
+        ctx.fillRect(x + 5, y + 5, TILE_SIZE - 10, TILE_SIZE - 10);
+        ctx.strokeStyle = lv.border || '#00E5FF';
+        ctx.lineWidth = 1.6;
+        ctx.strokeRect(x + 5, y + 5, TILE_SIZE - 10, TILE_SIZE - 10);
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.rotate(t * (1.8 + (s.level || 1) * 0.5));
+        ctx.strokeStyle = flash ? '#FFFFFF' : '#00E5FF';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, 9, -Math.PI * 0.4, Math.PI * 0.4);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(10, 0);
+        ctx.stroke();
+        ctx.restore();
+        ctx.fillStyle = '#00E5FF';
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, 3, 0, Math.PI * 2);
+        ctx.fill();
       } else {
         // Turret base pad
         ctx.fillStyle = '#141c28';
@@ -12773,6 +13920,32 @@
         ctx.lineWidth = 2;
         ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
         ctx.lineWidth = 1;
+        if (s.type === 'barracks' && s.stance === 'hold' && s.holdTile) {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(0, 229, 255, 0.7)';
+          ctx.setLineDash([5, 4]);
+          ctx.beginPath();
+          ctx.moveTo(s.x, s.y);
+          ctx.lineTo(s.holdTile.x, s.holdTile.y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = 'rgba(0, 229, 255, 0.18)';
+          ctx.beginPath();
+          ctx.arc(s.holdTile.x, s.holdTile.y, 12, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#00E5FF';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.fillStyle = '#FFD23F';
+          ctx.fillRect(s.holdTile.x - 1, s.holdTile.y - 10, 2, 12);
+          ctx.beginPath();
+          ctx.moveTo(s.holdTile.x + 1, s.holdTile.y - 10);
+          ctx.lineTo(s.holdTile.x + 9, s.holdTile.y - 7);
+          ctx.lineTo(s.holdTile.x + 1, s.holdTile.y - 4);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
       }
 
       if (s.hp < s.maxHp) {
@@ -12840,7 +14013,7 @@
         const ownerColor = s.ownerColor || this.getPlayerColor(s.ownerId);
         if (ownerColor) {
           ctx.save();
-          if (s.type === 'sentry' || s.type === 'cryo' || s.type === 'sniper' || s.type === 'tesla' || s.type === 'barracks' || s.type === 'engineering' || s.type === 'habitat') {
+          if (this.isTowerType(s.type) || s.type === 'barracks' || s.type === 'engineering' || s.type === 'habitat') {
             ctx.strokeStyle = ownerColor;
             ctx.globalAlpha = 0.55;
             ctx.lineWidth = 1.6;
@@ -12983,6 +14156,15 @@
           ctx.fillRect(-9, -4, 4, 8);
           ctx.fillStyle = '#FF9A1F';
           ctx.fillRect(2, -2, 10, 4);
+        } else if (sol.unitKind === 'gunner') {
+          ctx.strokeStyle = '#7CE0FF';
+          ctx.lineWidth = 2.6;
+          ctx.beginPath();
+          ctx.arc(2, 0, sol.radius + 1.5, -Math.PI * 0.42, Math.PI * 0.42);
+          ctx.stroke();
+          ctx.lineWidth = 1;
+          ctx.fillStyle = '#D6E2F3';
+          ctx.fillRect(2, -2, 10, 4);
         } else {
           ctx.fillStyle = '#D6E2F3';
           ctx.fillRect(2, -1.5, 9, 3);
@@ -13055,8 +14237,16 @@
           ctx.lineWidth = 1;
         }
 
-        // Welding torch beam when actively repairing an adjacent target
-        if (eng.repairTarget && Math.hypot(eng.repairTarget.x - eng.x, eng.repairTarget.y - eng.y) <= TILE_SIZE * 1.45) {
+        // Medical beam or Welding torch beam
+        if (eng.unitKind === 'medic' && eng.healBeamTarget) {
+          ctx.strokeStyle = Math.sin(t * 16) > 0 ? '#00FF9D' : '#88FFCC';
+          ctx.lineWidth = 2.2;
+          ctx.beginPath();
+          ctx.moveTo(eng.x, eng.y);
+          ctx.lineTo(eng.healBeamTarget.x, eng.healBeamTarget.y);
+          ctx.stroke();
+          ctx.lineWidth = 1;
+        } else if (eng.repairTarget && Math.hypot(eng.repairTarget.x - eng.x, eng.repairTarget.y - eng.y) <= TILE_SIZE * 1.45) {
           ctx.strokeStyle = Math.sin(t * 25) > 0 ? '#00E5FF' : '#FFD23F';
           ctx.lineWidth = 1.8;
           ctx.beginPath();
@@ -13070,23 +14260,23 @@
         ctx.save();
         ctx.translate(eng.x, eng.y);
         ctx.rotate(eng.angle || 0);
-        ctx.fillStyle = '#00E5FF';
+        ctx.fillStyle = eng.unitKind === 'medic' ? '#00FF9D' : eng.unitKind === 'sapper' ? '#FF6B1A' : '#00E5FF';
         ctx.fillRect(2, -2, 9, 4);
         ctx.restore();
 
-        // Amber-gold hard-hat body with cyan trim
-        ctx.fillStyle = spec.color;
+        // Hard-hat body (Mint Medic / Amber Sapper / Gold Engineer)
+        ctx.fillStyle = eng.color || spec.color;
         ctx.beginPath();
         ctx.arc(eng.x, eng.y, eng.radius, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.strokeStyle = '#00E5FF';
+        ctx.strokeStyle = eng.unitKind === 'medic' ? '#FFFFFF' : eng.unitKind === 'sapper' ? '#FF5522' : '#00E5FF';
         ctx.lineWidth = 1.5;
         ctx.stroke();
         ctx.lineWidth = 1;
 
-        // Inner cross-wrench emblem
-        ctx.fillStyle = '#18202c';
+        // Inner emblem (Red Cross for Medic / Bomb diamond for Sapper / Wrench for Engineer)
+        ctx.fillStyle = eng.unitKind === 'medic' ? '#0A3B28' : '#18202c';
         ctx.fillRect(eng.x - 3, eng.y - 1, 6, 2);
         ctx.fillRect(eng.x - 1, eng.y - 3, 2, 6);
 
@@ -13109,7 +14299,29 @@
 
     renderZombies(ctx, t) {
       for (const z of this.zombies) {
+        if (z.type === 'behemoth') {
+          ctx.save();
+          ctx.fillStyle = 'rgba(255, 51, 102, 0.08)';
+          ctx.strokeStyle = 'rgba(255, 51, 102, 0.36)';
+          ctx.lineWidth = 1.6;
+          ctx.setLineDash([6, 4]);
+          ctx.beginPath();
+          ctx.arc(z.x, z.y, 120, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.restore();
+        }
         drawZombieSprite(ctx, z, t);
+
+        if (z.broodBuffed && z.type !== 'behemoth') {
+          ctx.strokeStyle = 'rgba(255, 51, 102, 0.75)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(z.x, z.y, z.radius + 1.8, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.lineWidth = 1;
+        }
 
         // Visual Tell for 25% Random Brute-Breach zombies (Walker/Runner/Tank/Wrecker that breach walls straight to Safe Zones)
         if (z.bruteBreach && z.type !== 'demolisher') {
@@ -13185,6 +14397,50 @@
           ctx.beginPath();
           ctx.moveTo(p.x1, p.y1);
           ctx.lineTo(p.x2, p.y2);
+          ctx.stroke();
+          ctx.restore();
+        } else if (p.type === 'laserBeam') {
+          ctx.save();
+          ctx.globalAlpha = 0.85;
+          ctx.strokeStyle = p.color || '#FF2A55';
+          ctx.lineWidth = p.width || 2.5;
+          ctx.beginPath();
+          ctx.moveTo(p.x1, p.y1);
+          ctx.lineTo(p.x2, p.y2);
+          ctx.stroke();
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = Math.max(1, (p.width || 2.5) * 0.35);
+          ctx.stroke();
+          ctx.restore();
+        } else if (p.type === 'mortarShell') {
+          const prog = 1 - Math.max(0, p.life / p.maxLife);
+          const arcLift = Math.sin(prog * Math.PI) * 34;
+          const sx = p.x !== undefined ? p.x : p.x1 + (p.x2 - p.x1) * prog;
+          const sy = (p.y !== undefined ? p.y : p.y1 + (p.y2 - p.y1) * prog) - arcLift;
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+          ctx.beginPath();
+          ctx.arc(sx, sy + arcLift, 3.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#FF9A1F';
+          ctx.beginPath();
+          ctx.arc(sx, sy, 4.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#FFF088';
+          ctx.beginPath();
+          ctx.arc(sx, sy, 2.0, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (p.type === 'napalmBlast') {
+          const prog = 1 - Math.max(0, p.life / p.maxLife);
+          const rad = (p.radius || 110) * (0.4 + 0.6 * prog);
+          ctx.save();
+          ctx.globalAlpha = a * 0.45;
+          ctx.fillStyle = '#FF5511';
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, rad, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = a * 0.75;
+          ctx.strokeStyle = '#FFD23F';
+          ctx.lineWidth = 3;
           ctx.stroke();
           ctx.restore();
         } else if (p.type === 'lightningArc' && Array.isArray(p.points) && p.points.length >= 2) {
