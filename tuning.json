@@ -1,25 +1,67 @@
 {
-  "version": "v0.46.0",
-  "updatedAt": "2026-11-25T01:10:00+08:00",
+  "version": "v0.46.1",
+  "updatedAt": "2026-11-24T17:55:41.371Z",
   "general": {
-    "towerStrengthMult": 1.0,
+    "towerStrengthMult": 1,
     "zombieHpMult": 0.5,
     "zombieScrapMult": 1.5,
-    "zombieSpeedMult": 1.0,
+    "zombieSpeedMult": 1,
     "breachCountMult": 0.75,
     "safeZonesPerStructure": 3
   },
   "waveMeter": {
-    "toughness10WaveMult": 1.0,
-    "speed10WaveMult": 1.0
+    "toughness10WaveMult": 1,
+    "speed10WaveMult": 1
   },
   "zombies": {
-    "walker": { "hpMult": 1.0, "speedMult": 1.0, "dmgMult": 1.0, "bounty": 1, "countMult": 1.0 },
-    "runner": { "hpMult": 1.0, "speedMult": 1.0, "dmgMult": 1.0, "bounty": 1, "countMult": 1.0 },
-    "tank": { "hpMult": 1.0, "speedMult": 1.0, "dmgMult": 1.0, "bounty": 10, "countMult": 1.0 },
-    "demolisher": { "hpMult": 1.0, "speedMult": 1.0, "dmgMult": 1.0, "bounty": 9, "countMult": 1.0 },
-    "wrecker": { "hpMult": 1.0, "speedMult": 1.0, "dmgMult": 1.0, "bounty": 7, "countMult": 1.0 },
-    "miniboss": { "hpMult": 1.0, "speedMult": 1.0, "dmgMult": 1.0, "bounty": 45, "countMult": 1.0 },
-    "behemoth": { "hpMult": 1.0, "speedMult": 1.0, "dmgMult": 1.0, "bounty": 80, "countMult": 1.0 }
+    "walker": {
+      "hpMult": 1,
+      "speedMult": 1,
+      "dmgMult": 1,
+      "bounty": 1,
+      "countMult": 1
+    },
+    "runner": {
+      "hpMult": 1,
+      "speedMult": 1,
+      "dmgMult": 1,
+      "bounty": 1,
+      "countMult": 1
+    },
+    "tank": {
+      "hpMult": 1,
+      "speedMult": 1,
+      "dmgMult": 1,
+      "bounty": 10,
+      "countMult": 1
+    },
+    "demolisher": {
+      "hpMult": 1,
+      "speedMult": 1,
+      "dmgMult": 1,
+      "bounty": 9,
+      "countMult": 1
+    },
+    "wrecker": {
+      "hpMult": 1,
+      "speedMult": 1,
+      "dmgMult": 1,
+      "bounty": 7,
+      "countMult": 1
+    },
+    "miniboss": {
+      "hpMult": 1,
+      "speedMult": 1,
+      "dmgMult": 1,
+      "bounty": 45,
+      "countMult": 1
+    },
+    "behemoth": {
+      "hpMult": 1,
+      "speedMult": 1,
+      "dmgMult": 1,
+      "bounty": 80,
+      "countMult": 1
+    }
   }
 }
