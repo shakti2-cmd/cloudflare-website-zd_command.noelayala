@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.34.0 (20s Survival Rift Respawn +1 Breach, Dev Defaults 0.5x HP / 1.5x Scrap & 0.1x-10x Sliders, Clear Selection on Settings)
+ * Version: v0.35.0 (Survival Per-Breach Spawns & Mid-Wave Cancel, Speed/Count Dev Sliders, Barrier Fallback Waypoints & Linked Wall/Gate Repairs)
  */
 
 (function () {
@@ -1051,10 +1051,12 @@
       this.zombieSpeedMult = 1.0;
       this.infectionWindow = 2.0;
 
-      // Developer Tuning Live Multipliers (v0.34.0)
+      // Developer Tuning Live Multipliers (v0.35.0)
       this.devTowerStrengthMult = 1.0;
       this.devZombieHpMult = 0.5;
       this.devZombieScrapMult = 1.5;
+      this.devZombieSpeedMult = 1.0;
+      this.devBreachCountMult = 1.0;
       this.devSliderStops = [0.1, 0.2, 0.35, 0.5, 0.75, 1.0, 1.5, 2.0, 3.5, 6.0, 10.0];
 
       this.scrap = 100;
@@ -1424,9 +1426,13 @@
       this.sliderDevTowerStrength = $('sliderDevTowerStrength');
       this.sliderDevZombieHp = $('sliderDevZombieHp');
       this.sliderDevZombieScrap = $('sliderDevZombieScrap');
+      this.sliderDevZombieSpeed = $('sliderDevZombieSpeed');
+      this.sliderDevBreachCount = $('sliderDevBreachCount');
       this.valDevTowerStrength = $('valDevTowerStrength');
       this.valDevZombieHp = $('valDevZombieHp');
       this.valDevZombieScrap = $('valDevZombieScrap');
+      this.valDevZombieSpeed = $('valDevZombieSpeed');
+      this.valDevBreachCount = $('valDevBreachCount');
 
       // Multiplayer UI Elements (v0.23.0)
       this.btnStartMultiplayer = $('btnStartMultiplayer');
@@ -1623,6 +1629,10 @@
           if (this.selectedStructure) this.updateUpgradePanel();
         } else if (key === 'scrap') {
           this.devZombieScrapMult = val;
+        } else if (key === 'speed') {
+          this.setDevZombieSpeedMult(val);
+        } else if (key === 'breach') {
+          this.devBreachCountMult = val;
         }
         if (readout) readout.textContent = val + 'x';
       };
@@ -1630,6 +1640,8 @@
       on(this.sliderDevTowerStrength, 'input', () => updateDevSlider(this.sliderDevTowerStrength, 'tower', this.valDevTowerStrength));
       on(this.sliderDevZombieHp, 'input', () => updateDevSlider(this.sliderDevZombieHp, 'hp', this.valDevZombieHp));
       on(this.sliderDevZombieScrap, 'input', () => updateDevSlider(this.sliderDevZombieScrap, 'scrap', this.valDevZombieScrap));
+      on(this.sliderDevZombieSpeed, 'input', () => updateDevSlider(this.sliderDevZombieSpeed, 'speed', this.valDevZombieSpeed));
+      on(this.sliderDevBreachCount, 'input', () => updateDevSlider(this.sliderDevBreachCount, 'breach', this.valDevBreachCount));
 
       const saveSettingsCallsign = () => {
         if (!this.settingsPlayerCallsign) return;
@@ -2855,6 +2867,8 @@
       const towerMult = typeof this.devTowerStrengthMult === 'number' ? this.devTowerStrengthMult : 1.0;
       const hpMult = typeof this.devZombieHpMult === 'number' ? this.devZombieHpMult : 0.5;
       const scrapMult = typeof this.devZombieScrapMult === 'number' ? this.devZombieScrapMult : 1.5;
+      const speedMult = typeof this.devZombieSpeedMult === 'number' ? this.devZombieSpeedMult : 1.0;
+      const breachMult = typeof this.devBreachCountMult === 'number' ? this.devBreachCountMult : 1.0;
 
       if (this.sliderDevTowerStrength) {
         this.sliderDevTowerStrength.value = getStopIndex(towerMult);
@@ -2876,20 +2890,40 @@
       if (this.valDevZombieScrap) {
         this.valDevZombieScrap.textContent = scrapMult + 'x';
       }
+
+      if (this.sliderDevZombieSpeed) {
+        this.sliderDevZombieSpeed.value = getStopIndex(speedMult);
+      }
+      if (this.valDevZombieSpeed) {
+        this.valDevZombieSpeed.textContent = speedMult + 'x';
+      }
+
+      if (this.sliderDevBreachCount) {
+        this.sliderDevBreachCount.value = getStopIndex(breachMult);
+      }
+      if (this.valDevBreachCount) {
+        this.valDevBreachCount.textContent = breachMult + 'x';
+      }
     }
 
     resetDeveloperDefaults() {
       // Defaults in [0.1, 0.2, 0.35, 0.5, 0.75, 1.0, 1.5, 2.0, 3.5, 6.0, 10.0]:
-      // Tower Strength = 1.0x (idx 5), Zombie HP = 0.5x (idx 3), Zombie Scrap Drops = 1.5x (idx 6)
+      // Tower = 1.0x (5), HP = 0.5x (3), Scrap = 1.5x (6), Speed = 1.0x (5), Breach Count = 1.0x (5)
       if (this.sliderDevTowerStrength) this.sliderDevTowerStrength.value = 5;
       if (this.sliderDevZombieHp) this.sliderDevZombieHp.value = 3;
       if (this.sliderDevZombieScrap) this.sliderDevZombieScrap.value = 6;
+      if (this.sliderDevZombieSpeed) this.sliderDevZombieSpeed.value = 5;
+      if (this.sliderDevBreachCount) this.sliderDevBreachCount.value = 5;
       if (this.valDevTowerStrength) this.valDevTowerStrength.textContent = '1.0x';
       if (this.valDevZombieHp) this.valDevZombieHp.textContent = '0.5x';
       if (this.valDevZombieScrap) this.valDevZombieScrap.textContent = '1.5x';
+      if (this.valDevZombieSpeed) this.valDevZombieSpeed.textContent = '1.0x';
+      if (this.valDevBreachCount) this.valDevBreachCount.textContent = '1.0x';
       this.devTowerStrengthMult = 1.0;
       this.devZombieScrapMult = 1.5;
+      this.devBreachCountMult = 1.0;
       this.setDevZombieHpMult(0.5);
+      this.setDevZombieSpeedMult(1.0);
       if (this.selectedStructure) this.updateUpgradePanel();
       this.sound.playClick();
     }
@@ -2909,6 +2943,23 @@
         }
       }
       this.devZombieHpMult = newMult;
+    }
+
+    setDevZombieSpeedMult(newMult) {
+      if (typeof newMult !== 'number' || newMult <= 0) newMult = 1.0;
+      const prev = this.devZombieSpeedMult || 1.0;
+      if (Math.abs(prev - newMult) > 0.0001) {
+        const ratio = newMult / prev;
+        if (Array.isArray(this.zombies)) {
+          for (let i = 0; i < this.zombies.length; i++) {
+            const z = this.zombies[i];
+            if (!z || z.dead) continue;
+            z.baseSpeed = Math.max(5, Math.round((z.baseSpeed || 45) * ratio));
+            z.speed = Math.max(5, Math.round((z.speed || z.baseSpeed) * ratio));
+          }
+        }
+      }
+      this.devZombieSpeedMult = newMult;
     }
 
     syncSettingsUI() {
@@ -6236,49 +6287,6 @@
       const w = this.wave;
       const L = this.currentLevel;
       const allowSiege = w >= 6;
-      const mpScaleArr = [1.0, 1.0, 1.4, 1.8, 2.2];
-      const mpMult = this.isMultiplayer
-        ? (mpScaleArr[Math.min(4, Math.max(1, (this.mpPlayers || []).length))] || 1.0)
-        : 1.0;
-      const scaleCnt = (n) => (n > 0 ? Math.max(1, Math.round(n * mpMult)) : 0);
-
-      const cfg = (this.isTutorialMode && w === 1)
-        ? { walkers: 4, runners: 0, tanks: 0, demolishers: 0, wreckers: 0 }
-        : {
-            walkers: scaleCnt(8 + L * 2 + w * 3),
-            runners: scaleCnt(w >= 2 ? 3 + L + w * 2 : 0),
-            tanks: scaleCnt(w >= 3 ? 2 + Math.floor((w - 2) * 1.3) : 0),
-            demolishers: scaleCnt(allowSiege ? Math.min(2, 1 + Math.floor((w - 6) / 3)) : 0),
-            wreckers: scaleCnt(allowSiege ? Math.min(2, 1 + Math.floor((w - 6) / 2)) : 0)
-          };
-
-      const batch = [];
-      for (let i = 0; i < cfg.walkers; i++) batch.push('walker');
-      for (let i = 0; i < cfg.runners; i++) batch.push('runner');
-      for (let i = 0; i < cfg.tanks; i++) batch.push('tank');
-      for (let i = 0; i < cfg.demolishers; i++) batch.push('demolisher');
-      for (let i = 0; i < cfg.wreckers; i++) batch.push('wrecker');
-
-      for (let i = batch.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [batch[i], batch[j]] = [batch[j], batch[i]];
-      }
-
-      if (this.isMultiplayer && this.isMpHost) {
-        const activeOwners = Array.from(new Set(Array.from(this.safeZones.values()).map((sz) => sz.ownerId).filter(Boolean)));
-        if (activeOwners.length > 0) {
-          const assignedBatch = batch.map((t, idx) => ({
-            type: t,
-            assignedPlayerId: activeOwners[idx % activeOwners.length]
-          }));
-          this.waveSpawnQueue.push(...assignedBatch);
-        } else {
-          this.waveSpawnQueue.push(...batch);
-        }
-      } else {
-        this.waveSpawnQueue.push(...batch);
-      }
-      if (this.spawnTimer <= 0) this.spawnTimer = 0.35;
 
       // Recalculate Horde Scaling dynamically from Base Power every 10th wave boundary (Wave 11, 21, 31...)
       let scaleNote = '';
@@ -6295,6 +6303,7 @@
       }
 
       // Survival escalation (+60% HP per 5 waves; reshuffle spawns with 20s cooldown every 10 waves; dormant rift on Wave 6, 16, 26...)
+      // Executed BEFORE Survival per-breach queue generation so queued breachKeys match active/reshuffled spawns.
       if (this.isSurvivalMode && w >= 6 && (w - 1) % 5 === 0) {
         const sMult = this.getSurvivalHpMult();
         this.addFloatingText(`SURVIVAL ESCALATION (${sMult.toFixed(1)}x HP)!`, WIDTH / 2, 138, '#00E5FF');
@@ -6304,6 +6313,96 @@
           this.spawnSurvivalDormantRift();
         }
       }
+
+      let cfg = { walkers: 0, runners: 0, tanks: 0, demolishers: 0, wreckers: 0 };
+      if (this.isSurvivalMode && !(this.isTutorialMode && w === 1)) {
+        const perBreach = Math.max(1, Math.round(6 * (this.devBreachCountMult || 1.0)));
+        const activeOwners = (this.isMultiplayer && this.isMpHost)
+          ? Array.from(new Set(Array.from(this.safeZones.values()).map((sz) => sz.ownerId).filter(Boolean)))
+          : [];
+        const pickSurvivalZombieType = () => {
+          const r = Math.random();
+          if (w < 2) return 'walker';
+          if (w < 3) return r < 0.65 ? 'walker' : 'runner';
+          if (w < 6) {
+            if (r < 0.48) return 'walker';
+            if (r < 0.82) return 'runner';
+            return 'tank';
+          }
+          if (r < 0.40) return 'walker';
+          if (r < 0.70) return 'runner';
+          if (r < 0.86) return 'tank';
+          return r < 0.93 ? 'demolisher' : 'wrecker';
+        };
+        const survivalBatch = [];
+        let bIdx = 0;
+        for (const [breachKey] of this.spawns.entries()) {
+          const assignedPlayerId = activeOwners.length > 0 ? activeOwners[bIdx % activeOwners.length] : null;
+          bIdx++;
+          for (let k = 0; k < perBreach; k++) {
+            const zType = pickSurvivalZombieType();
+            if (zType === 'walker') cfg.walkers++;
+            else if (zType === 'runner') cfg.runners++;
+            else if (zType === 'tank') cfg.tanks++;
+            else if (zType === 'demolisher') cfg.demolishers++;
+            else if (zType === 'wrecker') cfg.wreckers++;
+            survivalBatch.push(
+              assignedPlayerId
+                ? { type: zType, breachKey, assignedPlayerId }
+                : { type: zType, breachKey }
+            );
+          }
+        }
+        for (let i = survivalBatch.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [survivalBatch[i], survivalBatch[j]] = [survivalBatch[j], survivalBatch[i]];
+        }
+        this.waveSpawnQueue.push(...survivalBatch);
+      } else {
+        const mpScaleArr = [1.0, 1.0, 1.4, 1.8, 2.2];
+        const mpMult = this.isMultiplayer
+          ? (mpScaleArr[Math.min(4, Math.max(1, (this.mpPlayers || []).length))] || 1.0)
+          : 1.0;
+        const scaleCnt = (n) => (n > 0 ? Math.max(1, Math.round(n * mpMult)) : 0);
+
+        cfg = (this.isTutorialMode && w === 1)
+          ? { walkers: 4, runners: 0, tanks: 0, demolishers: 0, wreckers: 0 }
+          : {
+              walkers: scaleCnt(8 + L * 2 + w * 3),
+              runners: scaleCnt(w >= 2 ? 3 + L + w * 2 : 0),
+              tanks: scaleCnt(w >= 3 ? 2 + Math.floor((w - 2) * 1.3) : 0),
+              demolishers: scaleCnt(allowSiege ? Math.min(2, 1 + Math.floor((w - 6) / 3)) : 0),
+              wreckers: scaleCnt(allowSiege ? Math.min(2, 1 + Math.floor((w - 6) / 2)) : 0)
+            };
+
+        const batch = [];
+        for (let i = 0; i < cfg.walkers; i++) batch.push('walker');
+        for (let i = 0; i < cfg.runners; i++) batch.push('runner');
+        for (let i = 0; i < cfg.tanks; i++) batch.push('tank');
+        for (let i = 0; i < cfg.demolishers; i++) batch.push('demolisher');
+        for (let i = 0; i < cfg.wreckers; i++) batch.push('wrecker');
+
+        for (let i = batch.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [batch[i], batch[j]] = [batch[j], batch[i]];
+        }
+
+        if (this.isMultiplayer && this.isMpHost) {
+          const activeOwners = Array.from(new Set(Array.from(this.safeZones.values()).map((sz) => sz.ownerId).filter(Boolean)));
+          if (activeOwners.length > 0) {
+            const assignedBatch = batch.map((t, idx) => ({
+              type: t,
+              assignedPlayerId: activeOwners[idx % activeOwners.length]
+            }));
+            this.waveSpawnQueue.push(...assignedBatch);
+          } else {
+            this.waveSpawnQueue.push(...batch);
+          }
+        } else {
+          this.waveSpawnQueue.push(...batch);
+        }
+      }
+      if (this.spawnTimer <= 0) this.spawnTimer = 0.35;
 
       this.computeThreatMultipliers();
       const earlyNote = wasEarly ? ` (+$${earlyBonus} early launch bonus!)` : '';
@@ -6346,8 +6445,9 @@
 
       const esc = this.computeThreatMultipliers();
       const devHp = this.devZombieHpMult || 1.0;
+      const devSpd = this.devZombieSpeedMult || 1.0;
       const hp = Math.max(1, Math.round(T.hp * this.zombieHpMult * esc.hp * devHp));
-      const speed = Math.round(T.speed * this.zombieSpeedMult * esc.speed);
+      const speed = Math.max(5, Math.round(T.speed * this.zombieSpeedMult * esc.speed * devSpd));
       const dmg = Math.round(T.dmg * esc.dmg);
 
       return {
@@ -6380,6 +6480,7 @@
 
       const type = typeof entry === 'string' ? entry : (entry && entry.type) || 'walker';
       const assignedPlayerId = typeof entry === 'object' && entry ? (entry.assignedPlayerId || null) : null;
+      const breachKey = typeof entry === 'object' && entry ? (entry.breachKey || null) : null;
 
       // Enforce Wave 6+ gate and Max 4 Combined on-screen cap for Demolisher & Wrecker
       let actualType = type;
@@ -6389,22 +6490,33 @@
         }
       }
 
-      const allSpawns = Array.from(this.spawns.values());
-      const activeBreaches = allSpawns.filter((sp) => !(sp.dormantTimer > 0));
-      if (activeBreaches.length === 0) {
-        this.waveSpawnQueue.unshift(entry);
-        return;
-      }
-      const breachList = activeBreaches;
-      let pick = breachList[Math.floor(Math.random() * breachList.length)];
-      if (this.isMultiplayer && assignedPlayerId && breachList.length > 1) {
-        const pZones = Array.from(this.safeZones.values()).filter((sz) => sz.ownerId === assignedPlayerId);
-        if (pZones.length > 0) {
-          const cx = pZones.reduce((s, sz) => s + sz.x, 0) / pZones.length;
-          const cy = pZones.reduce((s, sz) => s + sz.y, 0) / pZones.length;
-          const sorted = breachList.slice().sort((a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy));
-          const poolCount = Math.min(2, sorted.length);
-          pick = sorted[Math.floor(Math.random() * poolCount)];
+      let pick = null;
+      if (breachKey) {
+        const targetBreach = this.spawns.get(breachKey);
+        if (!targetBreach) return; // Discard entries for breaches destroyed mid-wave
+        if (targetBreach.dormantTimer > 0) {
+          this.waveSpawnQueue.push(entry);
+          return;
+        }
+        pick = targetBreach;
+      } else {
+        const allSpawns = Array.from(this.spawns.values());
+        const activeBreaches = allSpawns.filter((sp) => !(sp.dormantTimer > 0));
+        if (activeBreaches.length === 0) {
+          this.waveSpawnQueue.unshift(entry);
+          return;
+        }
+        const breachList = activeBreaches;
+        pick = breachList[Math.floor(Math.random() * breachList.length)];
+        if (this.isMultiplayer && assignedPlayerId && breachList.length > 1) {
+          const pZones = Array.from(this.safeZones.values()).filter((sz) => sz.ownerId === assignedPlayerId);
+          if (pZones.length > 0) {
+            const cx = pZones.reduce((s, sz) => s + sz.x, 0) / pZones.length;
+            const cy = pZones.reduce((s, sz) => s + sz.y, 0) / pZones.length;
+            const sorted = breachList.slice().sort((a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy));
+            const poolCount = Math.min(2, sorted.length);
+            pick = sorted[Math.floor(Math.random() * poolCount)];
+          }
         }
       }
       const z = this.makeZombie(actualType, pick.x, pick.y);
@@ -6434,6 +6546,9 @@
         const key = `${breach.col},${breach.row}`;
         this.spawns.delete(key);
         this.grid[breach.row][breach.col] = 0;
+        if (Array.isArray(this.waveSpawnQueue) && this.waveSpawnQueue.length > 0) {
+          this.waveSpawnQueue = this.waveSpawnQueue.filter((entry) => !(typeof entry === 'object' && entry && entry.breachKey === key));
+        }
 
         if (this.isMultiplayer) {
           const ownerId = (sourceUnitOrStruct && sourceUnitOrStruct.ownerId) || this.getNearestSafeZoneOwner(breach.x, breach.y);
@@ -8764,8 +8879,8 @@
         return anchors;
       }
 
-      // Case 2: Non-wall structure standing directly on a green Safe Zone tile (walkable directly)
-      if (targetStruct.type !== 'wall') {
+      // Case 2: Non-barrier structure standing directly on a green Safe Zone tile (walkable directly)
+      if (targetStruct.type !== 'wall' && targetStruct.type !== 'gate') {
         if (this.grid[row][col] === 2 && this.safeZones.has(key) && !this.engineerBlocked(col, row)) {
           pushAnchor(col, row);
           for (const [dc, dr] of DIRS_8) {
@@ -8775,7 +8890,10 @@
         return anchors;
       }
 
-      // Case 3: Barricade ('wall') -> eligible if part of a contiguous 8-way/4-way chain touching a green Safe Zone tile
+      // Case 3: Barricade ('wall') or Security Gate ('gate') -> eligible if part of a contiguous 8-way chain touching a Safe Zone tile
+      if (!this.engineerBlocked(col, row)) {
+        pushAnchor(col, row);
+      }
       const wallQueue = [[col, row]];
       const wallSeen = new Set([key]);
       for (let h = 0; h < wallQueue.length && h < TOTAL_CELLS; h++) {
@@ -8785,14 +8903,13 @@
           const nr = wr + dr;
           if (!inBounds(nc, nr)) continue;
           const nKey = `${nc},${nr}`;
+          const nSt = this.structures.get(nKey);
           if (!this.engineerBlocked(nc, nr)) {
             pushAnchor(nc, nr);
-          } else {
-            const nSt = this.structures.get(nKey);
-            if (nSt && nSt.type === 'wall' && !wallSeen.has(nKey)) {
-              wallSeen.add(nKey);
-              wallQueue.push([nc, nr]);
-            }
+          }
+          if (nSt && (nSt.type === 'wall' || nSt.type === 'gate') && !wallSeen.has(nKey)) {
+            wallSeen.add(nKey);
+            wallQueue.push([nc, nr]);
           }
         }
       }
@@ -8808,7 +8925,7 @@
 
     isBarricadeConnectedToSafeZone(col, row) {
       const st = this.structures.get(`${col},${row}`);
-      if (!st || st.type !== 'wall') return false;
+      if (!st || (st.type !== 'wall' && st.type !== 'gate')) return false;
       return this.getEngineerEligibleAnchors(st).length > 0;
     }
 
@@ -9078,7 +9195,7 @@
         const key = `${struct.col},${struct.row}`;
         const canAutoRepair = struct.type === 'safezone'
           || this.safeZones.has(key)
-          || (struct.type === 'wall' && this.isBarricadeConnectedToSafeZone(struct.col, struct.row));
+          || ((struct.type === 'wall' || struct.type === 'gate') && this.isBarricadeConnectedToSafeZone(struct.col, struct.row));
         this.inspectRepairStatus.innerText = canAutoRepair
           ? 'Engineer Auto-Repair Active'
           : 'Build Safe Zone Under to Repair';
@@ -9771,7 +9888,7 @@
 
                 const key = `${entity.col},${entity.row}`;
                 const canAutoRepair = this.safeZones.has(key)
-                  || (entity.type === 'wall' && this.isBarricadeConnectedToSafeZone(entity.col, entity.row));
+                  || ((entity.type === 'wall' || entity.type === 'gate') && this.isBarricadeConnectedToSafeZone(entity.col, entity.row));
                 parts.push(canAutoRepair ? 'Auto-Repair: ON' : 'Auto-Repair: OFF');
               }
             }
@@ -10019,7 +10136,7 @@
           let burst = 0;
           while (this.spawnTimer <= 0 && this.waveSpawnQueue.length > 0 && burst < 4) {
             const baseInterval = (this.isEndlessMode ? Math.max(0.28, 0.72 - this.wave * 0.025) : 0.7) + Math.random() * 0.35;
-            const loadScale = this.spawns.size / Math.max(1, this.initialSpawnCount || 1);
+            const loadScale = Math.min(1.0, this.spawns.size / Math.max(1, this.initialSpawnCount || 1));
             const effectiveInterval = Math.max(0.05, baseInterval * loadScale);
             this.spawnTimer += effectiveInterval;
             const nextType = this.waveSpawnQueue.shift();
@@ -10768,7 +10885,7 @@
           }
         }
 
-        // If standing on a valid anchor for target (Safe Zone structure OR Safe Zone tile touching connected Barricade chain), weld at $0 Scrap!
+        // If standing on a valid anchor for target (Safe Zone structure OR Safe Zone tile touching connected Barricade/Gate chain), weld at $0 Scrap!
         let target = eng.repairTarget || this.findNearestDamagedStructureOrSafeZone(eng.x, eng.y);
         if (target && this.isEngineerAtRepairAnchor(eng, target)) {
           eng.repairTarget = target;
@@ -10778,6 +10895,50 @@
           const before = target.hp;
           target.hp = Math.min(target.maxHp, target.hp + heal);
           eng.repairedTotal = (eng.repairedTotal || 0) + (target.hp - before);
+          if (target.type === 'wall' || target.type === 'gate') {
+            for (const [dc, dr] of DIRS_8) {
+              const adj = this.structures.get(`${target.col + dc},${target.row + dr}`);
+              if (adj && (adj.type === 'wall' || adj.type === 'gate') && adj.hp < adj.maxHp) {
+                const adjBefore = adj.hp;
+                adj.hp = Math.min(adj.maxHp, adj.hp + heal * 0.5);
+                eng.repairedTotal = (eng.repairedTotal || 0) + (adj.hp - adjBefore);
+                if (Math.random() < 0.12) {
+                  this.addParticles(adj.x + (Math.random() - 0.5) * 10, adj.y + (Math.random() - 0.5) * 10, '#00E5FF', 1, 18);
+                }
+              }
+            }
+            if (target.hp >= target.maxHp) {
+              const q = [[target.col, target.row]];
+              const seen = new Set([`${target.col},${target.row}`]);
+              let nextLinked = null;
+              for (let h = 0; h < q.length && h < TOTAL_CELLS && !nextLinked; h++) {
+                const [wc, wr] = q[h];
+                for (const [dc, dr] of DIRS_8) {
+                  const nc = wc + dc;
+                  const nr = wr + dr;
+                  const nKey = `${nc},${nr}`;
+                  if (!inBounds(nc, nr) || seen.has(nKey)) continue;
+                  const nSt = this.structures.get(nKey);
+                  if (nSt && (nSt.type === 'wall' || nSt.type === 'gate')) {
+                    seen.add(nKey);
+                    q.push([nc, nr]);
+                    if (nSt.hp < nSt.maxHp && this.getEngineerEligibleAnchors(nSt).length > 0) {
+                      nextLinked = nSt;
+                      break;
+                    }
+                  }
+                }
+              }
+              if (nextLinked) {
+                eng.repairTarget = nextLinked;
+                if (!this.isEngineerAtRepairAnchor(eng, nextLinked)) {
+                  this.commandEngineerToTarget(eng, nextLinked);
+                }
+              } else {
+                eng.repairTarget = null;
+              }
+            }
+          }
           if (target.type === 'safezone') this.recalcBaseIntegrity();
           if (Math.random() < 0.25) {
             this.addParticles(target.x + (Math.random() - 0.5) * 14, target.y + (Math.random() - 0.5) * 14, '#00E5FF', 1, 22);
@@ -10936,6 +11097,27 @@
         return weak;
       }
       return st;
+    }
+
+    findNearestBarrierOrStructure(zx, zy) {
+      let bestBarrier = null;
+      let bestBarrierD = Infinity;
+      let bestOther = null;
+      let bestOtherD = Infinity;
+      for (const st of this.structures.values()) {
+        if (!st || st.hp <= 0) continue;
+        const d = Math.hypot(st.x - zx, st.y - zy);
+        if (st.type === 'wall' || st.type === 'gate') {
+          if (d < bestBarrierD) {
+            bestBarrierD = d;
+            bestBarrier = st;
+          }
+        } else if (d < bestOtherD) {
+          bestOtherD = d;
+          bestOther = st;
+        }
+      }
+      return bestBarrier || bestOther || null;
     }
 
     updateZombies(dt) {
@@ -11118,6 +11300,16 @@
           }
         }
 
+        // 4. Fallback to nearest Barricade/Security Gate (or any destructible structure) if no Safe Zone can be targeted
+        if (closest === Infinity || tx === -1) {
+          const fb = this.findNearestBarrierOrStructure(z.x, z.y);
+          if (fb) {
+            closest = Math.hypot(fb.x - z.x, fb.y - z.y);
+            tx = fb.x;
+            ty = fb.y;
+          }
+        }
+
         const zc = Math.floor(z.x / TILE_SIZE);
         const zr = Math.floor(z.y / TILE_SIZE);
         const structDmg = this.getZombieStructDmg(z);
@@ -11182,6 +11374,15 @@
               path = findZombiePath(zc, zr, gc, gr, (c, r) => this.zombieRockOnly(c, r));
             }
           }
+          if (!path) {
+            const fb = this.findNearestBarrierOrStructure(z.x, z.y);
+            if (fb) {
+              tx = fb.x;
+              ty = fb.y;
+              closest = Math.hypot(fb.x - z.x, fb.y - z.y);
+              path = findZombiePath(zc, zr, fb.col, fb.row, (c, r) => this.zombieRockOnly(c, r));
+            }
+          }
           if (path) {
             const rawOx = z.laneOffsetX || 0;
             const rawOy = z.laneOffsetY || 0;
@@ -11243,46 +11444,74 @@
             z.angle = Math.atan2(node.y - z.y, node.x - z.x);
             this.stepToward(z, node.x, node.y, z.speed * dt, true);
           }
-        } else if (tx !== -1 && closest < TILE_SIZE * 1.5 && closest !== Infinity) {
-          const tc = Math.floor(tx / TILE_SIZE);
-          const tr = Math.floor(ty / TILE_SIZE);
-          const st = this.resolveZombieWallTarget(z, this.structures.get(`${tc},${tr}`) || this.structures.get(`${zc},${zr}`));
-          const szTarget = this.safeZones.get(`${tc},${tr}`);
-          if (st) {
-            z.angle = Math.atan2(st.y - z.y, st.x - z.x);
+        } else if (tx !== -1 && closest !== Infinity) {
+          const aimAng = Math.atan2(ty - z.y, tx - z.x);
+          const aheadC = Math.floor((z.x + Math.cos(aimAng) * TILE_SIZE * 0.65) / TILE_SIZE);
+          const aheadR = Math.floor((z.y + Math.sin(aimAng) * TILE_SIZE * 0.65) / TILE_SIZE);
+          const blockingAhead = this.resolveZombieWallTarget(
+            z,
+            this.structures.get(`${aheadC},${aheadR}`) || this.structures.get(`${zc},${zr}`)
+          );
+          if (blockingAhead) {
+            z.angle = Math.atan2(blockingAhead.y - z.y, blockingAhead.x - z.x);
             z.attackTimer -= dt;
             if (z.attackTimer <= 0) {
               z.attackTimer = attackInterval;
-              st.hp -= structDmg;
-              st.flash = 0.14;
+              blockingAhead.hp -= structDmg;
+              blockingAhead.flash = 0.14;
               this.sound.playHit();
-              this.addParticles(st.x, st.y, '#B833FF', 6, 45);
-              if (st.hp <= 0) {
-                this.destroyStructure(st);
+              const sparkCol = z.type === 'wrecker' ? '#B833FF' : z.type === 'demolisher' ? '#FF9A1F' : '#D2B48C';
+              this.addParticles(blockingAhead.x, blockingAhead.y, sparkCol, 6, 45);
+              if (blockingAhead.hp <= 0) {
+                this.destroyStructure(blockingAhead);
                 z.path = [];
                 z.repathTimer = 0;
               }
             }
-          } else if (szTarget) {
-            z.angle = Math.atan2(szTarget.y - z.y, szTarget.x - z.x);
-            z.attackTimer -= dt;
-            if (z.attackTimer <= 0) {
-              z.attackTimer = attackInterval;
-              szTarget.hp -= structDmg;
-              szTarget.flash = 0.14;
-              this.recalcBaseIntegrity();
-              this.sound.playHit();
-              this.addParticles(szTarget.x, szTarget.y, '#00E08A', 5, 38);
-              if (szTarget.hp <= 0) {
-                this.destroySafeZoneBlock(szTarget);
-                z.path = [];
-                z.repathTimer = 0;
-              } else {
-                this.updateHUD();
+          } else if (closest < TILE_SIZE * 1.5) {
+            const tc = Math.floor(tx / TILE_SIZE);
+            const tr = Math.floor(ty / TILE_SIZE);
+            const st = this.resolveZombieWallTarget(z, this.structures.get(`${tc},${tr}`) || this.structures.get(`${zc},${zr}`));
+            const szTarget = this.safeZones.get(`${tc},${tr}`);
+            if (st) {
+              z.angle = Math.atan2(st.y - z.y, st.x - z.x);
+              z.attackTimer -= dt;
+              if (z.attackTimer <= 0) {
+                z.attackTimer = attackInterval;
+                st.hp -= structDmg;
+                st.flash = 0.14;
+                this.sound.playHit();
+                this.addParticles(st.x, st.y, '#B833FF', 6, 45);
+                if (st.hp <= 0) {
+                  this.destroyStructure(st);
+                  z.path = [];
+                  z.repathTimer = 0;
+                }
               }
+            } else if (szTarget) {
+              z.angle = Math.atan2(szTarget.y - z.y, szTarget.x - z.x);
+              z.attackTimer -= dt;
+              if (z.attackTimer <= 0) {
+                z.attackTimer = attackInterval;
+                szTarget.hp -= structDmg;
+                szTarget.flash = 0.14;
+                this.recalcBaseIntegrity();
+                this.sound.playHit();
+                this.addParticles(szTarget.x, szTarget.y, '#00E08A', 5, 38);
+                if (szTarget.hp <= 0) {
+                  this.destroySafeZoneBlock(szTarget);
+                  z.path = [];
+                  z.repathTimer = 0;
+                } else {
+                  this.updateHUD();
+                }
+              }
+            } else {
+              z.angle = aimAng;
+              this.stepToward(z, tx, ty, z.speed * dt, false);
             }
-          } else {
-            z.angle = Math.atan2(ty - z.y, tx - z.x);
+          } else if (!this.zombieRockOnly(aheadC, aheadR)) {
+            z.angle = aimAng;
             this.stepToward(z, tx, ty, z.speed * dt, false);
           }
         }
