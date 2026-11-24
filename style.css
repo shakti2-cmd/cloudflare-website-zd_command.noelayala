@@ -1,4 +1,4 @@
-/* Zombie Defense Command v0.48.0 - tactical command-center theme (offline, zero layout shift) */
+/* Zombie Defense Command v0.49.0 - tactical command-center theme (offline, zero layout shift) */
 :root {
   --bg: #07090d;
   --panel: #0e131b;
@@ -1268,6 +1268,27 @@ body.is-mobile-touch #btnHudHelp,
 body.is-mobile-touch #btnHudSettings {
   display: none !important;
 }
+body:not(.is-mobile-touch) #topHud {
+  justify-content: center;
+  gap: 12px;
+}
+body:not(.is-mobile-touch) #topHud .hud-brand,
+body:not(.is-mobile-touch) #topHud .hud-stats,
+body:not(.is-mobile-touch) #topHud .hud-controls {
+  flex: 0 0 auto;
+}
+body:not(.is-mobile-touch) #btnHudZombies,
+body:not(.is-mobile-touch) #hudThreatBadge,
+body:not(.is-mobile-touch) .timer-badge,
+body:not(.is-mobile-touch) .base-badge,
+body:not(.is-mobile-touch) .soldier-badge {
+  display: none !important;
+}
+#btnHudSettings {
+  font-size: 15px;
+  padding: 4px 10px;
+  min-width: 36px;
+}
 body:not(.is-mobile-touch) .settings-mobile-only {
   display: none !important;
 }
@@ -2499,7 +2520,7 @@ body.is-mobile-touch .ability-btn {
 
 
 /* ==========================================================================
-   v0.48.0 QUARANTINE OUTPOST TACTICAL THEME (Start Screen + All Modals)
+   v0.49.0 QUARANTINE OUTPOST TACTICAL THEME (Start Screen + All Modals)
    (In-game #topHud / #commandDeck / #buildPanel / #gameCanvas untouched)
    ========================================================================== */
 

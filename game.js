@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.48.0 (Medic Zombie-Kiting & Reliable Engineering Garrisoning)
+ * Version: v0.49.0 (Medic Zombie-Kiting & Reliable Engineering Garrisoning)
  */
 
 (function () {
@@ -1630,7 +1630,7 @@
       this.arsenalTabUnits = $('arsenalTabUnits');
       this.arsenalTabTowers = $('arsenalTabTowers');
 
-      // Developer Tuning UI Elements (v0.48.0)
+      // Developer Tuning UI Elements (v0.49.0)
       this.developerModal = $('developerModal');
       this.btnCloseDeveloper = $('btnCloseDeveloper');
       this.btnDoneDeveloper = $('btnDoneDeveloper');
@@ -1864,7 +1864,7 @@
       on(this.tabArsenalUnits, 'click', () => { this.setArsenalTab('units'); this.sound.playClick(); });
       on(this.tabArsenalTowers, 'click', () => { this.setArsenalTab('towers'); this.sound.playClick(); });
 
-      // Developer Tuning Modal bindings (v0.48.0)
+      // Developer Tuning Modal bindings (v0.49.0)
       on(this.btnSettingsDeveloper, 'click', () => this.openDeveloperModal());
       on(this.btnCloseDeveloper, 'click', () => this.closeDeveloperModal());
       on(this.btnDoneDeveloper, 'click', () => this.closeDeveloperModal());
@@ -11092,6 +11092,7 @@
     renderBuildingUnitFloatMenu(struct, isAllyReadOnly = false) {
       if (!this.buildingUnitFloatMenu) return;
       if (!struct || isAllyReadOnly || (struct.type !== 'barracks' && struct.type !== 'engineering' && struct.type !== 'habitat')) {
+        this._lastFloatMenuHtml = '';
         hideEl(this.buildingUnitFloatMenu);
         return;
       }
@@ -11186,12 +11187,17 @@
         );
       }
 
-      this.buildingUnitFloatMenu.innerHTML = `<div class="float-unit-title">${headerTitle}</div>` + extraHeaderHtml + buttons.join('');
+      const nextHtml = `<div class="float-unit-title">${headerTitle}</div>` + extraHeaderHtml + buttons.join('');
+      if (this._lastFloatMenuHtml !== nextHtml) {
+        this.buildingUnitFloatMenu.innerHTML = nextHtml;
+        this._lastFloatMenuHtml = nextHtml;
+      }
       showEl(this.buildingUnitFloatMenu, 'flex');
     }
 
     renderSoldierInspector(soldier) {
       if (!this.upgradePanel || !soldier) return;
+      this._lastFloatMenuHtml = '';
       hideEl(this.buildingUnitFloatMenu);
       this.upgradePanel.classList.remove('details-expanded', 'is-ally-readonly');
       this.salvageConfirmId = null;
@@ -11531,6 +11537,7 @@
       if (this.btnSalvage) this.btnSalvage.classList.remove('confirming');
       if (this.btnMoveStructure) this.btnMoveStructure.classList.remove('moving-active', 'on-cooldown');
       if (this.upgradePanel) this.upgradePanel.classList.remove('details-expanded');
+      this._lastFloatMenuHtml = '';
       hideEl(this.buildingUnitFloatMenu);
       hideEl(this.upgradePanel);
       if (this.mobileFloatingDetails) this.mobileFloatingDetails.classList.add('hidden');
