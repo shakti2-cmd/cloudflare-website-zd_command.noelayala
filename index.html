@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Zombie Defense Command - Tactical Grid Survival (v0.47.0)</title>
+  <title>Zombie Defense Command - Tactical Grid Survival (v0.47.1)</title>
 
   <!-- PWA & Mobile Web App Meta -->
-  <meta name="theme-color" content="#07090d">
+  <meta name="theme-color" content="#050c14">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -24,13 +24,70 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Quarantine Outpost Boot Loading Screen -->
+  <div id="appBootSplash" class="app-boot-splash" role="status" aria-label="Loading Zombie Defense Command">
+    <div class="boot-hex-frame">
+      <svg class="boot-bio-svg" viewBox="0 0 120 120" width="76" height="76" aria-hidden="true">
+        <defs>
+          <mask id="bootBioCut">
+            <rect width="120" height="120" fill="white"/>
+            <circle cx="60" cy="60" r="6.5" fill="black"/>
+            <circle cx="60" cy="40" r="8" fill="black"/>
+            <circle cx="77.3" cy="70" r="8" fill="black"/>
+            <circle cx="42.7" cy="70" r="8" fill="black"/>
+            <path d="M60 60 L57 18 L63 18 Z" fill="black"/>
+            <path d="M60 60 L97 79 L94 84 Z" fill="black"/>
+            <path d="M60 60 L26 84 L23 79 Z" fill="black"/>
+          </mask>
+        </defs>
+        <polygon points="60,6 107,33 107,87 60,114 13,87 13,33" fill="rgba(7,19,31,0.9)" stroke="#00e5ff" stroke-width="2.5"/>
+        <g mask="url(#bootBioCut)">
+          <circle cx="60" cy="43" r="16" fill="#3bff92"/>
+          <circle cx="74.7" cy="68.5" r="16" fill="#3bff92"/>
+          <circle cx="45.3" cy="68.5" r="16" fill="#3bff92"/>
+          <circle cx="60" cy="60" r="13.5" fill="none" stroke="#3bff92" stroke-width="4.2"/>
+        </g>
+      </svg>
+    </div>
+    <div class="boot-title-top">ZOMBIE DEFENSE</div>
+    <div class="boot-title-sub">COMMAND</div>
+    <div class="boot-bar-track"><div class="boot-bar-fill"></div></div>
+    <div class="boot-status">INITIALIZING OUTPOST SYSTEMS...</div>
+  </div>
+  <script>
+    (function () {
+      var hidden = false;
+      function dismissBootSplash() {
+        if (hidden) return;
+        hidden = true;
+        var el = document.getElementById('appBootSplash');
+        if (!el) return;
+        el.classList.add('fade-out');
+        setTimeout(function () {
+          if (el && el.parentNode) el.style.display = 'none';
+        }, 420);
+      }
+      if (document.readyState === 'complete') {
+        setTimeout(dismissBootSplash, 260);
+      } else {
+        window.addEventListener('load', function () {
+          setTimeout(dismissBootSplash, 280);
+        });
+        document.addEventListener('DOMContentLoaded', function () {
+          setTimeout(dismissBootSplash, 480);
+        });
+      }
+      setTimeout(dismissBootSplash, 1500);
+    })();
+  </script>
+
   <div id="gameContainer">
 
     <!-- Top tactical HUD (Strictly fixed 52px height) -->
     <header id="topHud">
       <div class="hud-brand">
         <span class="hud-logo">&#9763;</span>
-        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.47.0</small></span>
+        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.47.1</small></span>
       </div>
 
       <div class="hud-stats">
@@ -111,7 +168,7 @@
         <button id="btnCamFocusBase" class="cam-btn cam-base-btn" type="button" title="Center Camera on Safe Zone Base">&#8982; Base</button>
       </div>
 
-      <!-- Tactical Active Abilities Bar (v0.47.0: Overcharge & Napalm) -->
+      <!-- Tactical Active Abilities Bar (v0.47.1: Overcharge & Napalm) -->
       <div id="abilityBar" class="ability-bar hidden" role="toolbar" aria-label="Tactical Abilities">
         <button id="btnAbilityOvercharge" class="ability-btn" type="button" title="Overcharge ($200, 25s CD): +50% turret fire rate for 10s">
           <span class="ability-icon">&#9889;</span>
@@ -143,24 +200,37 @@
         <span id="tutorialUiArrowGlyph" class="tutorial-ui-arrow-glyph">&#9660;</span>
       </div>
 
-      <!-- Startup screen (v0.47.0: Quarantine Outpost Tactical Theme) -->
+      <!-- Startup screen (v0.47.1: Quarantine Outpost Tactical Theme) -->
       <div id="startScreenOverlay" class="modal-overlay">
         <div class="modal-card start-card">
           <div class="start-hero-header">
             <div class="start-icon" aria-hidden="true">
-              <svg viewBox="0 0 64 64" width="46" height="46" fill="none">
-                <circle cx="32" cy="32" r="7" stroke="currentColor" stroke-width="2.6"/>
-                <path d="M32 10a15 15 0 0 1 13 22.5M51 43a15 15 0 0 1-26 0M13 43a15 15 0 0 1 13-22.5" stroke="currentColor" stroke-width="4.2" stroke-linecap="round"/>
-                <circle cx="32" cy="21" r="6" stroke="currentColor" stroke-width="2.4"/>
-                <circle cx="41.5" cy="37.5" r="6" stroke="currentColor" stroke-width="2.4"/>
-                <circle cx="22.5" cy="37.5" r="6" stroke="currentColor" stroke-width="2.4"/>
+              <svg viewBox="0 0 120 120" width="52" height="52">
+                <defs>
+                  <mask id="heroBioCut">
+                    <rect width="120" height="120" fill="white"/>
+                    <circle cx="60" cy="60" r="7" fill="black"/>
+                    <circle cx="60" cy="38" r="9" fill="black"/>
+                    <circle cx="79" cy="71" r="9" fill="black"/>
+                    <circle cx="41" cy="71" r="9" fill="black"/>
+                    <path d="M60 60 L56.8 14 L63.2 14 Z" fill="black"/>
+                    <path d="M60 60 L100 81 L96.8 86.5 Z" fill="black"/>
+                    <path d="M60 60 L23.2 86.5 L20 81 Z" fill="black"/>
+                  </mask>
+                </defs>
+                <g mask="url(#heroBioCut)">
+                  <circle cx="60" cy="41.5" r="18.5" fill="currentColor"/>
+                  <circle cx="76" cy="69.5" r="18.5" fill="currentColor"/>
+                  <circle cx="44" cy="69.5" r="18.5" fill="currentColor"/>
+                  <circle cx="60" cy="60" r="15.5" fill="none" stroke="currentColor" stroke-width="5"/>
+                </g>
               </svg>
             </div>
             <h1 class="start-title">
               <span class="title-top">ZOMBIE DEFENSE</span>
               <span class="title-sub">COMMAND</span>
             </h1>
-            <div class="start-version-badge">v0.47.0</div>
+            <div class="start-version-badge">v0.47.1</div>
           </div>
 
           <div id="startMainSection">
@@ -321,11 +391,11 @@
             <option value="tutorial">Tutorial: Basic Training</option>
           </select>
 
-          <div class="start-hint">v0.47.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause</div>
+          <div class="start-hint">v0.47.1 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause</div>
         </div>
       </div>
 
-      <!-- Settings Modal (v0.47.0) -->
+      <!-- Settings Modal (v0.47.1) -->
       <div id="settingsModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
         <div class="modal-card settings-card">
           <button id="btnCloseSettings" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
@@ -396,7 +466,7 @@
         </div>
       </div>
 
-      <!-- Developer Tuning Modal (v0.47.0: Live Multiplier Overrides) -->
+      <!-- Developer Tuning Modal (v0.47.1: Live Multiplier Overrides) -->
       <div id="developerModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="devTitle">
         <div class="modal-card dev-card">
           <button id="btnCloseDeveloper" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
@@ -672,7 +742,7 @@
       <div id="howToPlayModal" class="modal-overlay hidden">
         <div class="modal-card help-card">
           <button id="btnCloseHowToPlay" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.47.0)</h2>
+          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.47.1)</h2>
           <div class="help-grid">
             <section>
               <h3>Single 3&times;3 Start &amp; Line-Drag Barricades</h3>
@@ -709,7 +779,7 @@
       <div id="zombieGuideModal" class="modal-overlay hidden">
         <div class="modal-card help-card zombie-guide-card">
           <button id="btnCloseZombieGuide" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.47.0)</h2>
+          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.47.1)</h2>
           <div id="bestiaryHardIndicator" class="bestiary-hard-indicator hidden">&#9888; HARD MODE ACTIVE: 4.0&times; ZOMBIE HP APPLIED</div>
           <p class="bestiary-note"><b class="c-orange">25% Random Brute-Breach Trait:</b> Any spawned Walker, Runner, Tank, or Wrecker has a 25% chance (100% on Demolisher) to smash straight toward Safe Zones, dealing a <b>fixed unscaled 12 damage</b> (<b>16 damage</b> for Demolishers) per strike against structures &amp; Safe Zones.</p>
           <div class="zombie-intel-list">
@@ -769,11 +839,11 @@
         </div>
       </div>
 
-      <!-- Units & Towers Field Guide Modal (v0.47.0) -->
+      <!-- Units & Towers Field Guide Modal (v0.47.1) -->
       <div id="arsenalGuideModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="arsenalTitle">
         <div class="modal-card help-card arsenal-guide-card">
           <button id="btnCloseArsenalGuide" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 id="arsenalTitle" class="help-title">&#9876; UNITS &amp; TOWERS FIELD GUIDE (v0.47.0)</h2>
+          <h2 id="arsenalTitle" class="help-title">&#9876; UNITS &amp; TOWERS FIELD GUIDE (v0.47.1)</h2>
           <div class="arsenal-tabs" role="tablist" aria-label="Units and Towers Tabs">
             <button type="button" id="tabArsenalUnits" class="arsenal-tab-btn active" data-arsenal-tab="units" role="tab" aria-selected="true">Units</button>
             <button type="button" id="tabArsenalTowers" class="arsenal-tab-btn" data-arsenal-tab="towers" role="tab" aria-selected="false">Towers</button>
@@ -909,7 +979,7 @@
         </div>
       </div>
 
-      <!-- 4-Player Co-Op Multiplayer Modals (v0.47.0) -->
+      <!-- 4-Player Co-Op Multiplayer Modals (v0.47.1) -->
       <div id="mpRoleModal" class="modal-overlay hidden">
         <div class="modal-card mp-card">
           <h2 class="help-title mp-modal-title">&#127760; 4-PLAYER CO-OP MULTIPLAYER</h2>
@@ -1041,7 +1111,7 @@
         </div>
       </div>
 
-      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.47.0) -->
+      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.47.1) -->
       <div id="mpPauseModal" class="modal-overlay hidden">
         <div class="modal-card mp-card mp-pause-card">
           <h2 id="mpPauseTitle" class="help-title mp-modal-title">&#9208; MATCH PAUSED</h2>
@@ -1235,7 +1305,7 @@
         </div>
 
         <div id="deckHint">
-          <span class="hint-text">v0.47.0 &bull; Mortar ($240) / Laser ($260) / Radar ($175) &bull; Gunner / Medic / Sapper &bull; Barracks Hold Stance &bull; Overcharge &amp; Napalm</span>
+          <span class="hint-text">v0.47.1 &bull; Mortar ($240) / Laser ($260) / Radar ($175) &bull; Gunner / Medic / Sapper &bull; Barracks Hold Stance &bull; Overcharge &amp; Napalm</span>
         </div>
       </div>
     </footer>
