@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.44.0 (Medic & Sapper Free-Roam Manual Move Orders)
+ * Version: v0.45.0 (Medic Zombie-Kiting & Reliable Engineering Garrisoning)
  */
 
 (function () {
@@ -1627,7 +1627,7 @@
       this.arsenalTabUnits = $('arsenalTabUnits');
       this.arsenalTabTowers = $('arsenalTabTowers');
 
-      // Developer Tuning UI Elements (v0.44.0)
+      // Developer Tuning UI Elements (v0.45.0)
       this.developerModal = $('developerModal');
       this.btnCloseDeveloper = $('btnCloseDeveloper');
       this.btnDoneDeveloper = $('btnDoneDeveloper');
@@ -1869,7 +1869,7 @@
       on(this.tabArsenalUnits, 'click', () => { this.setArsenalTab('units'); this.sound.playClick(); });
       on(this.tabArsenalTowers, 'click', () => { this.setArsenalTab('towers'); this.sound.playClick(); });
 
-      // Developer Tuning Modal bindings (v0.44.0)
+      // Developer Tuning Modal bindings (v0.45.0)
       on(this.btnSettingsDeveloper, 'click', () => this.openDeveloperModal());
       on(this.btnCloseDeveloper, 'click', () => this.closeDeveloperModal());
       on(this.btnDoneDeveloper, 'click', () => this.closeDeveloperModal());
@@ -10614,7 +10614,7 @@
       this.sound.playClick();
       this.renderEngineerInspector(engineer);
       if (engineer.unitKind === 'medic') {
-        this.showStatus(`Medic (+${engineer.healRate || 18} HP/s) selected: click any walkable tile to move or Engineering to garrison.`);
+        this.showStatus(`Medic (+${engineer.healRate || 18} HP/s) selected: kites nearby zombies, heals squad, and returns to Engineering when idle.`);
       } else if (engineer.unitKind === 'sapper') {
         this.showStatus(`Sapper (max ${engineer.maxMines || 5} mines) selected: click any walkable tile to move or Engineering to garrison.`);
       } else {
@@ -12854,8 +12854,9 @@
 
         if (this.tryEnterEngineeringEngineer(eng, i)) continue;
 
-        // Specialist Engineer Branch: Medic (squad-only heal beam & base return when idle) & Sapper (continuous 5 barrier mines + Engineering return when full)
+        // Specialist Engineer Branch: Medic (squad-only heal beam, 100px zombie kiting & Engineering return when idle) & Sapper (continuous 5 barrier mines + Engineering return when full)
         if (eng.unitKind === 'medic') {
+          eng.aiTimer = Math.max(0, (eng.aiTimer || 0) - dt);
           const hRange = eng.healRange || 110;
           const hRate = eng.healRate || 18;
           let bestMate = null;
@@ -12887,7 +12888,57 @@
             eng.healBeamTarget = null;
           }
 
-          if (!eng.manualOrder && !eng.manualMoveOrder) {
+          let isKiting = false;
+          if (!eng.manualMoveOrder) {
+            let nearestZ = null;
+            let nearestD = Infinity;
+            for (const z of this.zombies) {
+              if (z.hp <= 0) continue;
+              const d = Math.hypot(z.x - eng.x, z.y - eng.y);
+              if (d < nearestD) {
+                nearestD = d;
+                nearestZ = z;
+              }
+            }
+            if (nearestZ && nearestD < 100) {
+              isKiting = true;
+              if (eng.aiTimer <= 0) {
+                eng.aiTimer = 0.20;
+                let retreatAnchor = this.findNearestAvailableEngineeringBay(eng.x, eng.y);
+                if (!retreatAnchor) {
+                  let bestSzD = Infinity;
+                  for (const sz of this.safeZones.values()) {
+                    const d = Math.hypot(sz.x - eng.x, sz.y - eng.y);
+                    if (d < bestSzD) { bestSzD = d; retreatAnchor = sz; }
+                  }
+                }
+                let bestScore = -Infinity;
+                let pick = null;
+                for (let k = 0; k < DIRS_8.length; k++) {
+                  const nc = ec + DIRS_8[k][0];
+                  const nr = er + DIRS_8[k][1];
+                  if (this.unitBlocked(nc, nr)) continue;
+                  const cPos = tileCenter(nc, nr);
+                  const dz = Math.hypot(cPos.x - nearestZ.x, cPos.y - nearestZ.y);
+                  if (dz <= nearestD) continue;
+                  const inHealBonus = (bestMate && Math.hypot(cPos.x - bestMate.x, cPos.y - bestMate.y) <= hRange) ? 300 : 0;
+                  const onSafeBonus = this.grid[nr][nc] === 2 ? 120 : 0;
+                  const anchorBonus = retreatAnchor ? -Math.hypot(cPos.x - retreatAnchor.x, cPos.y - retreatAnchor.y) * 0.65 : 0;
+                  const score = inHealBonus + onSafeBonus + dz + anchorBonus;
+                  if (score > bestScore) {
+                    bestScore = score;
+                    pick = [nc, nr];
+                  }
+                }
+                if (pick) {
+                  eng.path = [tileCenter(pick[0], pick[1])];
+                  eng.targetEngineering = null;
+                }
+              }
+            }
+          }
+
+          if (!isKiting && !eng.manualOrder && !eng.manualMoveOrder) {
             if (eng.targetEngineering && this.hasWoundedFriendlyForMedic(eng)) {
               eng.targetEngineering = null;
               eng.path = [];
