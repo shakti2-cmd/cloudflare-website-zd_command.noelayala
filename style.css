@@ -1,4 +1,4 @@
-/* Zombie Defense Command v0.32.0 - tactical command-center theme (offline, zero layout shift) */
+/* Zombie Defense Command v0.33.0 - tactical command-center theme (offline, zero layout shift) */
 :root {
   --bg: #07090d;
   --panel: #0e131b;
@@ -2114,7 +2114,7 @@ body.is-multiplayer #btnMobileReset {
   background: rgba(255, 210, 63, 0.15);
 }
 
-/* ---------- Bottom-Left Floating Vertical Unit Picker & Mobile 4-Tower Row (v0.32.0) ---------- */
+/* ---------- Bottom-Left Floating Vertical Unit Picker & Mobile 4-Tower Row (v0.33.0) ---------- */
 #buildingUnitFloatMenu {
   position: absolute;
   bottom: calc(54px + 10px);
@@ -2122,13 +2122,13 @@ body.is-multiplayer #btnMobileReset {
   z-index: 45;
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  padding: 6px;
+  gap: 4px;
+  padding: 5px;
   background: rgba(11, 16, 25, 0.96);
   border: 1px solid var(--color-cyan);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
-  min-width: 176px;
+  min-width: 144px;
 }
 #buildingUnitFloatMenu.hidden {
   display: none !important;
@@ -2137,30 +2137,32 @@ body.is-mobile-touch #buildingUnitFloatMenu {
   bottom: calc(100% + 64px);
   left: 8px;
   z-index: 30;
-  min-width: 168px;
+  min-width: 138px;
 }
 .float-unit-title {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: 9.5px;
   font-weight: 800;
-  letter-spacing: 1.5px;
+  letter-spacing: 0.8px;
+  text-transform: none;
   color: var(--color-cyan);
   text-align: left;
-  padding: 0 2px 2px;
+  padding: 0 2px 3px;
   border-bottom: 1px solid rgba(36, 48, 68, 0.7);
+  white-space: nowrap;
 }
 .float-unit-btn {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
+  gap: 6px;
+  padding: 5px 8px;
   border-radius: 6px;
   border: 1px solid var(--line);
   background: var(--panel-2);
   color: var(--text);
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 700;
   cursor: pointer;
   touch-action: manipulation;
@@ -2175,41 +2177,27 @@ body.is-mobile-touch #buildingUnitFloatMenu {
   opacity: 0.52;
   cursor: not-allowed;
 }
-.float-unit-name {
-  white-space: nowrap;
-  text-align: left;
-}
-.float-unit-meta {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  flex-shrink: 0;
-}
-.float-unit-q {
-  font-family: var(--mono);
-  font-size: 9.5px;
-  font-weight: 700;
-  color: var(--color-cyan);
-  background: rgba(0, 229, 255, 0.14);
-  border: 1px solid rgba(0, 229, 255, 0.35);
-  border-radius: 4px;
-  padding: 1px 4px;
-}
 .float-unit-cost {
   font-family: var(--mono);
   font-size: 10.5px;
   font-weight: 700;
   color: var(--color-yellow);
+  flex-shrink: 0;
+}
+.float-unit-name {
+  white-space: nowrap;
+  text-align: left;
 }
 .float-unit-lock {
+  margin-left: auto;
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 700;
   color: var(--color-orange);
   background: rgba(255, 154, 31, 0.14);
   border: 1px solid rgba(255, 154, 31, 0.35);
   border-radius: 4px;
-  padding: 1px 5px;
+  padding: 1px 4px;
   white-space: nowrap;
 }
 

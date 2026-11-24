@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.32.0 (4/8/10 Hub Scaling, Lv3 Flamethrower AoE, Bottom-Left Unit Picker, Chain Tesla Tower & Full-Width Mobile Framing)
+ * Version: v0.33.0 (Auto-Dismiss Train Unit Box, Compact Counter Header & $Price Layout, 2-Tile Flamethrower Combat Fix, & Subtle Safe Zone Opacity)
  */
 
 (function () {
@@ -333,7 +333,7 @@
     unitKind: 'flamethrower',
     name: 'Flamethrower',
     maxHp: 170,
-    range: 105,
+    range: 80,
     dmg: 24,
     rate: 0.45,
     speed: 80,
@@ -5428,6 +5428,7 @@
     }
 
     openMobileCategory(cat) {
+      this.closeUpgradePanel();
       this.activeMobileCategory = cat;
       if (this.mobileSubDrawer) showEl(this.mobileSubDrawer, 'block');
       if (this.subGroupWalls) {
@@ -9152,6 +9153,7 @@
         return;
       }
 
+      let headerTitle = 'Train Unit';
       const buttons = [];
       if (struct.type === 'barracks') {
         const cap = this.getHubCapacity(struct);
@@ -9162,23 +9164,20 @@
         const capFull = committed >= cap || globalFull;
         const commandoCost = STRUCTURE_SPECS.barracks.trainCost || 75;
         const flameCost = FLAMETHROWER_SPEC.trainCost || 100;
-        const commandoQ = q.filter((o) => (o.unitKind || 'commando') === 'commando').length;
-        const flameQ = q.filter((o) => o.unitKind === 'flamethrower').length;
         const flameUnlocked = (struct.level || 1) >= 3;
+        headerTitle = `Train Unit ${committed}/${cap}`;
 
         buttons.push(
           `<button type="button" class="float-unit-btn" data-unit-kind="commando" ${capFull || this.scrap < commandoCost ? 'disabled' : ''}>` +
-            `<span class="float-unit-name">&#9874; Commando</span>` +
-            `<span class="float-unit-meta"><span class="float-unit-q">Q:${commandoQ}</span><span class="float-unit-cost">$${commandoCost}</span></span>` +
+            `<span class="float-unit-cost">$${commandoCost}</span>` +
+            `<span class="float-unit-name">Commando</span>` +
           `</button>`
         );
         buttons.push(
           `<button type="button" class="float-unit-btn${flameUnlocked ? '' : ' locked'}" data-unit-kind="flamethrower" ${!flameUnlocked || capFull || this.scrap < flameCost ? 'disabled' : ''}>` +
-            `<span class="float-unit-name">&#128293; Flamethrower</span>` +
-            `<span class="float-unit-meta">` +
-              (flameUnlocked ? `<span class="float-unit-q">Q:${flameQ}</span>` : `<span class="float-unit-lock">Requires Lv3</span>`) +
-              `<span class="float-unit-cost">$${flameCost}</span>` +
-            `</span>` +
+            `<span class="float-unit-cost">$${flameCost}</span>` +
+            `<span class="float-unit-name">Flamethrower</span>` +
+            (flameUnlocked ? '' : `<span class="float-unit-lock">Lv3</span>`) +
           `</button>`
         );
       } else if (struct.type === 'engineering') {
@@ -9188,10 +9187,11 @@
         const committed = this.getHubRosterCount(struct) + activeLen + q.length;
         const engCost = STRUCTURE_SPECS.engineering.trainCost || 50;
         const disabled = committed >= cap || this.getTotalQueuedTrainOrders() >= 20 || this.scrap < engCost;
+        headerTitle = `Train Unit ${committed}/${cap}`;
         buttons.push(
           `<button type="button" class="float-unit-btn" data-unit-kind="engineer" ${disabled ? 'disabled' : ''}>` +
-            `<span class="float-unit-name">&#9881; Engineer</span>` +
-            `<span class="float-unit-meta"><span class="float-unit-q">Q:${q.length}</span><span class="float-unit-cost">$${engCost}</span></span>` +
+            `<span class="float-unit-cost">$${engCost}</span>` +
+            `<span class="float-unit-name">Engineer</span>` +
           `</button>`
         );
       } else if (struct.type === 'habitat') {
@@ -9199,15 +9199,16 @@
         const qLen = struct.trainQueue ? struct.trainQueue.length : 0;
         const civCost = STRUCTURE_SPECS.habitat.trainCost || 65;
         const disabled = qLen >= maxQ || this.scrap < civCost;
+        headerTitle = `Train Unit ${qLen}/${maxQ}`;
         buttons.push(
           `<button type="button" class="float-unit-btn" data-unit-kind="civilian" ${disabled ? 'disabled' : ''}>` +
-            `<span class="float-unit-name">&#8962; Civilian</span>` +
-            `<span class="float-unit-meta"><span class="float-unit-q">Q:${qLen}</span><span class="float-unit-cost">$${civCost}</span></span>` +
+            `<span class="float-unit-cost">$${civCost}</span>` +
+            `<span class="float-unit-name">Civilian</span>` +
           `</button>`
         );
       }
 
-      this.buildingUnitFloatMenu.innerHTML = `<div class="float-unit-title">TRAIN UNIT</div>` + buttons.join('');
+      this.buildingUnitFloatMenu.innerHTML = `<div class="float-unit-title">${headerTitle}</div>` + buttons.join('');
       showEl(this.buildingUnitFloatMenu, 'flex');
     }
 
@@ -10285,6 +10286,10 @@
         // 3) Actively intercept any zombie <= 120px of ANY Safe Zone tile or assault any Spawn Breach <= 120px of ANY Safe Zone tile across !commandoBlocked
         // 4) Recall to Barracks only when zero zombies & zero breaches threaten the 3-tile Safe Zone perimeter
         if (sol.isCommando && !sol.manualOrder && !sol.manualMoveOrder && !sol.targetBarracks) {
+          const isFlame = sol.unitKind === 'flamethrower';
+          const kiteDist = isFlame ? 36 : 120;
+          const interceptRange = isFlame ? Math.max(40, sol.range - 8) : sol.range;
+          const maxStandoff = isFlame ? 68 : 115;
           let nearestZ = null;
           let nearestD = Infinity;
           for (const z of this.zombies) {
@@ -10296,11 +10301,11 @@
             }
           }
 
-          if (nearestZ && nearestD < 120 && sol.isIntercepting && sol.path.length > 0) {
+          if (nearestZ && nearestD < kiteDist && sol.isIntercepting && sol.path.length > 0) {
             sol.path = [];
             sol.isIntercepting = false;
             sol.aiTimer = 0;
-          } else if (nearestZ && nearestD >= 120 && nearestD <= sol.range && sol.isIntercepting && sol.path.length > 0) {
+          } else if (nearestZ && nearestD >= kiteDist && nearestD <= sol.range && sol.isIntercepting && sol.path.length > 0) {
             sol.path = [];
             sol.isIntercepting = false;
           }
@@ -10319,7 +10324,7 @@
               }
             }
 
-            if (nearestZ && nearestD < 120) {
+            if (nearestZ && nearestD < kiteDist) {
               if (sol.aiTimer <= 0) {
                 sol.aiTimer = 0.20;
                 const strandedOut = this.commandoBlocked(scNow, srNow);
@@ -10353,7 +10358,7 @@
                 }
               }
             } else if (nearestZ && nearestD <= sol.range) {
-              // Zombie already within firing range (>= 120px) -> hold ground & shoot cleanly
+              // Zombie already within firing range (>= kiteDist) -> hold ground & shoot cleanly
             } else if (sol.aiTimer <= 0) {
               sol.aiTimer = 0.35;
               const perimZ = this.findNearestZombieNearSafeZone(sol.x, sol.y, 120);
@@ -10361,7 +10366,7 @@
 
               if (perimZ) {
                 const distPerim = Math.hypot(perimZ.x - sol.x, perimZ.y - sol.y);
-                if (distPerim > sol.range) {
+                if (distPerim > interceptRange) {
                   const inRangeCands = [];
                   const approachCands = [];
                   for (let r = 0; r < ROWS; r++) {
@@ -10371,12 +10376,12 @@
                       const cPos = tileCenter(c, r);
                       const dToZ = Math.hypot(cPos.x - perimZ.x, cPos.y - perimZ.y);
                       const dToSol = Math.hypot(cPos.x - sol.x, cPos.y - sol.y);
-                      if (dToZ <= sol.range) {
-                        const standoff = Math.min(dToZ, 115);
+                      if (dToZ <= interceptRange) {
+                        const standoff = Math.min(dToZ, maxStandoff);
                         const safeBonus = this.grid[r][c] === 2 ? 80 : 0;
                         const score = standoff + safeBonus - dToSol * 0.6;
                         inRangeCands.push({ c, r, score });
-                      } else if (dToZ >= 100) {
+                      } else if (dToZ >= (isFlame ? 36 : 100)) {
                         const score = -dToZ - dToSol * 0.25 + (this.grid[r][c] === 2 ? 20 : 0);
                         approachCands.push({ c, r, score });
                       }
@@ -10396,7 +10401,7 @@
                 }
               } else if (breachTarget) {
                 const distB = Math.hypot(breachTarget.x - sol.x, breachTarget.y - sol.y);
-                if (distB > sol.range) {
+                if (distB > interceptRange) {
                   const cands = [];
                   for (let r = 0; r < ROWS; r++) {
                     for (let c = 0; c < COLS; c++) {
@@ -10404,10 +10409,10 @@
                       if (c === scNow && r === srNow) continue;
                       const cPos = tileCenter(c, r);
                       const dToB = Math.hypot(cPos.x - breachTarget.x, cPos.y - breachTarget.y);
-                      if (dToB <= sol.range) {
+                      if (dToB <= interceptRange) {
                         const dToSol = Math.hypot(cPos.x - sol.x, cPos.y - sol.y);
                         const safeBonus = this.grid[r][c] === 2 ? 120 : 0;
-                        const score = safeBonus - dToSol + Math.min(dToB, 115) * 0.25;
+                        const score = safeBonus - dToSol + Math.min(dToB, maxStandoff) * 0.25;
                         cands.push({ c, r, score });
                       }
                     }
@@ -11991,11 +11996,11 @@
           }
         }
 
-        // 30% opacity territory pad with merged outer perimeter borders (no internal grid lines)
-        ctx.fillStyle = flash ? 'rgba(255, 255, 255, 0.55)' : 'rgba(0, 224, 138, 0.30)';
+        // Subtle 14% opacity territory pad with merged outer perimeter borders (no internal grid lines)
+        ctx.fillStyle = flash ? 'rgba(255, 255, 255, 0.55)' : 'rgba(0, 224, 138, 0.14)';
         ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
 
-        ctx.strokeStyle = ownerCol || 'rgba(0, 224, 138, 0.55)';
+        ctx.strokeStyle = ownerCol || 'rgba(0, 224, 138, 0.28)';
         ctx.lineWidth = ownerCol ? 2 : 1.5;
         ctx.beginPath();
         const sameTop = this.safeZones.get(`${sz.col},${sz.row - 1}`);
@@ -12022,7 +12027,7 @@
         ctx.lineWidth = 1;
 
         // Muted safe extraction cross
-        ctx.fillStyle = 'rgba(0, 224, 138, 0.28)';
+        ctx.fillStyle = 'rgba(0, 224, 138, 0.14)';
         ctx.fillRect(x + 18, y + 12, 4, 16);
         ctx.fillRect(x + 12, y + 18, 16, 4);
 
