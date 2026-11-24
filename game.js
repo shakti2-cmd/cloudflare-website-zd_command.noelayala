@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.40.0 (Sapper Barrier-Adjacent Mining & Return, Medic Target Filter, Soldier Gate Unstick, $1 Bounties & Tabbed Per-Zombie Developer Tuning)
+ * Version: v0.41.0 (Runners-Only Civilian Threat, Mine Build Detonation, Full Resume State, Survival under Mission Mode & Full Audit)
  */
 
 (function () {
@@ -424,7 +424,7 @@
     demolisher: { label: 'Demolisher', hp: 180, speed: 38, dmg: 20, radius: 12, color: '#3B0910', reward: 9 },
     wrecker: { label: 'Wrecker', hp: 110, speed: 62, dmg: 14, radius: 9, color: '#B833FF', reward: 7 },
     miniboss: { label: 'Brood Warden', hp: 450, speed: 30, dmg: 24, radius: 14, color: '#8B1E3F', reward: 45 },
-    behemoth: { label: 'Hive Behemoth', hp: 900, speed: 24, dmg: 35, radius: 17, color: '#6E0D25', reward: 40 }
+    behemoth: { label: 'Hive Behemoth', hp: 900, speed: 24, dmg: 35, radius: 17, color: '#6E0D25', reward: 80 }
   };
 
   // --- AUTO-REPAIR ENGINEER SPECS (Trained in Engineering from Lv1 Recruits over 4.0s; upgrades linked to Engineering Lv1-Lv3) ---
@@ -1189,9 +1189,10 @@
       this.sound = new SoundFX();
 
       this.currentLevel = 0;
-      this.startMenuMode = null; // 'campaign', 'random', 'post_defense'
+      this.startMenuMode = null; // 'campaign', 'post_defense', 'survival'
       this.selectedDifficulty = null;
       this.selectedCampaignLevel = null;
+      this._nonSurvivalDifficulty = 'normal';
       this.isRandomMode = false;
       this.isPostDefenseMode = false;
       this.postDefenseGrid = null;
@@ -1414,7 +1415,7 @@
     }
 
     get isEndlessMode() {
-      return this.isRandomMode || this.isPostDefenseMode || this.isSurvivalMode;
+      return this.isPostDefenseMode || this.isSurvivalMode;
     }
 
     get requiredQuota() {
@@ -1607,7 +1608,7 @@
       this.btnSettingsBestiary = $('btnSettingsBestiary');
       this.btnSettingsDeveloper = $('btnSettingsDeveloper');
 
-      // Developer Tuning UI Elements (v0.40.0)
+      // Developer Tuning UI Elements (v0.41.0)
       this.developerModal = $('developerModal');
       this.btnCloseDeveloper = $('btnCloseDeveloper');
       this.btnDoneDeveloper = $('btnDoneDeveloper');
@@ -1715,17 +1716,23 @@
       window.addEventListener('touchstart', unlockAudio, { passive: true });
       window.addEventListener('keydown', unlockAudio, { passive: true });
 
-      // Startup screen difficulty cards
+      // Startup screen difficulty cards (Easy / Normal / Hard)
       document.querySelectorAll('[data-diff]').forEach((card) => {
         on(card, 'click', () => {
           this.selectedDifficulty = card.dataset.diff;
           if (this.difficultySelect) this.difficultySelect.value = card.dataset.diff;
+          if (this.startMenuMode === 'survival') {
+            this.startMenuMode = null;
+            if (this.startLevelSelect && this.startLevelSelect.value === 'survival') {
+              this.startLevelSelect.value = '';
+            }
+          }
           this.syncStartCards();
           this.sound.playClick();
         });
       });
 
-      // Startup screen primary mode cards (Campaign / Random Sector / Post Defense)
+      // Startup screen primary mode cards (Campaign / Post Defense / Survival)
       document.querySelectorAll('[data-mode]').forEach((card) => {
         on(card, 'click', () => {
           const mode = card.dataset.mode;
@@ -1733,9 +1740,13 @@
           if (mode === 'campaign') {
             if (this.startMainSection) hideEl(this.startMainSection);
             if (this.campaignSectorPanel) showEl(this.campaignSectorPanel, 'block');
+          } else if (mode === 'survival') {
+            this.selectedDifficulty = null;
+            if (this.difficultySelect) this.difficultySelect.value = '';
+            if (this.startLevelSelect) this.startLevelSelect.value = 'survival';
           } else {
             if (this.startLevelSelect) {
-              this.startLevelSelect.value = mode === 'random' ? 'random' : 'post_defense';
+              this.startLevelSelect.value = 'post_defense';
             }
           }
           this.syncStartCards();
@@ -1765,12 +1776,19 @@
 
       on(this.difficultySelect, 'change', () => {
         this.selectedDifficulty = this.difficultySelect.value || null;
+        if (this.selectedDifficulty && this.startMenuMode === 'survival') {
+          this.startMenuMode = null;
+        }
         this.syncStartCards();
       });
       on(this.startLevelSelect, 'change', () => {
         const v = this.startLevelSelect.value;
-        if (v === 'random' || v === 'post_defense') {
-          this.startMenuMode = v;
+        if (v === 'survival') {
+          this.startMenuMode = 'survival';
+          this.selectedDifficulty = null;
+          if (this.difficultySelect) this.difficultySelect.value = '';
+        } else if (v === 'post_defense') {
+          this.startMenuMode = 'post_defense';
         } else if (v) {
           this.startMenuMode = 'campaign';
           this.selectedCampaignLevel = v;
@@ -1818,7 +1836,7 @@
       on(this.btnSettingsHowToPlay, 'click', () => this.openHowToPlay());
       on(this.btnSettingsBestiary, 'click', () => this.openZombieGuide());
 
-      // Developer Tuning Modal bindings (v0.40.0)
+      // Developer Tuning Modal bindings (v0.41.0)
       on(this.btnSettingsDeveloper, 'click', () => this.openDeveloperModal());
       on(this.btnCloseDeveloper, 'click', () => this.closeDeveloperModal());
       on(this.btnDoneDeveloper, 'click', () => this.closeDeveloperModal());
@@ -1924,12 +1942,32 @@
         if (val === 'tutorial') {
           this.startTutorial();
           return;
-        } else if (val === 'random') {
-          this.initLevel('random');
+        } else if (val === 'survival') {
+          if (this.difficulty !== 'survival') {
+            this._nonSurvivalDifficulty = DIFFICULTY_PRESETS[this.difficulty] ? this.difficulty : 'normal';
+          }
+          this.randomSectorCount = 0;
+          this.initLevel('survival');
         } else if (val === 'post_defense') {
+          if (this.difficulty === 'survival') {
+            const restoreDiff = DIFFICULTY_PRESETS[this._nonSurvivalDifficulty] ? this._nonSurvivalDifficulty : 'normal';
+            const restorePreset = DIFFICULTY_PRESETS[restoreDiff];
+            this.difficulty = restoreDiff;
+            this.zombieHpMult = restorePreset.zombieHpMult;
+            this.zombieSpeedMult = restorePreset.zombieSpeedMult;
+            this.infectionWindow = restorePreset.infectionWindow;
+          }
           this.postDefenseGrid = null;
           this.initLevel('post_defense');
         } else {
+          if (this.difficulty === 'survival') {
+            const restoreDiff = DIFFICULTY_PRESETS[this._nonSurvivalDifficulty] ? this._nonSurvivalDifficulty : 'normal';
+            const restorePreset = DIFFICULTY_PRESETS[restoreDiff];
+            this.difficulty = restoreDiff;
+            this.zombieHpMult = restorePreset.zombieHpMult;
+            this.zombieSpeedMult = restorePreset.zombieSpeedMult;
+            this.infectionWindow = restorePreset.infectionWindow;
+          }
           const idx = Math.max(0, Math.min(LEVEL_MAPS.length - 1, (parseInt(val, 10) || 1) - 1));
           this.initLevel(idx);
         }
@@ -2124,10 +2162,10 @@
         if (this.isTutorialMode) {
           this.startTutorial();
           return;
+        } else if (this.isSurvivalMode) {
+          this.initLevel('survival');
         } else if (this.isPostDefenseMode) {
           this.initLevel('post_defense');
-        } else if (this.isRandomMode) {
-          this.initLevel('random');
         } else {
           this.initLevel(this.currentLevel);
         }
@@ -2140,11 +2178,11 @@
         if (this.isTutorialMode) {
           this.clearTutorial();
           this.initLevel(0);
-        } else if (this.isPostDefenseMode) {
+        } else if (this.isSurvivalMode) {
+          this.initLevel('survival');
+        } else if (this.isPostDefenseMode || this.currentLevel >= LEVEL_MAPS.length - 1) {
           this.postDefenseGrid = null;
           this.initLevel('post_defense');
-        } else if (this.isRandomMode || this.currentLevel >= LEVEL_MAPS.length - 1) {
-          this.initLevel('random');
         } else {
           this.initLevel(this.currentLevel + 1);
         }
@@ -3041,9 +3079,13 @@
       const diff = this.selectedDifficulty;
       const mode = this.startMenuMode;
       const lvl = this.selectedCampaignLevel;
+      const isSurvival = mode === 'survival';
+
+      if (this.startMainSection) this.startMainSection.classList.toggle('is-survival-selected', isSurvival);
+      if (this.difficultyCards) this.difficultyCards.classList.toggle('is-survival-selected', isSurvival);
 
       document.querySelectorAll('[data-diff]').forEach((c) => {
-        c.classList.toggle('selected', !!diff && c.dataset.diff === diff);
+        c.classList.toggle('selected', !isSurvival && !!diff && c.dataset.diff === diff);
       });
       document.querySelectorAll('[data-mode]').forEach((c) => {
         c.classList.toggle('selected', !!mode && c.dataset.mode === mode);
@@ -3058,7 +3100,7 @@
         else c.classList.toggle('selected', match);
       });
 
-      const readyToDeploy = !!diff && !!mode && (mode !== 'campaign' || !!lvl);
+      const readyToDeploy = isSurvival || (!!diff && !!mode && (mode !== 'campaign' || !!lvl));
       if (readyToDeploy) {
         if (this.startValidationMsg) this.startValidationMsg.classList.add('hidden');
         if (this.campaignValidationMsg) this.campaignValidationMsg.classList.add('hidden');
@@ -3188,7 +3230,7 @@
       if (Array.isArray(this.zombies)) {
         for (let i = 0; i < this.zombies.length; i++) {
           const z = this.zombies[i];
-          if (!z || z.dead || z.type !== zType) continue;
+          if (!z || z.dead || z.hp <= 0 || z.type !== zType) continue;
           if (stat === 'hpMult' && prev > 0) {
             const ratio = newVal / prev;
             z.maxHp = Math.max(1, Math.round(z.maxHp * ratio));
@@ -3281,7 +3323,7 @@
         const prev = this.devZombieOverrides && this.devZombieOverrides[zType];
         if (prev && Array.isArray(this.zombies)) {
           for (const z of this.zombies) {
-            if (!z || z.dead || z.type !== zType) continue;
+            if (!z || z.dead || z.hp <= 0 || z.type !== zType) continue;
             if ((prev.hpMult || 1.0) !== 1.0) {
               const r = 1.0 / (prev.hpMult || 1.0);
               z.maxHp = Math.max(1, Math.round(z.maxHp * r));
@@ -3328,7 +3370,7 @@
         if (Array.isArray(this.zombies)) {
           for (let i = 0; i < this.zombies.length; i++) {
             const z = this.zombies[i];
-            if (!z || z.dead) continue;
+            if (!z || z.dead || z.hp <= 0) continue;
             z.maxHp = Math.max(1, Math.round(z.maxHp * ratio));
             z.hp = Math.max(1, Math.min(z.maxHp, Math.round(z.hp * ratio)));
           }
@@ -3345,7 +3387,7 @@
         if (Array.isArray(this.zombies)) {
           for (let i = 0; i < this.zombies.length; i++) {
             const z = this.zombies[i];
-            if (!z || z.dead) continue;
+            if (!z || z.dead || z.hp <= 0) continue;
             z.baseSpeed = Math.max(5, Math.round((z.baseSpeed || 45) * ratio));
             z.speed = Math.max(5, Math.round((z.speed || z.baseSpeed) * ratio));
           }
@@ -3453,12 +3495,13 @@
       }
       const activeDiffKey = this.inPlay
         ? (this.difficulty || 'normal')
-        : (this.selectedDifficulty || this.difficulty || 'normal');
+        : (this.startMenuMode === 'survival' ? 'survival' : (this.selectedDifficulty || this.difficulty || 'normal'));
       const preset = DIFFICULTY_PRESETS[activeDiffKey] || DIFFICULTY_PRESETS.normal;
       const escMult = this.inPlay && this.isSurvivalMode ? this.getSurvivalHpMult() : 1.0;
       const effHpMult = preset.zombieHpMult * escMult;
       if (this.bestiaryHardIndicator) {
-        this.bestiaryHardIndicator.textContent = `\u26A0 ${preset.name.toUpperCase()} THREAT: ${effHpMult.toFixed(1)}\u00D7 ZOMBIE HP ACTIVE`;
+        const labelType = activeDiffKey === 'survival' ? 'MODE' : 'THREAT';
+        this.bestiaryHardIndicator.textContent = `\u26A0 ${preset.name.toUpperCase()} ${labelType}: ${effHpMult.toFixed(1)}\u00D7 ZOMBIE HP ACTIVE`;
         this.bestiaryHardIndicator.classList.remove('hidden');
       }
       this.renderBestiaryPortraits();
@@ -3481,7 +3524,8 @@
     }
 
     deployFromStartScreen() {
-      const missingDiff = !this.selectedDifficulty;
+      const isSurvival = this.startMenuMode === 'survival';
+      const missingDiff = !isSurvival && !this.selectedDifficulty;
       const missingMode = !this.startMenuMode;
       const missingLevel = this.startMenuMode === 'campaign' && !this.selectedCampaignLevel;
 
@@ -3533,8 +3577,11 @@
       if (this.campaignValidationMsg) this.campaignValidationMsg.classList.add('hidden');
       this.sound.unlock();
       this.clearSinglePlayerSession();
-      const diffVal = this.selectedDifficulty;
+      const diffVal = isSurvival ? 'survival' : this.selectedDifficulty;
       this.difficulty = DIFFICULTY_PRESETS[diffVal] ? diffVal : 'normal';
+      if (!isSurvival) {
+        this._nonSurvivalDifficulty = this.difficulty;
+      }
       const preset = DIFFICULTY_PRESETS[this.difficulty];
       this.zombieHpMult = preset.zombieHpMult;
       this.zombieSpeedMult = preset.zombieSpeedMult;
@@ -3543,17 +3590,17 @@
       hideEl(this.startScreenOverlay);
       if (document.body) document.body.classList.remove('in-start-menu');
 
-      const rawLvl = this.startMenuMode === 'random'
-        ? 'random'
+      const rawLvl = isSurvival
+        ? 'survival'
         : this.startMenuMode === 'post_defense'
         ? 'post_defense'
         : (this.selectedCampaignLevel || '1');
       if (rawLvl === 'tutorial') {
         this.startTutorial();
         return;
-      } else if (rawLvl === 'random') {
+      } else if (rawLvl === 'survival') {
         this.randomSectorCount = 0;
-        this.initLevel('random');
+        this.initLevel('survival');
       } else if (rawLvl === 'post_defense') {
         this.postDefenseGrid = null;
         this.initLevel('post_defense');
@@ -3569,13 +3616,17 @@
       this.waveState = STATE.PREPARE;
       this.updateHUD();
       this.updateTimerHud();
-      const modeDesc = this.isPostDefenseMode
+      const modeDesc = this.isSurvivalMode
+        ? `Survival #${this.randomSectorCount} (${this.randomArchetype} - Endless 4.0x HP Siege)`
+        : this.isPostDefenseMode
         ? `Post Defense (${this.randomArchetype} - Endless Single-Outpost Siege)`
-        : this.isRandomMode
-        ? `Random Sector #${this.randomSectorCount} (${this.randomArchetype})`
         : `Sector ${this.currentLevel + 1}`;
-      this.showStatus(`Mission deployed (${preset.name} - ${modeDesc}). Destroy all Red Spawn Breaches & defend Safe Zones!`);
-      this.addFloatingText(`${preset.name.toUpperCase()} THREAT LEVEL`, WIDTH / 2, HEIGHT / 2 - 40, '#00FFFF');
+      this.showStatus(
+        this.isSurvivalMode
+          ? `Survival Mode deployed (${modeDesc}). Survive endless waves & +1 Invincible Rift every 5 waves!`
+          : `Mission deployed (${preset.name} - ${modeDesc}). Destroy all Red Spawn Breaches & defend Safe Zones!`
+      );
+      this.addFloatingText(this.isSurvivalMode ? 'SURVIVAL MODE' : `${preset.name.toUpperCase()} THREAT LEVEL`, WIDTH / 2, HEIGHT / 2 - 40, '#00FFFF');
     }
 
     returnToStartMenu() {
@@ -3604,6 +3655,9 @@
       this.selectedDifficulty = null;
       this.startMenuMode = null;
       this.selectedCampaignLevel = null;
+      this.difficulty = DIFFICULTY_PRESETS[this._nonSurvivalDifficulty] ? this._nonSurvivalDifficulty : 'normal';
+      if (this.difficultySelect) this.difficultySelect.value = '';
+      if (this.startLevelSelect) this.startLevelSelect.value = '';
       if (this.startValidationMsg) this.startValidationMsg.classList.add('hidden');
       if (this.campaignValidationMsg) this.campaignValidationMsg.classList.add('hidden');
       hideEl(this.gameOverOverlay);
@@ -3634,22 +3688,134 @@
       this.refreshResumeButton();
     }
 
+    serializeSessionSoldier(s) {
+      return {
+        id: s.id,
+        level: s.level || 1,
+        unitKind: s.unitKind || (s.isCommando ? 'commando' : undefined),
+        name: s.name || '',
+        homeHubId: s.homeHubId || null,
+        isCommando: !!s.isCommando,
+        x: s.x,
+        y: s.y,
+        radius: s.radius || (s.isCommando ? 8 : 7),
+        speed: s.speed || (s.isCommando ? 85 : 70),
+        hp: s.hp,
+        maxHp: s.maxHp,
+        range: s.range,
+        dmg: s.dmg,
+        rate: s.rate,
+        aoeRadius: s.aoeRadius,
+        armorMult: s.armorMult,
+        kills: s.kills || 0,
+        color: s.color || '#38E8FF',
+        angle: s.angle !== undefined ? s.angle : -Math.PI / 2,
+        ownerId: s.ownerId || null
+      };
+    }
+
+    serializeSessionEngineer(e) {
+      return {
+        id: e.id,
+        unitType: 'engineer',
+        unitKind: e.unitKind || 'engineer',
+        level: e.level || 1,
+        name: e.name || '',
+        homeHubId: e.homeHubId || null,
+        x: e.x,
+        y: e.y,
+        radius: e.radius || 7,
+        speed: e.speed || 70,
+        hp: e.hp,
+        maxHp: e.maxHp,
+        repairRate: e.repairRate !== undefined ? e.repairRate : 20,
+        healRange: e.healRange,
+        healRate: e.healRate,
+        mineCooldown: e.mineCooldown,
+        mineTimer: e.mineTimer || 0,
+        mineDmg: e.mineDmg,
+        mineRadius: e.mineRadius,
+        maxMines: e.maxMines,
+        minesPlanted: e.minesPlanted || 0,
+        curedCount: e.curedCount || 0,
+        repairedTotal: e.repairedTotal || 0,
+        color: e.color || '#FFD23F',
+        angle: e.angle !== undefined ? e.angle : 0,
+        ownerId: e.ownerId || null
+      };
+    }
+
+    hydrateSessionSoldier(s) {
+      return {
+        ...s,
+        radius: s.radius || (s.isCommando ? 8 : 7),
+        speed: s.speed || (s.isCommando ? 85 : 70),
+        cooldown: 0,
+        angle: s.angle !== undefined ? s.angle : -Math.PI / 2,
+        path: [],
+        dest: null,
+        targetBunker: null,
+        targetBarracks: null,
+        targetEngineering: null,
+        assignedHubId: null,
+        manualOrder: false,
+        manualMoveOrder: false,
+        reenterCooldown: 0,
+        aiTimer: 0.2
+      };
+    }
+
+    hydrateSessionEngineer(e) {
+      return {
+        ...e,
+        radius: e.radius || 7,
+        speed: e.speed || 70,
+        unitType: 'engineer',
+        unitKind: e.unitKind || 'engineer',
+        cooldown: 0,
+        angle: e.angle !== undefined ? e.angle : 0,
+        path: [],
+        dest: null,
+        repairTarget: null,
+        targetEngineering: null,
+        healBeamTarget: null,
+        manualOrder: false,
+        manualMoveOrder: false,
+        reenterCooldown: 0,
+        scanTimer: 0.1
+      };
+    }
+
     saveSinglePlayerSession() {
       if (this.isMultiplayer || this.isTutorialMode || !this.inPlay || this.safeZones.size === 0) return;
       try {
+        const serializeOcc = (u) => (u && u.unitType === 'engineer' ? this.serializeSessionEngineer(u) : this.serializeSessionSoldier(u));
+        const devOvr = {};
+        if (this.devZombieOverrides) {
+          for (const [k, v] of Object.entries(this.devZombieOverrides)) {
+            devOvr[k] = { ...v };
+          }
+        }
         const payload = {
-          v: 1,
+          v: 2,
           cols: COLS,
           rows: ROWS,
           mapSizePreset: this.mapSizePreset || 'auto',
           difficulty: this.difficulty || 'normal',
+          isSurvivalMode: !!this.isSurvivalMode,
           currentLevel: this.currentLevel,
-          isRandomMode: !!this.isRandomMode,
+          isRandomMode: false,
           isPostDefenseMode: !!this.isPostDefenseMode,
           randomSectorCount: this.randomSectorCount || 0,
           randomArchetype: this.randomArchetype || '',
           wave: this.wave || 0,
-          nextWaveTimer: this.nextWaveTimer || 0,
+          waveState: this.waveState,
+          nextWaveTimer: Number(this.nextWaveTimer) || 0,
+          spawnTimer: Number(this.spawnTimer) || 0,
+          waveSpawnQueue: (this.waveSpawnQueue || []).map((q) => (q && typeof q === 'object' ? { ...q } : q)),
+          elapsedTime: Number(this.elapsedTime) || 0,
+          threatMult: Number(this.threatMult) || 1.0,
+          breachCivTimer: Number(this.breachCivTimer) || 17.0,
           scrap: Math.floor(this.scrap || 0),
           score: Math.floor(this.score || 0),
           savedCount: this.savedCount || 0,
@@ -3657,30 +3823,101 @@
           civTotal: this.civTotal || 0,
           totalCommandoKills: this.totalCommandoKills || 0,
           initialSpawnCount: this.initialSpawnCount || Math.max(1, this.spawns.size),
-          hordeScale: this.hordeScale || { hp: 1.0, dmg: 1.0, speed: 1.0, weakened: false },
+          hordeScale: this.hordeScale ? { ...this.hordeScale } : { hp: 1.0, dmg: 1.0, speed: 1.0, weakened: false },
+          overchargeTimer: Number(this.overchargeTimer) || 0,
+          overchargeCooldown: Number(this.overchargeCooldown) || 0,
+          napalmCooldown: Number(this.napalmCooldown) || 0,
+          sealedSpawns: (this.sealedSpawns || []).map((ss) => ({ ...ss })),
+          devTuning: {
+            devTowerStrengthMult: typeof this.devTowerStrengthMult === 'number' ? this.devTowerStrengthMult : 1.0,
+            devZombieHpMult: typeof this.devZombieHpMult === 'number' ? this.devZombieHpMult : 0.5,
+            devZombieScrapMult: typeof this.devZombieScrapMult === 'number' ? this.devZombieScrapMult : 1.5,
+            devZombieSpeedMult: typeof this.devZombieSpeedMult === 'number' ? this.devZombieSpeedMult : 1.0,
+            devBreachCountMult: typeof this.devBreachCountMult === 'number' ? this.devBreachCountMult : 0.75,
+            devZombieOverrides: devOvr
+          },
           grid: this.grid,
           safeZones: Array.from(this.safeZones.values()).map((sz) => ({
             id: sz.id, col: sz.col, row: sz.row, level: sz.level, hp: sz.hp, maxHp: sz.maxHp,
             invested: sz.invested, preplaced: !!sz.preplaced
           })),
           structures: Array.from(this.structures.values()).map((st) => ({
-            id: st.id, type: st.type, col: st.col, row: st.row, level: st.level, hp: st.hp, maxHp: st.maxHp,
-            kills: st.kills || 0, invested: st.invested || 0, preplaced: !!st.preplaced,
-            angle: st.angle || 0, capacity: st.capacity || 4,
-            spawnedCivs: st.spawnedCivs || 0
+            id: st.id,
+            type: st.type,
+            col: st.col,
+            row: st.row,
+            level: st.level,
+            hp: st.hp,
+            maxHp: st.maxHp,
+            kills: st.kills || 0,
+            invested: st.invested || 0,
+            preplaced: !!st.preplaced,
+            angle: st.angle || 0,
+            capacity: st.capacity || 4,
+            spawnedCivs: st.spawnedCivs || 0,
+            moveCooldown: st.moveCooldown || 0,
+            moveDuration: st.moveDuration || 10,
+            trainTimer: st.trainTimer || 0,
+            trainDuration: st.trainDuration || 0,
+            stance: st.type === 'barracks' ? (st.stance || 'kite') : undefined,
+            holdTile: st.type === 'barracks' && st.holdTile
+              ? { col: st.holdTile.col, row: st.holdTile.row, x: st.holdTile.x, y: st.holdTile.y }
+              : null,
+            occupants: Array.isArray(st.occupants) ? st.occupants.map(serializeOcc) : [],
+            trainQueue: Array.isArray(st.trainQueue) ? st.trainQueue.map((o) => ({
+              id: o.id,
+              unitKind: o.unitKind || (st.type === 'engineering' ? 'engineer' : 'commando'),
+              cost: o.cost || 0,
+              assignedRecruitId: null
+            })) : [],
+            activeTrainers: Array.isArray(st.activeTrainers) ? st.activeTrainers.map((tr) => ({
+              id: tr.id,
+              unitKind: tr.unitKind || (st.type === 'engineering' ? 'engineer' : 'commando'),
+              timer: tr.timer || 0,
+              duration: tr.duration || st.trainDuration || 4.0,
+              cost: tr.cost || 0,
+              unit: tr.unit ? serializeOcc(tr.unit) : null
+            })) : []
           })),
           spawns: Array.from(this.spawns.values()).map((sp) => ({
             col: sp.col, row: sp.row, hp: sp.hp, maxHp: sp.maxHp,
             dormantTimer: sp.dormantTimer || 0
           })),
-          soldiers: this.soldiers.map((s) => ({
-            id: s.id, level: s.level, isCommando: !!s.isCommando, x: s.x, y: s.y, hp: s.hp, maxHp: s.maxHp,
-            range: s.range, dmg: s.dmg, rate: s.rate, kills: s.kills || 0, name: s.name || '', color: s.color || '#38E8FF'
+          zombies: this.zombies.filter((z) => z && z.hp > 0).map((z) => ({
+            id: z.id,
+            type: z.type,
+            x: z.x,
+            y: z.y,
+            hp: z.hp,
+            maxHp: z.maxHp,
+            baseSpeed: z.baseSpeed,
+            speed: z.speed,
+            dmg: z.dmg,
+            radius: z.radius,
+            color: z.color,
+            reward: z.reward,
+            angle: z.angle || 0,
+            bruteBreach: !!z.bruteBreach,
+            slowTimer: z.slowTimer || 0,
+            slowFactor: z.slowFactor || 0,
+            attackTimer: z.attackTimer || 0,
+            laneOffsetX: z.laneOffsetX || 0,
+            laneOffsetY: z.laneOffsetY || 0
           })),
-          engineers: this.engineers.map((e) => ({
-            id: e.id, level: e.level, x: e.x, y: e.y, hp: e.hp, maxHp: e.maxHp, speed: e.speed, repairRate: e.repairRate,
-            repairedTotal: e.repairedTotal || 0, name: e.name || '', color: e.color || '#FFD23F'
+          mines: (this.mines || []).map((m) => ({
+            id: m.id,
+            col: m.col,
+            row: m.row,
+            x: m.x,
+            y: m.y,
+            dmg: m.dmg || 75,
+            radius: m.radius || 48,
+            armorMult: m.armorMult !== undefined ? m.armorMult : 0.35,
+            ownerId: m.ownerId || null,
+            ownerUnitId: m.ownerUnitId || null
           })),
+          soldiers: this.soldiers.map((s) => this.serializeSessionSoldier(s)),
+          engineers: this.engineers.map((e) => this.serializeSessionEngineer(e)),
           civilians: this.civilians.map((c) => ({
             id: c.id, x: c.x, y: c.y, isIncubating: !!c.isIncubating, incubationTimer: c.incubationTimer || 0
           }))
@@ -3708,21 +3945,22 @@
       if (saved.mapSizePreset) this.mapSizePreset = saved.mapSizePreset;
       this.setMapDimensions(saved.cols || 32, saved.rows || 24);
 
-      this.difficulty = DIFFICULTY_PRESETS[saved.difficulty] ? saved.difficulty : 'normal';
+      const savedDiff = saved.isSurvivalMode ? 'survival' : saved.difficulty;
+      this.difficulty = DIFFICULTY_PRESETS[savedDiff] ? savedDiff : 'normal';
       const preset = DIFFICULTY_PRESETS[this.difficulty];
       this.zombieHpMult = preset.zombieHpMult;
       this.zombieSpeedMult = preset.zombieSpeedMult;
       this.infectionWindow = preset.infectionWindow;
 
       this.currentLevel = saved.currentLevel || 0;
-      this.isRandomMode = !!saved.isRandomMode;
+      this.isRandomMode = false;
       this.isPostDefenseMode = !!saved.isPostDefenseMode;
+      this.postDefenseGrid = this.isPostDefenseMode ? saved.grid.map((row) => [...row]) : null;
       this.randomSectorCount = saved.randomSectorCount || 0;
       this.randomArchetype = saved.randomArchetype || '';
       this.totalWaves = this.isEndlessMode ? Infinity : 5;
       this.wave = saved.wave || 0;
-      this.nextWaveTimer = Math.max(5.0, Number(saved.nextWaveTimer) || 15.0);
-      this.scrap = Number(saved.scrap) || preset.startingScrap;
+      this.scrap = Number.isFinite(Number(saved.scrap)) ? Number(saved.scrap) : preset.startingScrap;
       this.score = Number(saved.score) || 0;
       this.savedCount = saved.savedCount || 0;
       this.infectedCount = saved.infectedCount || 0;
@@ -3730,23 +3968,49 @@
       this.totalCommandoKills = saved.totalCommandoKills || 0;
       this.initialSpawnCount = saved.initialSpawnCount || 1;
       this.hordeScale = saved.hordeScale || { hp: 1.0, dmg: 1.0, speed: 1.0, weakened: false };
+      this.elapsedTime = Number(saved.elapsedTime) || 0;
+      this.threatMult = Number(saved.threatMult) || 1.0;
+      this.breachCivTimer = Number.isFinite(Number(saved.breachCivTimer)) ? Number(saved.breachCivTimer) : 17.0;
+      this.sealedSpawns = Array.isArray(saved.sealedSpawns) ? saved.sealedSpawns.map((ss) => ({ ...ss })) : [];
       this.grid = saved.grid;
+
+      if (saved.devTuning && typeof saved.devTuning === 'object') {
+        const dtCfg = saved.devTuning;
+        if (typeof dtCfg.devTowerStrengthMult === 'number') this.devTowerStrengthMult = dtCfg.devTowerStrengthMult;
+        if (typeof dtCfg.devZombieHpMult === 'number') this.devZombieHpMult = dtCfg.devZombieHpMult;
+        if (typeof dtCfg.devZombieScrapMult === 'number') this.devZombieScrapMult = dtCfg.devZombieScrapMult;
+        if (typeof dtCfg.devZombieSpeedMult === 'number') this.devZombieSpeedMult = dtCfg.devZombieSpeedMult;
+        if (typeof dtCfg.devBreachCountMult === 'number') this.devBreachCountMult = dtCfg.devBreachCountMult;
+        const baseOverrides = this.createDefaultZombieOverrides();
+        if (dtCfg.devZombieOverrides && typeof dtCfg.devZombieOverrides === 'object') {
+          for (const zType of Object.keys(baseOverrides)) {
+            if (dtCfg.devZombieOverrides[zType]) {
+              baseOverrides[zType] = { ...baseOverrides[zType], ...dtCfg.devZombieOverrides[zType] };
+            }
+          }
+        }
+        this.devZombieOverrides = baseOverrides;
+        this.syncDeveloperUI();
+      }
 
       this.structures.clear();
       this.safeZones.clear();
       this.spawns.clear();
-      this.zombies = [];
       this.projectiles = [];
-      this.mines = [];
       this.particles = [];
       this.pulseRings = [];
       this.floatingTexts = [];
       this.settingBarracksHoldPoint = null;
       this.armingNapalm = false;
-      this.overchargeTimer = 0;
-      this.overchargeCooldown = 0;
-      this.napalmCooldown = 0;
-      this.waveSpawnQueue = [];
+      this.overchargeTimer = Number(saved.overchargeTimer) || 0;
+      this.overchargeCooldown = Number(saved.overchargeCooldown) || 0;
+      this.napalmCooldown = Number(saved.napalmCooldown) || 0;
+      this.spawnTimer = Number(saved.spawnTimer) || 0;
+      this.waveSpawnQueue = Array.isArray(saved.waveSpawnQueue)
+        ? saved.waveSpawnQueue.map((q) => (q && typeof q === 'object' ? { ...q } : q))
+        : [];
+
+      const hydrateOcc = (u) => (u && u.unitType === 'engineer' ? this.hydrateSessionEngineer(u) : this.hydrateSessionSoldier(u));
 
       for (const sz of saved.safeZones) {
         const p = tileCenter(sz.col, sz.row);
@@ -3764,11 +4028,18 @@
           y: p.y,
           cooldown: 0,
           flash: 0,
-          occupants: [],
-          trainQueue: [],
-          activeTrainers: [],
-          trainTimer: 0,
-          trainDuration: (lv && lv.trainDuration) || (spec && spec.trainDuration) || 4.0
+          moveCooldown: Number(st.moveCooldown) || 0,
+          moveDuration: Number(st.moveDuration) || 10,
+          stance: st.type === 'barracks' ? (st.stance || 'kite') : st.stance,
+          holdTile: st.type === 'barracks' && st.holdTile ? { ...st.holdTile } : null,
+          occupants: Array.isArray(st.occupants) ? st.occupants.map(hydrateOcc) : [],
+          trainQueue: Array.isArray(st.trainQueue) ? st.trainQueue.map((o) => ({ ...o, assignedRecruitId: null })) : [],
+          activeTrainers: Array.isArray(st.activeTrainers) ? st.activeTrainers.map((tr) => ({
+            ...tr,
+            unit: tr.unit ? hydrateOcc(tr.unit) : null
+          })) : [],
+          trainTimer: Number(st.trainTimer) || 0,
+          trainDuration: Number(st.trainDuration) || (lv && lv.trainDuration) || (spec && spec.trainDuration) || 4.0
         });
       }
       for (const sp of saved.spawns || []) {
@@ -3779,25 +4050,66 @@
           dormantTimer: sp.dormantTimer || 0
         });
       }
-      this.soldiers = (saved.soldiers || []).map((s) => ({
-        ...s, radius: 7, speed: s.isCommando ? 85 : 70, cooldown: 0, angle: -Math.PI / 2,
-        path: [], dest: null, targetBunker: null, targetBarracks: null, targetEngineering: null, assignedHubId: null, manualMoveOrder: false, reenterCooldown: 0
+      this.zombies = (saved.zombies || []).filter((z) => z && z.hp > 0).map((z) => ({
+        id: z.id || Math.random().toString(36).slice(2, 11),
+        type: z.type || 'walker',
+        x: z.x,
+        y: z.y,
+        hp: z.hp,
+        maxHp: z.maxHp,
+        baseSpeed: z.baseSpeed || 45,
+        speed: z.speed || z.baseSpeed || 45,
+        dmg: z.dmg || 10,
+        radius: z.radius || 7,
+        color: z.color || '#FF3333',
+        reward: Math.max(1, z.reward || 1),
+        angle: z.angle || 0,
+        bruteBreach: !!z.bruteBreach,
+        slowTimer: z.slowTimer || 0,
+        slowFactor: z.slowFactor || 0,
+        attackTimer: z.attackTimer || 0,
+        broodBuffed: false,
+        path: [],
+        repathTimer: 0.1,
+        laneOffsetX: z.laneOffsetX || 0,
+        laneOffsetY: z.laneOffsetY || 0
       }));
-      this.engineers = (saved.engineers || []).map((e) => ({
-        ...e, radius: 7, unitType: 'engineer', path: [], dest: null, repairTarget: null, targetEngineering: null, manualOrder: false, manualMoveOrder: false, reenterCooldown: 0
+      this.mines = (saved.mines || []).map((m) => ({
+        id: m.id || Math.random().toString(36).slice(2, 11),
+        col: m.col !== undefined ? m.col : Math.floor(m.x / TILE_SIZE),
+        row: m.row !== undefined ? m.row : Math.floor(m.y / TILE_SIZE),
+        x: m.x,
+        y: m.y,
+        dmg: m.dmg || 75,
+        radius: m.radius || 48,
+        armorMult: m.armorMult !== undefined ? m.armorMult : 0.35,
+        ownerId: m.ownerId || null,
+        ownerUnitId: m.ownerUnitId || null
       }));
+      this.soldiers = (saved.soldiers || []).map((s) => this.hydrateSessionSoldier(s));
+      this.engineers = (saved.engineers || []).map((e) => this.hydrateSessionEngineer(e));
       this.civilians = (saved.civilians || []).map((c) => ({
         ...c, radius: 6, speed: 60, path: [], dest: null, repathTimer: 0.2, targetBarracks: null
       }));
+
+      const modeVal = this.isSurvivalMode ? 'survival' : this.isPostDefenseMode ? 'post_defense' : String(this.currentLevel + 1);
+      if (this.levelSelect) this.levelSelect.value = modeVal;
+      if (this.startLevelSelect) this.startLevelSelect.value = modeVal;
 
       hideEl(this.startScreenOverlay);
       if (document.body) {
         document.body.classList.remove('in-start-menu');
         document.body.classList.remove('is-multiplayer');
       }
-      this.waveState = STATE.PREPARE;
+      const isActiveResume = saved.waveState === STATE.ACTIVE || this.zombies.length > 0 || this.waveSpawnQueue.length > 0;
+      this.waveState = isActiveResume ? STATE.ACTIVE : STATE.PREPARE;
+      this.nextWaveTimer = isActiveResume
+        ? Math.max(0, Number(saved.nextWaveTimer) || 0)
+        : Math.max(3.0, Number(saved.nextWaveTimer) || 15.0);
+
       this.recalcBaseIntegrity();
       this.clearSelection();
+      this.updateAbilityUI();
       this.updateHUD();
       this.updateTimerHud();
       if (this.isMobileTouch) {
@@ -5480,11 +5792,11 @@
       if (this.isTutorialMode) {
         this.startTutorial();
         return;
+      } else if (this.isSurvivalMode) {
+        this.initLevel('survival');
       } else if (this.isPostDefenseMode) {
         this.postDefenseGrid = null;
         this.initLevel('post_defense');
-      } else if (this.isRandomMode) {
-        this.initLevel('random');
       } else {
         this.initLevel(this.currentLevel);
       }
@@ -5758,16 +6070,21 @@
           this.grid = this.postDefenseGrid.map((row) => [...row]);
           if (this.levelSelect) this.levelSelect.value = 'post_defense';
           if (this.startLevelSelect) this.startLevelSelect.value = 'post_defense';
-        } else if (levelTarget === 'random') {
-          this.isRandomMode = true;
+        } else if (levelTarget === 'survival') {
+          this.isRandomMode = false;
           this.isPostDefenseMode = false;
+          this.difficulty = 'survival';
+          const sPreset = DIFFICULTY_PRESETS.survival;
+          this.zombieHpMult = sPreset.zombieHpMult;
+          this.zombieSpeedMult = sPreset.zombieSpeedMult;
+          this.infectionWindow = sPreset.infectionWindow;
           this.randomSectorCount += 1;
           this.currentLevel = 3;
           const gen = generateRandomSector(this.randomSectorCount);
           this.grid = gen.grid;
           this.randomArchetype = gen.archetype;
-          if (this.levelSelect) this.levelSelect.value = 'random';
-          if (this.startLevelSelect) this.startLevelSelect.value = 'random';
+          if (this.levelSelect) this.levelSelect.value = 'survival';
+          if (this.startLevelSelect) this.startLevelSelect.value = 'survival';
         } else {
           this.isRandomMode = false;
           this.isPostDefenseMode = false;
@@ -5893,10 +6210,10 @@
       this.updateTimerHud();
       if (this.isTutorialMode) {
         this.showStatus('Tutorial active! Follow the glowing spotlight arrows on screen & map.');
+      } else if (this.isSurvivalMode) {
+        this.showStatus(`Survival Mode #${this.randomSectorCount} (${this.randomArchetype}, 4.0x HP, +1 Rift / 5w) active!`);
       } else if (this.isPostDefenseMode) {
         this.showStatus(`Post Defense (${this.randomArchetype}, 3x3 Safe Zone) active!`);
-      } else if (this.isRandomMode) {
-        this.showStatus(`Random Sector #${this.randomSectorCount} (${this.randomArchetype}, 3x3 Safe Zone) ready!`);
       } else {
         this.showStatus(`Sector ${this.currentLevel + 1} loaded (${rolledClusters}x 3x3 Safe Zone). Destroy all Red Spawn Breaches!`);
       }
@@ -8038,6 +8355,7 @@
           ...(pendingUntil ? { pendingConfirmUntil: pendingUntil, pendingCost: unitCost } : {})
         });
         this.grid[r][c] = 2;
+        this.detonateMinesAtTile(c, r, effActor);
         this.addParticles(p.x, p.y, (pMeta && pMeta.color) || '#00E08A', 5, 36);
       }
       this.recalcBaseIntegrity();
@@ -8167,6 +8485,7 @@
         } else if (type === 'gate' && this.grid[r][c] === 4) {
           this.grid[r][c] = this.safeZones.has(key) ? 2 : 0;
         }
+        this.detonateMinesAtTile(c, r, effActor);
         this.addParticles(p.x, p.y, type === 'gate' ? '#FFD23F' : '#00FFFF', 6, 40);
       }
       this.sound.playClick();
@@ -8319,6 +8638,7 @@
         };
         this.safeZones.set(key, szBlock);
         this.grid[row][col] = 2;
+        this.detonateMinesAtTile(col, row, effActor);
         this.recalcBaseIntegrity();
         this.sound.playClick();
         this.addFloatingText(`-$${spec.baseCost}`, p.x, p.y - 10, '#00E08A');
@@ -8374,6 +8694,7 @@
         if (type === 'gate' && this.grid[row][col] === 4) {
           this.grid[row][col] = this.safeZones.has(key) ? 2 : 0;
         }
+        this.detonateMinesAtTile(col, row, effActor);
         if (this.isTutorialMode && (type === 'habitat' || type === 'engineering' || type === 'barracks')) {
           this.selectStructure(struct);
           this.updateTutorial();
@@ -8384,7 +8705,7 @@
           this.addParticles(p.x, p.y, '#00FFFF', 8, 45);
           this.updateHUD();
           this.showStatus(`Replaced Barricade with ${spec.name} (Lv1).`);
-          if (this.isMobileTouch) {
+          if (this.isMobileTouch && (!effActor || effActor === this.localPlayerId)) {
             this.selectedBuildType = null;
             this.updateBuildPanelUI();
           }
@@ -8397,7 +8718,7 @@
       this.addParticles(p.x, p.y, '#00FFFF', 8, 45);
       this.updateHUD();
       this.showStatus(`Constructed ${spec.name} (Lv1).`);
-      if (this.isMobileTouch) {
+      if (this.isMobileTouch && (!effActor || effActor === this.localPlayerId)) {
         this.selectedBuildType = null;
         this.updateBuildPanelUI();
       }
@@ -9510,7 +9831,7 @@
       this.addParticles(eng.x, eng.y, eng.color || '#FFD23F', 14, 55);
       this.showStatus(
         unitKind === 'medic'
-          ? `Deployed ${eng.name} (+${eng.healRate} HP/s squad heal & infection cure)!`
+          ? `Deployed ${eng.name} (+${eng.healRate} HP/s squad field heal)!`
           : unitKind === 'sapper'
           ? `Deployed ${eng.name} (plants up to ${eng.maxMines} proximity mines every ${eng.mineCooldown}s)!`
           : `Deployed ${eng.name} (+${eng.repairRate} HP/s $0 welding inside Safe Zones & connected Barricades)!`
@@ -10444,7 +10765,7 @@
       if (this.inspectName) this.inspectName.innerText = isMedic ? MEDIC_SPEC.name : isSapper ? SAPPER_SPEC.name : cur.name;
       if (this.inspectTier) {
         this.inspectTier.innerText = isMedic
-          ? 'Lv2/3 • Field Support & Cure'
+          ? 'Lv2/3 • Squad Field Medic'
           : isSapper
           ? 'Lv3/3 • Proximity Mine Layer'
           : engineer.homeHubId
@@ -10457,11 +10778,11 @@
       }
       if (isMedic) {
         if (this.inspectStatRange) this.inspectStatRange.innerText = `Heal: +${engineer.healRate || 18} HP/s (${engineer.healRange || 110}px)`;
-        if (this.inspectStatDmg) this.inspectStatDmg.innerText = 'Cures Infected Civilians';
-        if (this.inspectStatKills) this.inspectStatKills.innerText = `Healed: ${Math.floor(engineer.repairedTotal || 0)} • Cured: ${engineer.curedCount || 0}`;
+        if (this.inspectStatDmg) this.inspectStatDmg.innerText = 'Heals Squad & Safe-Zone Sappers';
+        if (this.inspectStatKills) this.inspectStatKills.innerText = `Healed: ${Math.floor(engineer.repairedTotal || 0)}`;
       } else if (isSapper) {
         const activeMines = this.mines ? this.mines.filter((m) => m.ownerUnitId === engineer.id).length : 0;
-        if (this.inspectStatRange) this.inspectStatRange.innerText = `Mines: ${activeMines}/${engineer.maxMines || 6}`;
+        if (this.inspectStatRange) this.inspectStatRange.innerText = `Mines: ${activeMines}/${engineer.maxMines || 5}`;
         if (this.inspectStatDmg) this.inspectStatDmg.innerText = `Mine AoE: ${engineer.mineDmg || 75} (${engineer.mineRadius || 48}px)`;
         if (this.inspectStatKills) this.inspectStatKills.innerText = `Planted: ${engineer.minesPlanted || 0}`;
       } else {
@@ -10800,6 +11121,7 @@
         struct.pendingMovedFromKey = oldKey;
       }
       this.structures.set(newKey, struct);
+      this.detonateMinesAtTile(col, row, effActor);
 
       if (struct.occupants) {
         for (const u of struct.occupants) {
@@ -12362,6 +12684,19 @@
       return this.minChebyshevDistToSafeZone(mc, mr) <= 3;
     }
 
+    detonateMinesAtTile(col, row, actorId = null) {
+      if (!this.mines || this.mines.length === 0) return;
+      const tp = tileCenter(col, row);
+      for (let i = this.mines.length - 1; i >= 0; i--) {
+        const m = this.mines[i];
+        const mc = m.col !== undefined ? m.col : Math.floor(m.x / TILE_SIZE);
+        const mr = m.row !== undefined ? m.row : Math.floor(m.y / TILE_SIZE);
+        if ((mc === col && mr === row) || Math.hypot(m.x - tp.x, m.y - tp.y) <= TILE_SIZE * 0.55) {
+          this.detonateMine(m, actorId, false);
+        }
+      }
+    }
+
     detonateMine(mine, actorId = null, manual = false) {
       if (!mine || !this.mines) return false;
       const idx = this.mines.indexOf(mine);
@@ -12562,20 +12897,22 @@
           }
         }
 
-        // 1. Check civilians for contact infection (Demolishers, Wreckers & random Brute-Breachers ignore chasing civilians outside bite range)
-        for (const civ of this.civilians) {
-          const d = Math.hypot(civ.x - z.x, civ.y - z.y);
-          if (d <= 18 && !civ.isIncubating) {
-            civ.isIncubating = true;
-            civ.incubationTimer = 0;
-            this.sound.playInfection();
-            this.addFloatingText('Civilian Infected!', civ.x, civ.y - 14, '#FF8800');
-            this.showStatus('A civilian was bitten! Incubation has started!');
-          }
-          if (z.type !== 'demolisher' && z.type !== 'wrecker' && !z.bruteBreach && !civ.isIncubating && d < closest) {
-            closest = d;
-            tx = civ.x;
-            ty = civ.y;
+        // 1. Only Runners chase and contact-infect civilians; all other zombie types ignore civilians completely
+        if (z.type === 'runner') {
+          for (const civ of this.civilians) {
+            const d = Math.hypot(civ.x - z.x, civ.y - z.y);
+            if (d <= 18 && !civ.isIncubating) {
+              civ.isIncubating = true;
+              civ.incubationTimer = 0;
+              this.sound.playInfection();
+              this.addFloatingText('Civilian Infected!', civ.x, civ.y - 14, '#FF8800');
+              this.showStatus('A civilian was bitten by a Runner! Incubation has started!');
+            }
+            if (!z.bruteBreach && !civ.isIncubating && d < closest) {
+              closest = d;
+              tx = civ.x;
+              ty = civ.y;
+            }
           }
         }
 
@@ -13573,10 +13910,12 @@
         if (showNext) {
           this.btnNextLevel.innerHTML = this.isTutorialMode
             ? 'Start Sector 1 &rarr;'
+            : this.isSurvivalMode
+            ? 'New Survival Map &rarr;'
             : this.isPostDefenseMode
             ? 'New Post Defense Map &rarr;'
-            : (this.isRandomMode || this.currentLevel >= LEVEL_MAPS.length - 1)
-            ? 'Next Random Sector &rarr;'
+            : this.currentLevel >= LEVEL_MAPS.length - 1
+            ? 'Play Post Defense &#8734; &rarr;'
             : 'Next Sector &rarr;';
           showEl(this.btnNextLevel, 'inline-flex');
         } else {

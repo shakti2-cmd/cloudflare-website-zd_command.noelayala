@@ -1,4 +1,4 @@
-/* Zombie Defense Command v0.40.0 - tactical command-center theme (offline, zero layout shift) */
+/* Zombie Defense Command v0.41.0 - tactical command-center theme (offline, zero layout shift) */
 :root {
   --bg: #07090d;
   --panel: #0e131b;
@@ -249,8 +249,16 @@ select:hover, .hud-btn:hover { border-color: var(--color-cyan); background: #182
 .tag-normal .pick-name { color: var(--color-yellow); }
 .tag-hard .pick-name { color: var(--color-red); }
 .tag-survival .pick-name { color: var(--color-cyan); }
-.tag-random .pick-name { color: var(--color-orange); }
 .tag-post .pick-name { color: var(--color-violet); }
+#startMainSection.is-survival-selected #threatLevelLabel,
+#startMainSection.is-survival-selected #difficultyCards {
+  opacity: 0.38;
+  filter: grayscale(0.45);
+  transition: opacity 0.18s ease, filter 0.18s ease;
+}
+#startMainSection.is-survival-selected #difficultyCards .pick-card {
+  border-style: dashed;
+}
 #startScreenOverlay .start-card {
   text-align: center;
 }

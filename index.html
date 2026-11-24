@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Zombie Defense Command - Tactical Grid Survival (v0.40.0)</title>
+  <title>Zombie Defense Command - Tactical Grid Survival (v0.41.0)</title>
 
   <!-- PWA & Mobile Web App Meta -->
   <meta name="theme-color" content="#07090d">
@@ -30,7 +30,7 @@
     <header id="topHud">
       <div class="hud-brand">
         <span class="hud-logo">&#9763;</span>
-        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.40.0</small></span>
+        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.41.0</small></span>
       </div>
 
       <div class="hud-stats">
@@ -67,8 +67,8 @@
           <option value="2">Sector 2: Choke Alley</option>
           <option value="3">Sector 3: Twin Fronts</option>
           <option value="4">Sector 4: Citadel</option>
-          <option value="random">Random Sector (Endless)</option>
           <option value="post_defense">Post Defense (Endless)</option>
+          <option value="survival">Survival Mode (Endless)</option>
           <option value="tutorial">Tutorial: Basic Training</option>
         </select>
         <button id="btnResetLevel" class="hud-btn" title="Restart current sector &amp; roll fresh Safe Zones">&#8635; Reset</button>
@@ -111,7 +111,7 @@
         <button id="btnCamFocusBase" class="cam-btn cam-base-btn" type="button" title="Center Camera on Safe Zone Base">&#8982; Base</button>
       </div>
 
-      <!-- Tactical Active Abilities Bar (v0.40.0: Overcharge & Napalm) -->
+      <!-- Tactical Active Abilities Bar (v0.41.0: Overcharge & Napalm) -->
       <div id="abilityBar" class="ability-bar hidden" role="toolbar" aria-label="Tactical Abilities">
         <button id="btnAbilityOvercharge" class="ability-btn" type="button" title="Overcharge ($200, 25s CD): +50% turret fire rate for 10s">
           <span class="ability-icon">&#9889;</span>
@@ -142,16 +142,16 @@
         <span id="tutorialUiArrowGlyph" class="tutorial-ui-arrow-glyph">&#9660;</span>
       </div>
 
-      <!-- Startup screen (v1.9.0: Clean 3-Card Campaign / Random / Post Defense Picker + Zombies Button) -->
+      <!-- Startup screen (v0.41.0: 3-Card Threat Level + Campaign / Post Defense / Survival Picker) -->
       <div id="startScreenOverlay" class="modal-overlay">
         <div class="modal-card start-card">
           <div class="start-icon">&#9763;</div>
           <h1 class="start-title">ZOMBIE DEFENSE COMMAND</h1>
-          <div class="start-version-badge">v0.40.0</div>
+          <div class="start-version-badge">v0.41.0</div>
           <p class="start-subtitle">Expand green Safe Zones within 3 tiles of Red Spawn Breaches and deploy Commandos to destroy them (towers defend against zombies only).</p>
 
           <div id="startMainSection">
-            <div class="option-label">THREAT LEVEL</div>
+            <div id="threatLevelLabel" class="option-label">THREAT LEVEL</div>
             <div class="card-row" id="difficultyCards">
               <button type="button" class="pick-card diff-card tag-easy" data-diff="easy">
                 <span class="pick-name">EASY</span>
@@ -165,17 +165,12 @@
                 <span class="pick-name">HARD</span>
                 <span class="pick-desc">4.0&times; HP &bull; $100 Scrap</span>
               </button>
-              <button type="button" class="pick-card diff-card tag-survival" data-diff="survival">
-                <span class="pick-name">SURVIVAL &#8734;</span>
-                <span class="pick-desc">4.0&times; HP (+60% / 5w) &bull; +1 Invincible Rift / 5w (20s)</span>
-              </button>
             </div>
             <select id="difficultySelect" class="sync-select" aria-label="Difficulty">
               <option value="" disabled selected>Select Threat Level</option>
               <option value="easy">Easy - 160 Scrap, 1.0x zombies, 3.0s incubation</option>
               <option value="normal">Normal - 100 Scrap, 2.0x zombies, 2.0s incubation</option>
               <option value="hard">Hard - 100 Scrap, 4.0x zombies, 1.2s incubation</option>
-              <option value="survival">Survival - 110 Scrap, 4.0x HP (+60% / 5 waves), 1.35x speed, 5-wave +1 uncapped invincible rift reshuffle (20s)</option>
             </select>
 
             <div class="option-label">MISSION MODE</div>
@@ -184,13 +179,13 @@
                 <span class="pick-name">CAMPAIGN</span>
                 <span class="pick-desc">Sectors 1&ndash;4</span>
               </button>
-              <button type="button" class="pick-card mode-card tag-random" data-mode="random">
-                <span class="pick-name">RANDOM SECTOR &#8734;</span>
-                <span class="pick-desc">Procedural Maps</span>
-              </button>
               <button type="button" class="pick-card mode-card tag-post" data-mode="post_defense">
                 <span class="pick-name">POST DEFENSE &#8734;</span>
                 <span class="pick-desc">Endless Outpost</span>
+              </button>
+              <button type="button" class="pick-card mode-card tag-survival" data-mode="survival">
+                <span class="pick-name">SURVIVAL &#8734;</span>
+                <span class="pick-desc">4.0&times; HP (+60% / 5w) &bull; +1 Invincible Rift / 5w (20s)</span>
               </button>
             </div>
 
@@ -237,16 +232,16 @@
             <option value="2">Sector 2: Choke Alley</option>
             <option value="3">Sector 3: Twin Fronts</option>
             <option value="4">Sector 4: Citadel</option>
-            <option value="random">Random Sector (Endless)</option>
             <option value="post_defense">Post Defense (Endless)</option>
+            <option value="survival">Survival Mode (Endless)</option>
             <option value="tutorial">Tutorial: Basic Training</option>
           </select>
 
-          <div class="start-hint">v0.40.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; Settings</div>
+          <div class="start-hint">v0.41.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; Settings</div>
         </div>
       </div>
 
-      <!-- Settings Modal (v0.40.0) -->
+      <!-- Settings Modal (v0.41.0) -->
       <div id="settingsModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
         <div class="modal-card settings-card">
           <button id="btnCloseSettings" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
@@ -316,7 +311,7 @@
         </div>
       </div>
 
-      <!-- Developer Tuning Modal (v0.40.0: Live Multiplier Overrides) -->
+      <!-- Developer Tuning Modal (v0.41.0: Live Multiplier Overrides) -->
       <div id="developerModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="devTitle">
         <div class="modal-card dev-card">
           <button id="btnCloseDeveloper" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
@@ -537,7 +532,7 @@
       <div id="howToPlayModal" class="modal-overlay hidden">
         <div class="modal-card help-card">
           <button id="btnCloseHowToPlay" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.40.0)</h2>
+          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.41.0)</h2>
           <div class="help-grid">
             <section>
               <h3>Single 3&times;3 Start &amp; Line-Drag Barricades</h3>
@@ -574,22 +569,22 @@
       <div id="zombieGuideModal" class="modal-overlay hidden">
         <div class="modal-card help-card zombie-guide-card">
           <button id="btnCloseZombieGuide" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.40.0)</h2>
-          <div id="bestiaryHardIndicator" class="bestiary-hard-indicator hidden">&#9888; HARD MODE ACTIVE: 3.0&times; ZOMBIE HP APPLIED</div>
+          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.41.0)</h2>
+          <div id="bestiaryHardIndicator" class="bestiary-hard-indicator hidden">&#9888; HARD MODE ACTIVE: 4.0&times; ZOMBIE HP APPLIED</div>
           <p class="bestiary-note"><b class="c-orange">25% Random Brute-Breach Trait:</b> Any spawned Walker, Runner, Tank, or Wrecker has a 25% chance (100% on Demolisher) to smash straight toward Safe Zones, dealing a <b>fixed unscaled 12 damage</b> (<b>16 damage</b> for Demolishers) per strike against structures &amp; Safe Zones.</p>
           <div class="zombie-intel-list">
             <div class="zombie-intel-row">
               <canvas id="zPortraitWalker" class="z-portrait" width="52" height="52"></canvas>
               <div class="z-info">
                 <div class="z-head"><span class="z-name c-red">1. WALKER (walker)</span><span class="z-stats">HP: 40 &bull; Speed: 45 px/s &bull; Dmg: 10 / 0.5s &bull; Bounty: +$1 &bull; Wave 1+</span></div>
-                <p>Standard infected shambler. Pursues nearest uninfected civilian, then Rescued Soldiers/Engineers within 300px, then green Safe Zone blocks. Routes around structures when an open lane exists.</p>
+                <p>Standard infected shambler. Ignores civilians completely; targets Rescued Soldiers/Engineers within 300px, then green Safe Zone blocks. Routes around structures when an open lane exists.</p>
               </div>
             </div>
             <div class="zombie-intel-row">
               <canvas id="zPortraitRunner" class="z-portrait" width="52" height="52"></canvas>
               <div class="z-info">
                 <div class="z-head"><span class="z-name c-orange">2. RUNNER (runner)</span><span class="z-stats">HP: 25 &bull; Speed: 85 px/s &bull; Dmg: 8 / 0.5s &bull; Bounty: +$1 &bull; Wave 2+</span></div>
-                <p>High-velocity sprinter appearing from Wave 2+. Closes distance rapidly to bite exposed civilians; also spawns immediately whenever an infected white-dot civilian completes incubation.</p>
+                <p>High-velocity sprinter appearing from Wave 2+. Only zombie type that chases and infects exposed civilians; also spawns immediately whenever an infected white-dot civilian completes incubation.</p>
               </div>
             </div>
             <div class="zombie-intel-row">
@@ -623,7 +618,7 @@
             <div class="zombie-intel-row">
               <canvas id="zPortraitBehemoth" class="z-portrait" width="52" height="52"></canvas>
               <div class="z-info">
-                <div class="z-head"><span class="z-name c-red">7. HIVE BEHEMOTH (behemoth)</span><span class="z-stats">HP: 900 &bull; Speed: 24 px/s &bull; Dmg: 35 / 0.5s &bull; Bounty: +$40 &bull; Survival Wave 10, 20, 30...</span></div>
+                <div class="z-head"><span class="z-name c-red">7. HIVE BEHEMOTH (behemoth)</span><span class="z-stats">HP: 900 &bull; Speed: 24 px/s &bull; Dmg: 35 / 0.5s &bull; Bounty: +$80 &bull; Survival Wave 10, 20, 30...</span></div>
                 <p>Survival Mode apex brood boss spawning every 10th wave (Sniper headshot immune). Radiates a 120px crimson brood aura granting nearby zombies +20% movement speed and 25% damage reduction until eliminated.</p>
               </div>
             </div>
@@ -654,7 +649,7 @@
         </div>
       </div>
 
-      <!-- 4-Player Co-Op Multiplayer Modals (v0.40.0) -->
+      <!-- 4-Player Co-Op Multiplayer Modals (v0.41.0) -->
       <div id="mpRoleModal" class="modal-overlay hidden">
         <div class="modal-card mp-card">
           <h2 class="help-title mp-modal-title">&#127760; 4-PLAYER CO-OP MULTIPLAYER</h2>
@@ -786,7 +781,7 @@
         </div>
       </div>
 
-      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.40.0) -->
+      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.41.0) -->
       <div id="mpPauseModal" class="modal-overlay hidden">
         <div class="modal-card mp-card mp-pause-card">
           <h2 id="mpPauseTitle" class="help-title mp-modal-title">&#9208; MATCH PAUSED</h2>
@@ -980,7 +975,7 @@
         </div>
 
         <div id="deckHint">
-          <span class="hint-text">v0.40.0 &bull; Mortar ($240) / Laser ($260) / Radar ($175) &bull; Gunner / Medic / Sapper &bull; Barracks Hold Stance &bull; Overcharge &amp; Napalm</span>
+          <span class="hint-text">v0.41.0 &bull; Mortar ($240) / Laser ($260) / Radar ($175) &bull; Gunner / Medic / Sapper &bull; Barracks Hold Stance &bull; Overcharge &amp; Napalm</span>
         </div>
       </div>
     </footer>
