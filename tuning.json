@@ -1,6 +1,6 @@
 {
-  "version": "v0.50.0",
-  "updatedAt": "2026-11-24T17:55:41.371Z",
+  "version": "v0.50.1",
+  "updatedAt": "2026-11-24T21:12:25.842Z",
   "general": {
     "towerStrengthMult": 1,
     "zombieHpMult": 0.5,
@@ -10,7 +10,7 @@
     "safeZonesPerStructure": 3
   },
   "waveMeter": {
-    "toughness10WaveMult": 1,
+    "toughness10WaveMult": 1.5,
     "speed10WaveMult": 1
   },
   "zombies": {
