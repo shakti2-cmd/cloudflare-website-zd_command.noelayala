@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "zd-command",
+  "main": "worker.js",
+  "compatibility_date": "2026-11-24",
+  "assets": {
+    "directory": ".",
+    "binding": "ASSETS"
+  }
+}

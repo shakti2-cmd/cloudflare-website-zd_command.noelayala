@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.45.0 (Medic Zombie-Kiting & Reliable Engineering Garrisoning)
+ * Version: v0.46.0 (Medic Zombie-Kiting & Reliable Engineering Garrisoning)
  */
 
 (function () {
@@ -1249,6 +1249,8 @@
       this.devActiveTab = 'general';
       this.devSelectedZombieType = 'walker';
       this.devZombieOverrides = this.createDefaultZombieOverrides();
+      this._devUserModified = false;
+      this._publishedTuningDefaults = null;
 
       this.scrap = 100;
       this.score = 0;
@@ -1385,6 +1387,7 @@
       showEl(this.startScreenOverlay, 'flex');
       this.updateHUD();
       this.updateTimerHud();
+      this.loadRemoteTuningDefaults();
 
       const autoSaveSp = () => {
         if (!this.isMultiplayer && !this.isTutorialMode && this.inPlay) {
@@ -1627,7 +1630,7 @@
       this.arsenalTabUnits = $('arsenalTabUnits');
       this.arsenalTabTowers = $('arsenalTabTowers');
 
-      // Developer Tuning UI Elements (v0.45.0)
+      // Developer Tuning UI Elements (v0.46.0)
       this.developerModal = $('developerModal');
       this.btnCloseDeveloper = $('btnCloseDeveloper');
       this.btnDoneDeveloper = $('btnDoneDeveloper');
@@ -1869,7 +1872,7 @@
       on(this.tabArsenalUnits, 'click', () => { this.setArsenalTab('units'); this.sound.playClick(); });
       on(this.tabArsenalTowers, 'click', () => { this.setArsenalTab('towers'); this.sound.playClick(); });
 
-      // Developer Tuning Modal bindings (v0.45.0)
+      // Developer Tuning Modal bindings (v0.46.0)
       on(this.btnSettingsDeveloper, 'click', () => this.openDeveloperModal());
       on(this.btnCloseDeveloper, 'click', () => this.closeDeveloperModal());
       on(this.btnDoneDeveloper, 'click', () => this.closeDeveloperModal());
@@ -1890,6 +1893,7 @@
 
       const updateDevSlider = (slider, key, readout) => {
         if (!slider) return;
+        this._devUserModified = true;
         const idx = Math.max(0, Math.min(this.devSliderStops.length - 1, parseInt(slider.value, 10) || 0));
         const val = this.devSliderStops[idx];
         if (key === 'hp') {
@@ -1913,6 +1917,7 @@
       on(this.sliderDevZombieSpeed, 'input', () => updateDevSlider(this.sliderDevZombieSpeed, 'speed', this.valDevZombieSpeed));
       on(this.sliderDevBreachCount, 'input', () => updateDevSlider(this.sliderDevBreachCount, 'breach', this.valDevBreachCount));
       on(this.sliderDevStructRatio, 'input', () => {
+        this._devUserModified = true;
         const stops = this.devStructRatioStops || [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
         const idx = Math.max(0, Math.min(stops.length - 1, parseInt(this.sliderDevStructRatio.value, 10) || 0));
         const val = stops[idx];
@@ -1925,30 +1930,37 @@
       });
 
       on(this.sliderDevZTypeHp, 'input', () => {
+        this._devUserModified = true;
         const idx = Math.max(0, Math.min(this.devSliderStops.length - 1, parseInt(this.sliderDevZTypeHp.value, 10) || 0));
         this.setDevZombieTypeStat(this.devSelectedZombieType, 'hpMult', this.devSliderStops[idx]);
       });
       on(this.sliderDevZTypeSpeed, 'input', () => {
+        this._devUserModified = true;
         const idx = Math.max(0, Math.min(this.devSliderStops.length - 1, parseInt(this.sliderDevZTypeSpeed.value, 10) || 0));
         this.setDevZombieTypeStat(this.devSelectedZombieType, 'speedMult', this.devSliderStops[idx]);
       });
       on(this.sliderDevZTypeDmg, 'input', () => {
+        this._devUserModified = true;
         const idx = Math.max(0, Math.min(this.devSliderStops.length - 1, parseInt(this.sliderDevZTypeDmg.value, 10) || 0));
         this.setDevZombieTypeStat(this.devSelectedZombieType, 'dmgMult', this.devSliderStops[idx]);
       });
       on(this.sliderDevZTypeBounty, 'input', () => {
+        this._devUserModified = true;
         const val = Math.max(1, Math.min(100, parseInt(this.sliderDevZTypeBounty.value, 10) || 1));
         this.setDevZombieTypeStat(this.devSelectedZombieType, 'bounty', val);
       });
       on(this.sliderDevZTypeCount, 'input', () => {
+        this._devUserModified = true;
         const idx = Math.max(0, Math.min(this.devCountStops.length - 1, parseInt(this.sliderDevZTypeCount.value, 10) || 0));
         this.setDevZombieTypeStat(this.devSelectedZombieType, 'countMult', this.devCountStops[idx]);
       });
       on(this.sliderDev10WaveToughness, 'input', () => {
+        this._devUserModified = true;
         const idx = Math.max(0, Math.min(this.dev10WaveToughnessStops.length - 1, parseInt(this.sliderDev10WaveToughness.value, 10) || 0));
         this.setDev10WaveToughnessMult(this.dev10WaveToughnessStops[idx]);
       });
       on(this.sliderDev10WaveSpeed, 'input', () => {
+        this._devUserModified = true;
         const idx = Math.max(0, Math.min(this.dev10WaveSpeedStops.length - 1, parseInt(this.sliderDev10WaveSpeed.value, 10) || 0));
         this.setDev10WaveSpeedMult(this.dev10WaveSpeedStops[idx]);
       });
@@ -3394,24 +3406,83 @@
       }
     }
 
+    async loadRemoteTuningDefaults() {
+      if (typeof window === 'undefined' || !window.location || !/^https?:$/.test(window.location.protocol)) return;
+      try {
+        const res = await fetch('./tuning.json', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data || typeof data !== 'object') return;
+        this._publishedTuningDefaults = data;
+        if (!this._devUserModified) {
+          this.applyTuningDefaults(data);
+        }
+      } catch (_) {}
+    }
+
+    applyTuningDefaults(data) {
+      if (!data || typeof data !== 'object') return;
+      const g = data.general && typeof data.general === 'object' ? data.general : {};
+      const w = data.waveMeter && typeof data.waveMeter === 'object' ? data.waveMeter : {};
+      const zMap = data.zombies && typeof data.zombies === 'object' ? data.zombies : {};
+
+      if (typeof g.devTowerStrengthMult === 'number') this.devTowerStrengthMult = g.devTowerStrengthMult;
+      if (typeof g.devZombieScrapMult === 'number') this.devZombieScrapMult = g.devZombieScrapMult;
+      if (typeof g.devBreachCountMult === 'number') this.devBreachCountMult = g.devBreachCountMult;
+      if (typeof g.devSafeZonesPerStructure === 'number') this.devSafeZonesPerStructure = g.devSafeZonesPerStructure;
+      if (typeof g.devZombieHpMult === 'number') this.setDevZombieHpMult(g.devZombieHpMult);
+      if (typeof g.devZombieSpeedMult === 'number') this.setDevZombieSpeedMult(g.devZombieSpeedMult);
+
+      if (typeof w.dev10WaveToughnessMult === 'number') this.setDev10WaveToughnessMult(w.dev10WaveToughnessMult);
+      if (typeof w.dev10WaveSpeedMult === 'number') this.setDev10WaveSpeedMult(w.dev10WaveSpeedMult);
+
+      const baseOverrides = this.createDefaultZombieOverrides();
+      for (const zType of Object.keys(baseOverrides)) {
+        if (zMap[zType] && typeof zMap[zType] === 'object') {
+          const src = zMap[zType];
+          baseOverrides[zType] = {
+            hpMult: typeof src.hpMult === 'number' ? src.hpMult : baseOverrides[zType].hpMult,
+            speedMult: typeof src.speedMult === 'number' ? src.speedMult : baseOverrides[zType].speedMult,
+            dmgMult: typeof src.dmgMult === 'number' ? src.dmgMult : baseOverrides[zType].dmgMult,
+            bounty: typeof src.bounty === 'number' ? Math.max(1, Math.round(src.bounty)) : baseOverrides[zType].bounty,
+            countMult: typeof src.countMult === 'number' ? src.countMult : baseOverrides[zType].countMult
+          };
+        }
+      }
+      this.devZombieOverrides = baseOverrides;
+      this.syncDeveloperUI();
+      this.updateHUD();
+      if (this.selectedStructure) this.renderUpgradePanel(this.selectedStructure);
+    }
+
     resetGeneralDeveloperDefaults() {
-      this.devTowerStrengthMult = 1.0;
-      this.devZombieScrapMult = 1.5;
-      this.devBreachCountMult = 0.75;
-      this.devSafeZonesPerStructure = 3;
-      this.setDevZombieHpMult(0.5);
-      this.setDevZombieSpeedMult(1.0);
+      const g = (this._publishedTuningDefaults && this._publishedTuningDefaults.general) || {};
+      this.devTowerStrengthMult = typeof g.devTowerStrengthMult === 'number' ? g.devTowerStrengthMult : 1.0;
+      this.devZombieScrapMult = typeof g.devZombieScrapMult === 'number' ? g.devZombieScrapMult : 1.5;
+      this.devBreachCountMult = typeof g.devBreachCountMult === 'number' ? g.devBreachCountMult : 0.75;
+      this.devSafeZonesPerStructure = typeof g.devSafeZonesPerStructure === 'number' ? g.devSafeZonesPerStructure : 3;
+      this.setDevZombieHpMult(typeof g.devZombieHpMult === 'number' ? g.devZombieHpMult : 0.5);
+      this.setDevZombieSpeedMult(typeof g.devZombieSpeedMult === 'number' ? g.devZombieSpeedMult : 1.0);
       this.updateHUD();
       if (this.selectedStructure) this.renderUpgradePanel(this.selectedStructure);
     }
 
     resetWaveMeterDeveloperDefaults() {
-      this.setDev10WaveToughnessMult(1.0);
-      this.setDev10WaveSpeedMult(1.0);
+      const w = (this._publishedTuningDefaults && this._publishedTuningDefaults.waveMeter) || {};
+      this.setDev10WaveToughnessMult(typeof w.dev10WaveToughnessMult === 'number' ? w.dev10WaveToughnessMult : 1.0);
+      this.setDev10WaveSpeedMult(typeof w.dev10WaveSpeedMult === 'number' ? w.dev10WaveSpeedMult : 1.0);
     }
 
     resetZombieDeveloperDefaults() {
       const defaults = this.createDefaultZombieOverrides();
+      const pubZ = this._publishedTuningDefaults && this._publishedTuningDefaults.zombies;
+      if (pubZ && typeof pubZ === 'object') {
+        for (const zType of Object.keys(defaults)) {
+          if (pubZ[zType] && typeof pubZ[zType] === 'object') {
+            defaults[zType] = { ...defaults[zType], ...pubZ[zType] };
+          }
+        }
+      }
       for (const zType of Object.keys(ZOMBIE_BASE_STATS)) {
         const def = defaults[zType];
         const prev = this.devZombieOverrides && this.devZombieOverrides[zType];
@@ -3440,6 +3511,7 @@
     }
 
     resetDeveloperTab() {
+      this._devUserModified = true;
       if (this.devActiveTab === 'zombies') {
         this.resetZombieDeveloperDefaults();
       } else if (this.devActiveTab === 'wavemeter') {
@@ -3452,6 +3524,7 @@
     }
 
     resetAllDeveloperDefaults() {
+      this._devUserModified = true;
       this.resetGeneralDeveloperDefaults();
       this.resetZombieDeveloperDefaults();
       this.resetWaveMeterDeveloperDefaults();
@@ -4357,6 +4430,7 @@
       this.grid = saved.grid;
 
       if (saved.devTuning && typeof saved.devTuning === 'object') {
+        this._devUserModified = true;
         const dtCfg = saved.devTuning;
         if (typeof dtCfg.devTowerStrengthMult === 'number') this.devTowerStrengthMult = dtCfg.devTowerStrengthMult;
         if (typeof dtCfg.devZombieHpMult === 'number') this.devZombieHpMult = dtCfg.devZombieHpMult;

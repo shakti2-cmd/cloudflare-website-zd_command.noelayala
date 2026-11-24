@@ -1,11 +1,12 @@
 // Zombie Defense Command - Offline PWA Service Worker (Network-First with Cache Fallback)
-const CACHE_NAME = 'zdc-pwa-v0.45.0';
+const CACHE_NAME = 'zdc-pwa-v0.46.0';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './style.css',
   './multiplayer.js',
   './game.js',
+  './tuning.json',
   './manifest.json',
   './icon.svg',
   './assets/icon-192.png',
@@ -37,6 +38,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
+  if (url.pathname.startsWith('/admin') || url.pathname.startsWith('/api/')) return;
 
   // Network-first strategy for same-origin app shell & game files
   if (url.origin === self.location.origin) {

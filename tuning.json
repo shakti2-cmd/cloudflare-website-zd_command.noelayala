@@ -1,0 +1,25 @@
+{
+  "version": "v0.46.0",
+  "updatedAt": "2026-11-25T01:10:00+08:00",
+  "general": {
+    "towerStrengthMult": 1.0,
+    "zombieHpMult": 0.5,
+    "zombieScrapMult": 1.5,
+    "zombieSpeedMult": 1.0,
+    "breachCountMult": 0.75,
+    "safeZonesPerStructure": 3
+  },
+  "waveMeter": {
+    "toughness10WaveMult": 1.0,
+    "speed10WaveMult": 1.0
+  },
+  "zombies": {
+    "walker": { "hpMult": 1.0, "speedMult": 1.0, "dmgMult": 1.0, "bounty": 1, "countMult": 1.0 },
+    "runner": { "hpMult": 1.0, "speedMult": 1.0, "dmgMult": 1.0, "bounty": 1, "countMult": 1.0 },
+    "tank": { "hpMult": 1.0, "speedMult": 1.0, "dmgMult": 1.0, "bounty": 10, "countMult": 1.0 },
+    "demolisher": { "hpMult": 1.0, "speedMult": 1.0, "dmgMult": 1.0, "bounty": 9, "countMult": 1.0 },
+    "wrecker": { "hpMult": 1.0, "speedMult": 1.0, "dmgMult": 1.0, "bounty": 7, "countMult": 1.0 },
+    "miniboss": { "hpMult": 1.0, "speedMult": 1.0, "dmgMult": 1.0, "bounty": 45, "countMult": 1.0 },
+    "behemoth": { "hpMult": 1.0, "speedMult": 1.0, "dmgMult": 1.0, "bounty": 80, "countMult": 1.0 }
+  }
+}
