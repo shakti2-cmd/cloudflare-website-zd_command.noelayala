@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.35.0 (Survival Per-Breach Spawns & Mid-Wave Cancel, Speed/Count Dev Sliders, Barrier Fallback Waypoints & Linked Wall/Gate Repairs)
+ * Version: v0.36.0 (Survival Tiered Breach Reshuffle, Queue Remapping, Wave Timer/Dormancy Guards & Immediate Active-Breach Spawning)
  */
 
 (function () {
@@ -6097,6 +6097,66 @@
       return 1.0 + 0.60 * steps;
     }
 
+    buildSurvivalSpawnTiers() {
+      const szTiles = Array.from(this.safeZones.values());
+      const tier6 = [];
+      const tier4 = [];
+      const tier3 = [];
+      const tier2 = [];
+      for (let r = 1; r < ROWS - 1; r++) {
+        for (let c = 1; c < COLS - 1; c++) {
+          if (this.grid[r][c] !== 0) continue;
+          const key = `${c},${r}`;
+          if (this.structures.has(key) || this.safeZones.has(key) || this.spawns.has(key)) continue;
+          let minSzD = Infinity;
+          for (const sz of szTiles) {
+            const d = Math.hypot(c - sz.col, r - sz.row);
+            if (d < minSzD) minSzD = d;
+          }
+          if (minSzD >= 6) tier6.push([c, r]);
+          else if (minSzD >= 4) tier4.push([c, r]);
+          else if (minSzD >= 3) tier3.push([c, r]);
+          else if (minSzD >= 2) tier2.push([c, r]);
+        }
+      }
+      const tiers = [tier6, tier4, tier3, tier2];
+      for (const tier of tiers) {
+        for (let i = tier.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [tier[i], tier[j]] = [tier[j], tier[i]];
+        }
+      }
+      return { tiers, sampleSz: szTiles[0] };
+    }
+
+    hasNearbySpawnBreach(col, row, minDist = 2) {
+      for (const sp of this.spawns.values()) {
+        if (Math.hypot(col - sp.col, row - sp.row) < minDist) return true;
+      }
+      return false;
+    }
+
+    placeSurvivalDormantBreach(bc, br, breachHp) {
+      this.grid[br][bc] = 3;
+      const p = tileCenter(bc, br);
+      const key = `${bc},${br}`;
+      this.spawns.set(key, {
+        type: 'spawn',
+        col: bc,
+        row: br,
+        x: p.x,
+        y: p.y,
+        hp: breachHp,
+        maxHp: breachHp,
+        flash: 0,
+        timeSinceHit: 99,
+        isRegenerating: false,
+        dormantTimer: 20.0
+      });
+      this.pulseRings.push({ x: p.x, y: p.y, radius: 10, maxRadius: 72, color: '#FFD23F', life: 1.2, maxLife: 1.2 });
+      return p;
+    }
+
     reshuffleSurvivalSpawns() {
       if (this.safeZones.size === 0) return;
       const cap = 12 * (this.isMultiplayer ? Math.max(1, this.mpPlayers.length) : 1);
@@ -6109,50 +6169,50 @@
       }
       this.spawns.clear();
 
-      const szTiles = Array.from(this.safeZones.values());
-      const sampleSz = szTiles[0];
-      const candidates = [];
-      for (let r = 1; r < ROWS - 1; r++) {
-        for (let c = 1; c < COLS - 1; c++) {
-          if (this.grid[r][c] !== 0) continue;
-          const key = `${c},${r}`;
-          if (this.structures.has(key) || this.safeZones.has(key) || this.spawns.has(key)) continue;
-          let minSzD = Infinity;
-          for (const sz of szTiles) {
-            const d = Math.hypot(c - sz.col, r - sz.row);
-            if (d < minSzD) minSzD = d;
+      const { tiers, sampleSz } = this.buildSurvivalSpawnTiers();
+      const breachHp = 750 + Math.floor((this.wave || 1) / 5) * 150;
+      const blocked = (c, r) => !inBounds(c, r) || this.grid[r][c] === 1;
+
+      // Pass 1: Tiered Safe Zone distance fallback (6 -> 4 -> 3 -> 2) with >= 2-tile breach spacing
+      for (const tier of tiers) {
+        for (let i = 0; i < tier.length && this.spawns.size < targetCount; i++) {
+          const [bc, br] = tier[i];
+          const key = `${bc},${br}`;
+          if (this.grid[br][bc] !== 0 || this.safeZones.has(key) || this.structures.has(key) || this.spawns.has(key)) continue;
+          if (this.hasNearbySpawnBreach(bc, br, 2)) continue;
+          if (!findPath(bc, br, sampleSz.col, sampleSz.row, blocked)) continue;
+          this.placeSurvivalDormantBreach(bc, br, breachHp);
+        }
+        if (this.spawns.size >= targetCount) break;
+      }
+
+      // Pass 2: Unspaced fallback on heavily expanded Wave 30+ maps
+      if (this.spawns.size < targetCount) {
+        for (const tier of tiers) {
+          for (let i = 0; i < tier.length && this.spawns.size < targetCount; i++) {
+            const [bc, br] = tier[i];
+            const key = `${bc},${br}`;
+            if (this.grid[br][bc] !== 0 || this.safeZones.has(key) || this.structures.has(key) || this.spawns.has(key)) continue;
+            if (!findPath(bc, br, sampleSz.col, sampleSz.row, blocked)) continue;
+            this.placeSurvivalDormantBreach(bc, br, breachHp);
           }
-          if (minSzD >= 6) candidates.push([c, r]);
+          if (this.spawns.size >= targetCount) break;
         }
       }
-      for (let i = candidates.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+
+      // Remap unspawned queued zombies round-robin onto the newly placed breaches
+      if (this.waveSpawnQueue.length > 0 && this.spawns.size > 0) {
+        const newKeys = Array.from(this.spawns.keys());
+        let rr = 0;
+        for (let i = 0; i < this.waveSpawnQueue.length; i++) {
+          const q = this.waveSpawnQueue[i];
+          if (q && typeof q === 'object' && q.breachKey) {
+            q.breachKey = newKeys[rr % newKeys.length];
+            rr++;
+          }
+        }
       }
-      const breachHp = 750 + Math.floor((this.wave || 1) / 5) * 150;
-      for (let i = 0; i < candidates.length && this.spawns.size < targetCount; i++) {
-        const [bc, br] = candidates[i];
-        const key = `${bc},${br}`;
-        if (this.grid[br][bc] !== 0 || this.safeZones.has(key) || this.structures.has(key) || this.spawns.has(key)) continue;
-        const path = findPath(bc, br, sampleSz.col, sampleSz.row, (c, r) => !inBounds(c, r) || this.grid[r][c] === 1);
-        if (!path) continue;
-        this.grid[br][bc] = 3;
-        const p = tileCenter(bc, br);
-        this.spawns.set(key, {
-          type: 'spawn',
-          col: bc,
-          row: br,
-          x: p.x,
-          y: p.y,
-          hp: breachHp,
-          maxHp: breachHp,
-          flash: 0,
-          timeSinceHit: 99,
-          isRegenerating: false,
-          dormantTimer: 20.0
-        });
-        this.pulseRings.push({ x: p.x, y: p.y, radius: 10, maxRadius: 72, color: '#FFD23F', life: 1.2, maxLife: 1.2 });
-      }
+
       this.sound.playWaveWarning();
       this.addFloatingText(`SPAWNS RESHUFFLED +1 (${this.spawns.size} RIFTS, 20s COOLDOWN)!`, WIDTH / 2, 165, '#FFD23F');
       this.showStatus(`Survival Wave 10-boundary: ${this.spawns.size} Spawn Breaches (+1 added) reshuffled with a 20s cooldown!`);
@@ -6161,53 +6221,25 @@
     spawnSurvivalDormantRift() {
       const cap = 12 * (this.isMultiplayer ? Math.max(1, this.mpPlayers.length) : 1);
       if (this.spawns.size >= cap || this.safeZones.size === 0) return false;
-      const szTiles = Array.from(this.safeZones.values());
-      const sampleSz = szTiles[0];
-      const candidates = [];
-      for (let r = 1; r < ROWS - 1; r++) {
-        for (let c = 1; c < COLS - 1; c++) {
-          if (this.grid[r][c] !== 0) continue;
-          const key = `${c},${r}`;
-          if (this.spawns.has(key) || this.structures.has(key) || this.safeZones.has(key)) continue;
-          let minSzD = Infinity;
-          for (const sz of szTiles) {
-            const d = Math.hypot(c - sz.col, r - sz.row);
-            if (d < minSzD) minSzD = d;
+      const { tiers, sampleSz } = this.buildSurvivalSpawnTiers();
+      const breachHp = 750 + Math.floor((this.wave || 1) / 5) * 150;
+      const blocked = (c, r) => !inBounds(c, r) || this.grid[r][c] === 1;
+
+      for (const requireSpacing of [true, false]) {
+        for (const tier of tiers) {
+          for (let attempt = 0; attempt < tier.length; attempt++) {
+            const [bc, br] = tier[attempt];
+            const key = `${bc},${br}`;
+            if (this.grid[br][bc] !== 0 || this.safeZones.has(key) || this.structures.has(key) || this.spawns.has(key)) continue;
+            if (requireSpacing && this.hasNearbySpawnBreach(bc, br, 2)) continue;
+            if (!findPath(bc, br, sampleSz.col, sampleSz.row, blocked)) continue;
+            const p = this.placeSurvivalDormantBreach(bc, br, breachHp);
+            this.addFloatingText('NEW RIFT FORMING (20s)!', p.x, p.y - 16, '#FFD23F');
+            this.sound.playWaveWarning();
+            this.showStatus('Warning: Dormant Survival Rift detected! Activates in 20s!');
+            return true;
           }
-          if (minSzD >= 6) candidates.push([c, r]);
         }
-      }
-      for (let i = candidates.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
-      }
-      for (let attempt = 0; attempt < candidates.length; attempt++) {
-        const [bc, br] = candidates[attempt];
-        const key = `${bc},${br}`;
-        if (this.grid[br][bc] !== 0 || this.safeZones.has(key) || this.structures.has(key) || this.spawns.has(key)) continue;
-        const path = findPath(bc, br, sampleSz.col, sampleSz.row, (c, r) => !inBounds(c, r) || this.grid[r][c] === 1);
-        if (!path) continue;
-        this.grid[br][bc] = 3;
-        const p = tileCenter(bc, br);
-        const breachHp = 750 + Math.floor((this.wave || 1) / 5) * 150;
-        this.spawns.set(key, {
-          type: 'spawn',
-          col: bc,
-          row: br,
-          x: p.x,
-          y: p.y,
-          hp: breachHp,
-          maxHp: breachHp,
-          flash: 0,
-          timeSinceHit: 99,
-          isRegenerating: false,
-          dormantTimer: 20.0
-        });
-        this.pulseRings.push({ x: p.x, y: p.y, radius: 10, maxRadius: 72, color: '#FFD23F', life: 1.2, maxLife: 1.2 });
-        this.addFloatingText('NEW RIFT FORMING (20s)!', p.x, p.y - 16, '#FFD23F');
-        this.sound.playWaveWarning();
-        this.showStatus('Warning: Dormant Survival Rift detected! Activates in 20s!');
-        return true;
       }
       return false;
     }
@@ -6247,6 +6279,8 @@
       if (!this.inPlay || this.isPaused || this.modalBlocking) return false;
       if (this.isTutorialMode && this.tutorialStep < 7) return false;
       if (this.spawns.size === 0 && !this.isPostDefenseMode) return false;
+      if (this.spawns.size > 0 && Array.from(this.spawns.values()).every((sp) => sp.dormantTimer > 0)) return false;
+      if (this.isSurvivalMode && this.waveSpawnQueue.length > 0) return false;
       return this.isEndlessMode || this.wave < this.totalWaves || this.spawns.size > 0;
     }
 
@@ -6495,6 +6529,16 @@
         const targetBreach = this.spawns.get(breachKey);
         if (!targetBreach) return; // Discard entries for breaches destroyed mid-wave
         if (targetBreach.dormantTimer > 0) {
+          const readyIdx = this.waveSpawnQueue.findIndex((e) => {
+            if (!e || typeof e !== 'object' || !e.breachKey) return true;
+            const b = this.spawns.get(e.breachKey);
+            return !b || !(b.dormantTimer > 0);
+          });
+          if (readyIdx !== -1) {
+            this.waveSpawnQueue.push(entry);
+            const readyEntry = this.waveSpawnQueue.splice(readyIdx, 1)[0];
+            return this.spawnZombie(readyEntry);
+          }
           this.waveSpawnQueue.push(entry);
           return;
         }
@@ -10115,11 +10159,14 @@
         }
       }
 
+      const allBreachesDormant = this.spawns.size > 0 && Array.from(this.spawns.values()).every((sp) => sp.dormantTimer > 0);
       // Unified nextWaveTimer progression (frozen during Tutorial Steps 1-6 until Step 7 unlocks wave)
       if (
         (!this.isTutorialMode || this.tutorialStep >= 7) &&
         (this.waveState === STATE.PREPARE || this.waveState === STATE.ACTIVE) &&
-        (this.isEndlessMode || this.wave < this.totalWaves || this.spawns.size > 0)
+        (this.isEndlessMode || this.wave < this.totalWaves || this.spawns.size > 0) &&
+        this.waveSpawnQueue.length === 0 &&
+        !allBreachesDormant
       ) {
         this.nextWaveTimer -= dt;
         if (this.nextWaveTimer <= 0) {
@@ -10132,18 +10179,28 @@
         if (this.spawns.size === 0) {
           this.waveSpawnQueue = [];
         } else {
-          this.spawnTimer -= dt;
-          let burst = 0;
-          while (this.spawnTimer <= 0 && this.waveSpawnQueue.length > 0 && burst < 4) {
-            const baseInterval = (this.isEndlessMode ? Math.max(0.28, 0.72 - this.wave * 0.025) : 0.7) + Math.random() * 0.35;
-            const loadScale = Math.min(1.0, this.spawns.size / Math.max(1, this.initialSpawnCount || 1));
-            const effectiveInterval = Math.max(0.05, baseInterval * loadScale);
-            this.spawnTimer += effectiveInterval;
-            const nextType = this.waveSpawnQueue.shift();
-            this.spawnZombie(nextType);
-            burst++;
+          const hasActiveBreach = !allBreachesDormant;
+          const hasReadyEntry = hasActiveBreach && this.waveSpawnQueue.some((entry) => {
+            if (!entry || typeof entry !== 'object' || !entry.breachKey) return true;
+            const sp = this.spawns.get(entry.breachKey);
+            return !sp || !(sp.dormantTimer > 0);
+          });
+          if (!hasReadyEntry) {
+            this.spawnTimer = 0;
+          } else {
+            this.spawnTimer -= dt;
+            let burst = 0;
+            while (this.spawnTimer <= 0 && this.waveSpawnQueue.length > 0 && burst < 4) {
+              const baseInterval = (this.isEndlessMode ? Math.max(0.28, 0.72 - this.wave * 0.025) : 0.7) + Math.random() * 0.35;
+              const loadScale = Math.min(1.0, this.spawns.size / Math.max(1, this.initialSpawnCount || 1));
+              const effectiveInterval = Math.max(0.05, baseInterval * loadScale);
+              this.spawnTimer += effectiveInterval;
+              const nextType = this.waveSpawnQueue.shift();
+              this.spawnZombie(nextType);
+              burst++;
+            }
+            if (burst >= 4 && this.spawnTimer < 0) this.spawnTimer = 0;
           }
-          if (burst >= 4 && this.spawnTimer < 0) this.spawnTimer = 0;
         }
       } else if (this.waveState === STATE.ACTIVE && this.zombies.length === 0) {
         const clearBonus = 120 + 30 * this.wave;
