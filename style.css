@@ -1,4 +1,4 @@
-/* Zombie Defense Command v0.41.0 - tactical command-center theme (offline, zero layout shift) */
+/* Zombie Defense Command v0.42.0 - tactical command-center theme (offline, zero layout shift) */
 :root {
   --bg: #07090d;
   --panel: #0e131b;
@@ -203,6 +203,44 @@ select:hover, .hud-btn:hover { border-color: var(--color-cyan); background: #182
   overflow: auto;
 }
 #howToPlayModal, #zombieGuideModal { z-index: 30; }
+#arsenalGuideModal { z-index: 44; }
+.arsenal-guide-card { border-top-color: var(--color-cyan); }
+.arsenal-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.arsenal-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: border-color 0.14s, background 0.14s, color 0.14s;
+}
+.arsenal-tab-btn:hover {
+  border-color: var(--color-cyan);
+  color: var(--text);
+}
+.arsenal-tab-btn.active {
+  background: rgba(0, 229, 255, 0.14);
+  border-color: var(--color-cyan);
+  color: var(--color-cyan);
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.25);
+}
+.arsenal-tab-panel.hidden {
+  display: none !important;
+}
 #gameOverOverlay { z-index: 25; }
 .modal-card {
   position: relative;
@@ -1914,8 +1952,12 @@ body.is-multiplayer #btnMobileReset {
 .settings-btn-row,
 .settings-callsign-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+.settings-btn-row .modal-btn {
+  flex: 1 1 auto;
 }
 .rot-btn {
   flex: 1 1 0;
@@ -2037,9 +2079,19 @@ body.is-multiplayer #btnMobileReset {
 }
 .dev-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 6px;
   margin-bottom: 10px;
+}
+@media (max-width: 520px) {
+  .dev-tabs {
+    gap: 4px;
+  }
+  .dev-tab-btn {
+    padding: 6px 4px;
+    font-size: 10px;
+    letter-spacing: 0.2px;
+  }
 }
 .dev-tab-btn {
   display: inline-flex;

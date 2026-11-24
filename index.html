@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Zombie Defense Command - Tactical Grid Survival (v0.41.0)</title>
+  <title>Zombie Defense Command - Tactical Grid Survival (v0.42.0)</title>
 
   <!-- PWA & Mobile Web App Meta -->
   <meta name="theme-color" content="#07090d">
@@ -30,7 +30,7 @@
     <header id="topHud">
       <div class="hud-brand">
         <span class="hud-logo">&#9763;</span>
-        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.41.0</small></span>
+        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.42.0</small></span>
       </div>
 
       <div class="hud-stats">
@@ -86,6 +86,7 @@
     <div id="mobileSettingsMenu" class="mobile-settings-menu hidden" role="menu" aria-label="Mobile Settings">
       <div class="mobile-settings-header">TACTICAL SETTINGS</div>
       <button id="btnMobileOpenSettings" class="mobile-settings-item" role="menuitem">&#9881; Settings</button>
+      <button id="btnMobileArsenal" class="mobile-settings-item" role="menuitem">&#9876; Units &amp; Towers</button>
       <button id="btnMobileZombies" class="mobile-settings-item" role="menuitem">&#9763; Zombie Bestiary</button>
       <button id="btnMobileReset" class="mobile-settings-item" role="menuitem">&#8635; Restart Sector</button>
       <button id="btnMobileAudio" class="mobile-settings-item" role="menuitem">&#128266; Audio: On</button>
@@ -111,7 +112,7 @@
         <button id="btnCamFocusBase" class="cam-btn cam-base-btn" type="button" title="Center Camera on Safe Zone Base">&#8982; Base</button>
       </div>
 
-      <!-- Tactical Active Abilities Bar (v0.41.0: Overcharge & Napalm) -->
+      <!-- Tactical Active Abilities Bar (v0.42.0: Overcharge & Napalm) -->
       <div id="abilityBar" class="ability-bar hidden" role="toolbar" aria-label="Tactical Abilities">
         <button id="btnAbilityOvercharge" class="ability-btn" type="button" title="Overcharge ($200, 25s CD): +50% turret fire rate for 10s">
           <span class="ability-icon">&#9889;</span>
@@ -142,12 +143,12 @@
         <span id="tutorialUiArrowGlyph" class="tutorial-ui-arrow-glyph">&#9660;</span>
       </div>
 
-      <!-- Startup screen (v0.41.0: 3-Card Threat Level + Campaign / Post Defense / Survival Picker) -->
+      <!-- Startup screen (v0.42.0: 3-Card Threat Level + Campaign / Post Defense / Survival Picker) -->
       <div id="startScreenOverlay" class="modal-overlay">
         <div class="modal-card start-card">
           <div class="start-icon">&#9763;</div>
           <h1 class="start-title">ZOMBIE DEFENSE COMMAND</h1>
-          <div class="start-version-badge">v0.41.0</div>
+          <div class="start-version-badge">v0.42.0</div>
           <p class="start-subtitle">Expand green Safe Zones within 3 tiles of Red Spawn Breaches and deploy Commandos to destroy them (towers defend against zombies only).</p>
 
           <div id="startMainSection">
@@ -237,11 +238,11 @@
             <option value="tutorial">Tutorial: Basic Training</option>
           </select>
 
-          <div class="start-hint">v0.41.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; Settings</div>
+          <div class="start-hint">v0.42.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; Settings</div>
         </div>
       </div>
 
-      <!-- Settings Modal (v0.41.0) -->
+      <!-- Settings Modal (v0.42.0) -->
       <div id="settingsModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
         <div class="modal-card settings-card">
           <button id="btnCloseSettings" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
@@ -293,6 +294,7 @@
               <label class="settings-label">Field Guides</label>
               <div class="settings-btn-row">
                 <button id="btnSettingsHowToPlay" class="modal-btn secondary-btn" type="button">&#128214; Tactical Manual</button>
+                <button id="btnSettingsArsenal" class="modal-btn secondary-btn" type="button">&#9876; Units &amp; Towers</button>
                 <button id="btnSettingsBestiary" class="modal-btn secondary-btn" type="button">&#9760; Zombie Bestiary</button>
               </div>
             </div>
@@ -311,7 +313,7 @@
         </div>
       </div>
 
-      <!-- Developer Tuning Modal (v0.41.0: Live Multiplier Overrides) -->
+      <!-- Developer Tuning Modal (v0.42.0: Live Multiplier Overrides) -->
       <div id="developerModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="devTitle">
         <div class="modal-card dev-card">
           <button id="btnCloseDeveloper" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
@@ -320,6 +322,7 @@
           <div class="dev-tabs" role="tablist" aria-label="Developer Tuning Tabs">
             <button type="button" id="tabDevGeneral" class="dev-tab-btn active" data-dev-tab="general" role="tab" aria-selected="true">General</button>
             <button type="button" id="tabDevZombies" class="dev-tab-btn" data-dev-tab="zombies" role="tab" aria-selected="false">Zombies <span id="devZombiesDot" class="dev-override-dot hidden" title="Custom per-zombie overrides active"></span></button>
+            <button type="button" id="tabDevWaveMeter" class="dev-tab-btn" data-dev-tab="wavemeter" role="tab" aria-selected="false">10 Wave Meter <span id="devWaveMeterDot" class="dev-override-dot hidden" title="Custom 10-wave scaling active"></span></button>
           </div>
           <div id="devTabGeneral" class="dev-tab-panel dev-content">
             <div class="dev-group">
@@ -520,6 +523,36 @@
             </div>
           </div>
 
+          <div id="devTabWaveMeter" class="dev-tab-panel dev-content hidden">
+            <div class="dev-group">
+              <div class="dev-label-row">
+                <label class="dev-label" for="sliderDev10WaveToughness">10-Wave Toughness</label>
+                <span id="valDev10WaveToughness" class="dev-val-badge">1.0x</span>
+              </div>
+              <div class="dev-slider-wrap">
+                <input type="range" id="sliderDev10WaveToughness" class="dev-slider" min="0" max="10" step="1" value="0" />
+                <div class="dev-ticks">
+                  <span class="tick-mid">1.0x</span><span>1.25x</span><span>1.5x</span><span>2.0x</span><span>2.5x</span><span>3.0x</span><span>4.0x</span><span>5.0x</span><span>6.0x</span><span>8.0x</span><span>10.0x</span>
+                </div>
+              </div>
+              <div class="dev-hint">Multiplies zombie HP and Damage by this factor every 10 waves (Wave 11+, 21+, 31+...).</div>
+            </div>
+
+            <div class="dev-group">
+              <div class="dev-label-row">
+                <label class="dev-label" for="sliderDev10WaveSpeed">10-Wave Zombie Speed</label>
+                <span id="valDev10WaveSpeed" class="dev-val-badge">1.0x</span>
+              </div>
+              <div class="dev-slider-wrap">
+                <input type="range" id="sliderDev10WaveSpeed" class="dev-slider" min="0" max="10" step="1" value="0" />
+                <div class="dev-ticks">
+                  <span class="tick-mid">1.0x</span><span>1.1x</span><span>1.2x</span><span>1.35x</span><span>1.5x</span><span>1.75x</span><span>2.0x</span><span>2.5x</span><span>3.0x</span><span>4.0x</span><span>5.0x</span>
+                </div>
+              </div>
+              <div class="dev-hint">Multiplies zombie movement speed by this factor every 10 waves (Wave 11+, 21+, 31+...).</div>
+            </div>
+          </div>
+
           <div class="modal-actions dev-actions">
             <button id="btnResetDevTab" type="button" class="modal-btn secondary-btn dev-reset-btn">&#8635; Reset Tab</button>
             <button id="btnResetDevAll" type="button" class="modal-btn secondary-btn dev-reset-btn">Reset All</button>
@@ -532,7 +565,7 @@
       <div id="howToPlayModal" class="modal-overlay hidden">
         <div class="modal-card help-card">
           <button id="btnCloseHowToPlay" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.41.0)</h2>
+          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.42.0)</h2>
           <div class="help-grid">
             <section>
               <h3>Single 3&times;3 Start &amp; Line-Drag Barricades</h3>
@@ -569,7 +602,7 @@
       <div id="zombieGuideModal" class="modal-overlay hidden">
         <div class="modal-card help-card zombie-guide-card">
           <button id="btnCloseZombieGuide" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.41.0)</h2>
+          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.42.0)</h2>
           <div id="bestiaryHardIndicator" class="bestiary-hard-indicator hidden">&#9888; HARD MODE ACTIVE: 4.0&times; ZOMBIE HP APPLIED</div>
           <p class="bestiary-note"><b class="c-orange">25% Random Brute-Breach Trait:</b> Any spawned Walker, Runner, Tank, or Wrecker has a 25% chance (100% on Demolisher) to smash straight toward Safe Zones, dealing a <b>fixed unscaled 12 damage</b> (<b>16 damage</b> for Demolishers) per strike against structures &amp; Safe Zones.</p>
           <div class="zombie-intel-list">
@@ -629,6 +662,126 @@
         </div>
       </div>
 
+      <!-- Units & Towers Field Guide Modal (v0.42.0) -->
+      <div id="arsenalGuideModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="arsenalTitle">
+        <div class="modal-card help-card arsenal-guide-card">
+          <button id="btnCloseArsenalGuide" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
+          <h2 id="arsenalTitle" class="help-title">&#9876; UNITS &amp; TOWERS FIELD GUIDE (v0.42.0)</h2>
+          <div class="arsenal-tabs" role="tablist" aria-label="Units and Towers Tabs">
+            <button type="button" id="tabArsenalUnits" class="arsenal-tab-btn active" data-arsenal-tab="units" role="tab" aria-selected="true">Units</button>
+            <button type="button" id="tabArsenalTowers" class="arsenal-tab-btn" data-arsenal-tab="towers" role="tab" aria-selected="false">Towers</button>
+          </div>
+
+          <div id="arsenalTabUnits" class="arsenal-tab-panel zombie-intel-list">
+            <div class="zombie-intel-row">
+              <canvas id="aPortraitCivilian" class="z-portrait" width="52" height="52"></canvas>
+              <div class="z-info">
+                <div class="z-head"><span class="z-name c-white">1. CIVILIAN (civilian)</span><span class="z-stats">HP: -- &bull; Speed: 60 px/s &bull; Habitat Recruit: $65 &bull; Rescue: +$50</span></div>
+                <p>Stranded survivor (or recruited from Safe-Zone Habitat). Guide onto green Safe Zones to rescue for +$50 Scrap and promote to a Lv1 Recruit. Vulnerable to Runner bites.</p>
+              </div>
+            </div>
+            <div class="zombie-intel-row">
+              <canvas id="aPortraitSoldier" class="z-portrait" width="52" height="52"></canvas>
+              <div class="z-info">
+                <div class="z-head"><span class="z-name c-cyan">2. RECRUIT / RANGER / COMMANDO</span><span class="z-stats">HP: 60/100/160 (Barracks: 150/210/280) &bull; Dmg: 4/8/14 (12/17/23) &bull; Rng: 110&ndash;190px (120&ndash;160px)</span></div>
+                <p>Core rifleman. Rescued Soldiers upgrade individually ($60/$120) and auto-enter Barracks ($75 training over 4.0s) to become high-mobility Commandos capable of kiting zombies and assaulting Spawn Breaches.</p>
+              </div>
+            </div>
+            <div class="zombie-intel-row">
+              <canvas id="aPortraitGunner" class="z-portrait" width="52" height="52"></canvas>
+              <div class="z-info">
+                <div class="z-head"><span class="z-name c-cyan">3. GUNNER (gunner)</span><span class="z-stats">HP: 380 &bull; Dmg: 16 / 0.32s &bull; Range: 100px &bull; Speed: 68 px/s &bull; Barracks Lv2+: $110</span></div>
+                <p>Heavy riot-shielded assault specialist unlocked at Barracks Lv2. Boasts high frontline durability, sustained burst fire, and full Spawn Breach siege capability.</p>
+              </div>
+            </div>
+            <div class="zombie-intel-row">
+              <canvas id="aPortraitFlamethrower" class="z-portrait" width="52" height="52"></canvas>
+              <div class="z-info">
+                <div class="z-head"><span class="z-name c-orange">4. FLAMETHROWER (flamethrower)</span><span class="z-stats">HP: 170 &bull; Dmg: 24 AoE (46px) / 0.45s &bull; Range: 80px &bull; Speed: 80 px/s &bull; Barracks Lv3: $100</span></div>
+                <p>Short-range thermal crowd-clear specialist unlocked at Barracks Lv3. Engulfs clustered hordes in splash fire (35% effectiveness vs. Tank/Demolisher/Wrecker/Boss armor).</p>
+              </div>
+            </div>
+            <div class="zombie-intel-row">
+              <canvas id="aPortraitEngineer" class="z-portrait" width="52" height="52"></canvas>
+              <div class="z-info">
+                <div class="z-head"><span class="z-name c-yellow">5. ENGINEER (Lv1&ndash;Lv3)</span><span class="z-stats">HP: 70/110/160 &bull; Speed: 70/75/80 px/s &bull; Weld: +20/+40/+70 HP/s ($0) &bull; Engineering: $50</span></div>
+                <p>Zero-Scrap base maintenance specialist. Safely steps across Safe-Zone buildings, automatically welds damaged structures, Gates, and connected Barricades, and stands by inside Engineering when nothing needs repair.</p>
+              </div>
+            </div>
+            <div class="zombie-intel-row">
+              <canvas id="aPortraitMedic" class="z-portrait" width="52" height="52"></canvas>
+              <div class="z-info">
+                <div class="z-head"><span class="z-name c-green">6. MEDIC (medic)</span><span class="z-stats">HP: 120 &bull; Heal: +18 HP/s &bull; Range: 110px &bull; Speed: 78 px/s &bull; Engineering Lv2+: $85</span></div>
+                <p>Autonomous field trauma support unlocked at Engineering Lv2. Deploys immediately whenever any squad unit or Safe-Zone Sapper is injured, firing a green healing beam, and returns to Engineering / Safe Zones when idle.</p>
+              </div>
+            </div>
+            <div class="zombie-intel-row">
+              <canvas id="aPortraitSapper" class="z-portrait" width="52" height="52"></canvas>
+              <div class="z-info">
+                <div class="z-head"><span class="z-name c-orange">7. SAPPER (sapper)</span><span class="z-stats">HP: 130 &bull; Max 5 Mines (3.0s CD) &bull; Mine AoE: 75 Dmg (48px, 35% Heavy) &bull; Engineering Lv3: $90</span></div>
+                <p>Demolitions specialist unlocked at Engineering Lv3. Continuously plants up to 5 proximity mines on ground outside Safe Zones (prioritizing Barricade &amp; Gate tiles, &ge;3 tiles from breaches); returns to Engineering when full.</p>
+              </div>
+            </div>
+          </div>
+
+          <div id="arsenalTabTowers" class="arsenal-tab-panel zombie-intel-list hidden">
+            <div class="zombie-intel-row">
+              <canvas id="aPortraitSentry" class="z-portrait" width="52" height="52"></canvas>
+              <div class="z-info">
+                <div class="z-head"><span class="z-name c-cyan">1. SENTRY TURRET (sentry)</span><span class="z-stats">Cost: $150/$240/$390 &bull; HP: 120/220/350 &bull; Dmg: 11/22/40 &bull; Rate: 0.40s/0.25s/0.15s &bull; Rng: 120/160/200px</span></div>
+                <p>Rapid-fire Safe-Zone kinetic gun scaling from 1 to 4 rotary barrels. Cost-effective sustained DPS for holding lanes against Walkers and Runners.</p>
+              </div>
+            </div>
+            <div class="zombie-intel-row">
+              <canvas id="aPortraitCryo" class="z-portrait" width="52" height="52"></canvas>
+              <div class="z-info">
+                <div class="z-head"><span class="z-name c-cyan">2. CRYO TURRET (cryo)</span><span class="z-stats">Cost: $180/$270/$420 &bull; HP: 100/180/280 &bull; Slow: 30%/50%/70% (2.0&ndash;4.5s) &bull; AoE: 50/75/100px &bull; Rng: 100/140/180px</span></div>
+                <p>Cryogenic pulse emitter chilling all nearby zombies, slashing both movement speed and melee attack cadence around key chokepoints.</p>
+              </div>
+            </div>
+            <div class="zombie-intel-row">
+              <canvas id="aPortraitSniper" class="z-portrait" width="52" height="52"></canvas>
+              <div class="z-info">
+                <div class="z-head"><span class="z-name c-violet">3. SNIPER TURRET (sniper)</span><span class="z-stats">Cost: $225/$330/$525 &bull; HP: 90/160/250 &bull; Dmg: 80/160/300 &bull; Rate: 4.0s/3.0s/2.0s &bull; Rng: 250/320/400px</span></div>
+                <p>Long-range precision railgun prioritizing Bosses, Demolishers, Wreckers, and Tanks. Rolls 30% instant-kill HEADSHOT vs. non-boss zombies (Brood Warden &amp; Hive Behemoth immune).</p>
+              </div>
+            </div>
+            <div class="zombie-intel-row">
+              <canvas id="aPortraitTesla" class="z-portrait" width="52" height="52"></canvas>
+              <div class="z-info">
+                <div class="z-head"><span class="z-name c-cyan">4. TESLA TOWER (tesla)</span><span class="z-stats">Cost: $200/$320/$500 &bull; HP: 110/200/310 &bull; Dmg: 20/36/58 &bull; Chain: 3/5/8 targets &bull; Rng: 130/165/200px</span></div>
+                <p>Chain-reaction arc tower jumping up to 3/5/8 clustered zombies per discharge (85/100/115px jump range; 35% effectiveness vs. heavy-armored targets).</p>
+              </div>
+            </div>
+            <div class="zombie-intel-row">
+              <canvas id="aPortraitMortar" class="z-portrait" width="52" height="52"></canvas>
+              <div class="z-info">
+                <div class="z-head"><span class="z-name c-orange">5. MORTAR ARTILLERY (mortar)</span><span class="z-stats">Cost: $240/$360/$550 &bull; HP: 110/190/300 &bull; Dmg: 45/75/115 &bull; AoE: 56/68/80px &bull; Rng: 80&ndash;280/320/360px</span></div>
+                <p>Heavy long-range artillery lobbing high-explosive splash shells over obstacles (minimum 80px inner blind spot; 35% damage vs. Heavy armor).</p>
+              </div>
+            </div>
+            <div class="zombie-intel-row">
+              <canvas id="aPortraitLaser" class="z-portrait" width="52" height="52"></canvas>
+              <div class="z-info">
+                <div class="z-head"><span class="z-name c-red">6. LASER PRISM (laser)</span><span class="z-stats">Cost: $260/$390/$600 &bull; HP: 120/210/330 &bull; Dmg: 14/24/38 / 0.25s (1x&rarr;3x ramp) &bull; Rng: 160/195/230px</span></div>
+                <p>Anti-armor thermal beam dealing 100% full damage to Tank, Demolisher, Wrecker, and Boss armor while ramping output from 1.0x up to 3.0x on continuous lock-on.</p>
+              </div>
+            </div>
+            <div class="zombie-intel-row">
+              <canvas id="aPortraitRadar" class="z-portrait" width="52" height="52"></canvas>
+              <div class="z-info">
+                <div class="z-head"><span class="z-name c-cyan">7. RADAR BEACON (radar)</span><span class="z-stats">Cost: $175/$260/$400 &bull; HP: 130/220/340 &bull; Aura: +15%/+20%/+25% Range &amp; ROF &bull; Radius: 140/170/200px</span></div>
+                <p>Force-multiplier support array boosting fire rate and targeting range for all allied turrets and Safe-Zone Barracks inside its perimeter (highest overlapping aura applies).</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button id="btnDismissArsenalGuide" class="modal-btn primary-btn">Resume Command</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Victory / defeat -->
       <div id="gameOverOverlay" class="modal-overlay hidden">
         <div class="modal-card end-card">
@@ -649,7 +802,7 @@
         </div>
       </div>
 
-      <!-- 4-Player Co-Op Multiplayer Modals (v0.41.0) -->
+      <!-- 4-Player Co-Op Multiplayer Modals (v0.42.0) -->
       <div id="mpRoleModal" class="modal-overlay hidden">
         <div class="modal-card mp-card">
           <h2 class="help-title mp-modal-title">&#127760; 4-PLAYER CO-OP MULTIPLAYER</h2>
@@ -781,7 +934,7 @@
         </div>
       </div>
 
-      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.41.0) -->
+      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.42.0) -->
       <div id="mpPauseModal" class="modal-overlay hidden">
         <div class="modal-card mp-card mp-pause-card">
           <h2 id="mpPauseTitle" class="help-title mp-modal-title">&#9208; MATCH PAUSED</h2>
@@ -975,7 +1128,7 @@
         </div>
 
         <div id="deckHint">
-          <span class="hint-text">v0.41.0 &bull; Mortar ($240) / Laser ($260) / Radar ($175) &bull; Gunner / Medic / Sapper &bull; Barracks Hold Stance &bull; Overcharge &amp; Napalm</span>
+          <span class="hint-text">v0.42.0 &bull; Mortar ($240) / Laser ($260) / Radar ($175) &bull; Gunner / Medic / Sapper &bull; Barracks Hold Stance &bull; Overcharge &amp; Napalm</span>
         </div>
       </div>
     </footer>

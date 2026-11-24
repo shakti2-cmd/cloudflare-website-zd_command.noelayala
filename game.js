@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.41.0 (Runners-Only Civilian Threat, Mine Build Detonation, Full Resume State, Survival under Mission Mode & Full Audit)
+ * Version: v0.42.0 (Continuous Sapper Replanting, Idle Medic Base Return, 10 Wave Meter Dev Tab, Units & Towers Guide & Next Wave Stacking Fix)
  */
 
 (function () {
@@ -1240,6 +1240,10 @@
       this.devBreachCountMult = 0.75;
       this.devSliderStops = [0.1, 0.2, 0.35, 0.5, 0.75, 1.0, 1.5, 2.0, 3.5, 6.0, 10.0];
       this.devCountStops = [0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0];
+      this.dev10WaveToughnessMult = 1.0;
+      this.dev10WaveSpeedMult = 1.0;
+      this.dev10WaveToughnessStops = [1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0];
+      this.dev10WaveSpeedStops = [1.0, 1.1, 1.2, 1.35, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0];
       this.devActiveTab = 'general';
       this.devSelectedZombieType = 'walker';
       this.devZombieOverrides = this.createDefaultZombieOverrides();
@@ -1270,6 +1274,9 @@
       this.helpPausedGame = false;
       this.zombieGuideOpen = false;
       this.zombieGuidePausedGame = false;
+      this.arsenalGuideOpen = false;
+      this.arsenalGuidePausedGame = false;
+      this.arsenalActiveTab = 'units';
 
       this.selectModeActive = false;
       this.selectedBuildType = null;
@@ -1407,7 +1414,7 @@
     }
 
     get modalBlocking() {
-      return this.helpOpen || this.zombieGuideOpen;
+      return this.helpOpen || this.zombieGuideOpen || this.arsenalGuideOpen;
     }
 
     get isSurvivalMode() {
@@ -1580,6 +1587,7 @@
       this.mobileWaveTimerLabel = $('mobileWaveTimerLabel');
       this.btnMobileSettings = $('btnMobileSettings');
       this.mobileSettingsMenu = $('mobileSettingsMenu');
+      this.btnMobileArsenal = $('btnMobileArsenal');
       this.btnMobileZombies = $('btnMobileZombies');
       this.btnMobileReset = $('btnMobileReset');
       this.btnMobileAudio = $('btnMobileAudio');
@@ -1605,10 +1613,18 @@
       this.settingsVolumeSlider = $('settingsVolumeSlider');
       this.settingsVolumeValue = $('settingsVolumeValue');
       this.btnSettingsHowToPlay = $('btnSettingsHowToPlay');
+      this.btnSettingsArsenal = $('btnSettingsArsenal');
       this.btnSettingsBestiary = $('btnSettingsBestiary');
       this.btnSettingsDeveloper = $('btnSettingsDeveloper');
+      this.arsenalGuideModal = $('arsenalGuideModal');
+      this.btnCloseArsenalGuide = $('btnCloseArsenalGuide');
+      this.btnDismissArsenalGuide = $('btnDismissArsenalGuide');
+      this.tabArsenalUnits = $('tabArsenalUnits');
+      this.tabArsenalTowers = $('tabArsenalTowers');
+      this.arsenalTabUnits = $('arsenalTabUnits');
+      this.arsenalTabTowers = $('arsenalTabTowers');
 
-      // Developer Tuning UI Elements (v0.41.0)
+      // Developer Tuning UI Elements (v0.42.0)
       this.developerModal = $('developerModal');
       this.btnCloseDeveloper = $('btnCloseDeveloper');
       this.btnDoneDeveloper = $('btnDoneDeveloper');
@@ -1616,20 +1632,27 @@
       this.btnResetDevAll = $('btnResetDevAll');
       this.tabDevGeneral = $('tabDevGeneral');
       this.tabDevZombies = $('tabDevZombies');
+      this.tabDevWaveMeter = $('tabDevWaveMeter');
       this.devZombiesDot = $('devZombiesDot');
+      this.devWaveMeterDot = $('devWaveMeterDot');
       this.devTabGeneral = $('devTabGeneral');
       this.devTabZombies = $('devTabZombies');
+      this.devTabWaveMeter = $('devTabWaveMeter');
       this.devZombiePicker = $('devZombiePicker');
       this.sliderDevTowerStrength = $('sliderDevTowerStrength');
       this.sliderDevZombieHp = $('sliderDevZombieHp');
       this.sliderDevZombieScrap = $('sliderDevZombieScrap');
       this.sliderDevZombieSpeed = $('sliderDevZombieSpeed');
       this.sliderDevBreachCount = $('sliderDevBreachCount');
+      this.sliderDev10WaveToughness = $('sliderDev10WaveToughness');
+      this.sliderDev10WaveSpeed = $('sliderDev10WaveSpeed');
       this.valDevTowerStrength = $('valDevTowerStrength');
       this.valDevZombieHp = $('valDevZombieHp');
       this.valDevZombieScrap = $('valDevZombieScrap');
       this.valDevZombieSpeed = $('valDevZombieSpeed');
       this.valDevBreachCount = $('valDevBreachCount');
+      this.valDev10WaveToughness = $('valDev10WaveToughness');
+      this.valDev10WaveSpeed = $('valDev10WaveSpeed');
       this.sliderDevZTypeHp = $('sliderDevZTypeHp');
       this.sliderDevZTypeSpeed = $('sliderDevZTypeSpeed');
       this.sliderDevZTypeDmg = $('sliderDevZTypeDmg');
@@ -1834,9 +1857,14 @@
         if (this.settingsVolumeValue) this.settingsVolumeValue.textContent = `${Math.round(val)}%`;
       });
       on(this.btnSettingsHowToPlay, 'click', () => this.openHowToPlay());
+      on(this.btnSettingsArsenal, 'click', () => this.openArsenalGuide('units'));
       on(this.btnSettingsBestiary, 'click', () => this.openZombieGuide());
+      on(this.btnCloseArsenalGuide, 'click', () => this.closeArsenalGuide());
+      on(this.btnDismissArsenalGuide, 'click', () => this.closeArsenalGuide());
+      on(this.tabArsenalUnits, 'click', () => { this.setArsenalTab('units'); this.sound.playClick(); });
+      on(this.tabArsenalTowers, 'click', () => { this.setArsenalTab('towers'); this.sound.playClick(); });
 
-      // Developer Tuning Modal bindings (v0.41.0)
+      // Developer Tuning Modal bindings (v0.42.0)
       on(this.btnSettingsDeveloper, 'click', () => this.openDeveloperModal());
       on(this.btnCloseDeveloper, 'click', () => this.closeDeveloperModal());
       on(this.btnDoneDeveloper, 'click', () => this.closeDeveloperModal());
@@ -1844,6 +1872,7 @@
       on(this.btnResetDevAll, 'click', () => this.resetAllDeveloperDefaults());
       on(this.tabDevGeneral, 'click', () => { this.setDeveloperTab('general'); this.sound.playClick(); });
       on(this.tabDevZombies, 'click', () => { this.setDeveloperTab('zombies'); this.sound.playClick(); });
+      on(this.tabDevWaveMeter, 'click', () => { this.setDeveloperTab('wavemeter'); this.sound.playClick(); });
       if (this.devZombiePicker) {
         this.devZombiePicker.querySelectorAll('[data-dev-ztype]').forEach((btn) => {
           on(btn, 'click', () => {
@@ -1898,6 +1927,14 @@
       on(this.sliderDevZTypeCount, 'input', () => {
         const idx = Math.max(0, Math.min(this.devCountStops.length - 1, parseInt(this.sliderDevZTypeCount.value, 10) || 0));
         this.setDevZombieTypeStat(this.devSelectedZombieType, 'countMult', this.devCountStops[idx]);
+      });
+      on(this.sliderDev10WaveToughness, 'input', () => {
+        const idx = Math.max(0, Math.min(this.dev10WaveToughnessStops.length - 1, parseInt(this.sliderDev10WaveToughness.value, 10) || 0));
+        this.setDev10WaveToughnessMult(this.dev10WaveToughnessStops[idx]);
+      });
+      on(this.sliderDev10WaveSpeed, 'input', () => {
+        const idx = Math.max(0, Math.min(this.dev10WaveSpeedStops.length - 1, parseInt(this.sliderDev10WaveSpeed.value, 10) || 0));
+        this.setDev10WaveSpeedMult(this.dev10WaveSpeedStops[idx]);
       });
 
       const saveSettingsCallsign = () => {
@@ -2320,6 +2357,16 @@
         this.openSettingsModal();
       });
 
+      on(this.btnMobileArsenal, 'click', () => {
+        if (this.mobileSettingsMenu) this.mobileSettingsMenu.classList.add('hidden');
+        if (this.btnMobileSettings) this.btnMobileSettings.setAttribute('aria-expanded', 'false');
+        if (this.arsenalGuideOpen) {
+          this.closeArsenalGuide();
+        } else {
+          this.openArsenalGuide('units');
+        }
+      });
+
       on(this.btnMobileZombies, 'click', () => {
         if (this.mobileSettingsMenu) this.mobileSettingsMenu.classList.add('hidden');
         if (this.btnMobileSettings) this.btnMobileSettings.setAttribute('aria-expanded', 'false');
@@ -2732,6 +2779,8 @@
         if (key === 'escape') {
           if (this.developerModal && !this.developerModal.classList.contains('hidden')) {
             this.closeDeveloperModal();
+          } else if (this.arsenalGuideOpen) {
+            this.closeArsenalGuide();
           } else if (this.settingsModal && !this.settingsModal.classList.contains('hidden')) {
             this.closeSettingsModal();
           } else if (this.zombieGuideOpen) {
@@ -3206,19 +3255,26 @@
     }
 
     setDeveloperTab(tab) {
-      this.devActiveTab = tab === 'zombies' ? 'zombies' : 'general';
+      this.devActiveTab = (tab === 'zombies' || tab === 'wavemeter') ? tab : 'general';
+      const isGen = this.devActiveTab === 'general';
       const isZom = this.devActiveTab === 'zombies';
+      const isWm = this.devActiveTab === 'wavemeter';
       if (this.tabDevGeneral) {
-        this.tabDevGeneral.classList.toggle('active', !isZom);
-        this.tabDevGeneral.setAttribute('aria-selected', !isZom ? 'true' : 'false');
+        this.tabDevGeneral.classList.toggle('active', isGen);
+        this.tabDevGeneral.setAttribute('aria-selected', isGen ? 'true' : 'false');
       }
       if (this.tabDevZombies) {
         this.tabDevZombies.classList.toggle('active', isZom);
         this.tabDevZombies.setAttribute('aria-selected', isZom ? 'true' : 'false');
       }
-      if (this.devTabGeneral) this.devTabGeneral.classList.toggle('hidden', isZom);
+      if (this.tabDevWaveMeter) {
+        this.tabDevWaveMeter.classList.toggle('active', isWm);
+        this.tabDevWaveMeter.setAttribute('aria-selected', isWm ? 'true' : 'false');
+      }
+      if (this.devTabGeneral) this.devTabGeneral.classList.toggle('hidden', !isGen);
       if (this.devTabZombies) this.devTabZombies.classList.toggle('hidden', !isZom);
-      if (this.btnResetDevAll) this.btnResetDevAll.classList.toggle('hidden', isZom);
+      if (this.devTabWaveMeter) this.devTabWaveMeter.classList.toggle('hidden', !isWm);
+      if (this.btnResetDevAll) this.btnResetDevAll.classList.remove('hidden');
       this.syncDeveloperUI();
     }
 
@@ -3305,6 +3361,16 @@
       if (this.valDevZTypeBounty) this.valDevZTypeBounty.textContent = '$' + Math.max(1, ovr.bounty ?? base.reward);
       if (this.sliderDevZTypeCount) this.sliderDevZTypeCount.value = getStopIndex(this.devCountStops, ovr.countMult, 4);
       if (this.valDevZTypeCount) this.valDevZTypeCount.textContent = ovr.countMult + 'x';
+
+      const t10 = typeof this.dev10WaveToughnessMult === 'number' ? this.dev10WaveToughnessMult : 1.0;
+      const s10 = typeof this.dev10WaveSpeedMult === 'number' ? this.dev10WaveSpeedMult : 1.0;
+      if (this.sliderDev10WaveToughness) this.sliderDev10WaveToughness.value = getStopIndex(this.dev10WaveToughnessStops, t10, 0);
+      if (this.valDev10WaveToughness) this.valDev10WaveToughness.textContent = t10 + 'x';
+      if (this.sliderDev10WaveSpeed) this.sliderDev10WaveSpeed.value = getStopIndex(this.dev10WaveSpeedStops, s10, 0);
+      if (this.valDev10WaveSpeed) this.valDev10WaveSpeed.textContent = s10 + 'x';
+      if (this.devWaveMeterDot) {
+        this.devWaveMeterDot.classList.toggle('hidden', Math.abs(t10 - 1.0) <= 0.001 && Math.abs(s10 - 1.0) <= 0.001);
+      }
     }
 
     resetGeneralDeveloperDefaults() {
@@ -3314,6 +3380,11 @@
       this.setDevZombieHpMult(0.5);
       this.setDevZombieSpeedMult(1.0);
       if (this.selectedStructure) this.updateUpgradePanel();
+    }
+
+    resetWaveMeterDeveloperDefaults() {
+      this.setDev10WaveToughnessMult(1.0);
+      this.setDev10WaveSpeedMult(1.0);
     }
 
     resetZombieDeveloperDefaults() {
@@ -3348,6 +3419,8 @@
     resetDeveloperTab() {
       if (this.devActiveTab === 'zombies') {
         this.resetZombieDeveloperDefaults();
+      } else if (this.devActiveTab === 'wavemeter') {
+        this.resetWaveMeterDeveloperDefaults();
       } else {
         this.resetGeneralDeveloperDefaults();
       }
@@ -3358,8 +3431,54 @@
     resetAllDeveloperDefaults() {
       this.resetGeneralDeveloperDefaults();
       this.resetZombieDeveloperDefaults();
+      this.resetWaveMeterDeveloperDefaults();
       this.syncDeveloperUI();
       this.sound.playClick();
+    }
+
+    setDev10WaveToughnessMult(newMult) {
+      if (typeof newMult !== 'number' || newMult <= 0) newMult = 1.0;
+      const prev = this.dev10WaveToughnessMult || 1.0;
+      const tier10 = Math.floor(Math.max(0, (this.wave || 1) - 1) / 10);
+      if (tier10 > 0 && Math.abs(prev - newMult) > 0.0001) {
+        const prevPow = Math.pow(prev, tier10);
+        const nextPow = Math.pow(newMult, tier10);
+        const ratio = nextPow / Math.max(0.0001, prevPow);
+        if (Array.isArray(this.zombies)) {
+          for (let i = 0; i < this.zombies.length; i++) {
+            const z = this.zombies[i];
+            if (!z || z.dead || z.hp <= 0) continue;
+            z.maxHp = Math.max(1, Math.round(z.maxHp * ratio));
+            z.hp = Math.max(1, Math.min(z.maxHp, Math.round(z.hp * ratio)));
+            z.dmg = Math.max(1, Math.round((z.dmg || 10) * ratio));
+          }
+        }
+      }
+      this.dev10WaveToughnessMult = newMult;
+      if (this.inPlay && this.wave >= 1) this.computeThreatMultipliers();
+      this.syncDeveloperUI();
+    }
+
+    setDev10WaveSpeedMult(newMult) {
+      if (typeof newMult !== 'number' || newMult <= 0) newMult = 1.0;
+      const prev = this.dev10WaveSpeedMult || 1.0;
+      const tier10 = Math.floor(Math.max(0, (this.wave || 1) - 1) / 10);
+      if (tier10 > 0 && Math.abs(prev - newMult) > 0.0001) {
+        const prevPow = Math.pow(prev, tier10);
+        const nextPow = Math.pow(newMult, tier10);
+        const ratio = nextPow / Math.max(0.0001, prevPow);
+        if (Array.isArray(this.zombies)) {
+          for (let i = 0; i < this.zombies.length; i++) {
+            const z = this.zombies[i];
+            if (!z || z.dead || z.hp <= 0) continue;
+            z.baseSpeed = Math.max(5, Math.round((z.baseSpeed || 45) * ratio));
+            z.speed = Math.max(5, Math.round((z.speed || z.baseSpeed) * ratio));
+          }
+        }
+      }
+      this.dev10WaveSpeedMult = newMult;
+      if (this.inPlay && this.wave >= 1) this.computeThreatMultipliers();
+      this.syncDeveloperUI();
     }
 
     setDevZombieHpMult(newMult) {
@@ -3463,6 +3582,7 @@
     openHowToPlay() {
       if (this.helpOpen) return;
       if (this.zombieGuideOpen) this.closeZombieGuide();
+      if (this.arsenalGuideOpen) this.closeArsenalGuide();
       this.helpOpen = true;
       this.helpPausedGame = false;
       if (this.inPlay && !this.isPaused && !this.isMultiplayer) {
@@ -3487,6 +3607,7 @@
     openZombieGuide() {
       if (this.zombieGuideOpen) return;
       if (this.helpOpen) this.closeHowToPlay();
+      if (this.arsenalGuideOpen) this.closeArsenalGuide();
       this.zombieGuideOpen = true;
       this.zombieGuidePausedGame = false;
       if (this.inPlay && !this.isPaused && !this.isMultiplayer) {
@@ -3521,6 +3642,241 @@
       }
       this.zombieGuidePausedGame = false;
       this.updateTimerHud();
+    }
+
+    setArsenalTab(tab) {
+      this.arsenalActiveTab = tab === 'towers' ? 'towers' : 'units';
+      const isTowers = this.arsenalActiveTab === 'towers';
+      if (this.tabArsenalUnits) {
+        this.tabArsenalUnits.classList.toggle('active', !isTowers);
+        this.tabArsenalUnits.setAttribute('aria-selected', !isTowers ? 'true' : 'false');
+      }
+      if (this.tabArsenalTowers) {
+        this.tabArsenalTowers.classList.toggle('active', isTowers);
+        this.tabArsenalTowers.setAttribute('aria-selected', isTowers ? 'true' : 'false');
+      }
+      if (this.arsenalTabUnits) this.arsenalTabUnits.classList.toggle('hidden', isTowers);
+      if (this.arsenalTabTowers) this.arsenalTabTowers.classList.toggle('hidden', !isTowers);
+      this.renderArsenalPortraits();
+    }
+
+    openArsenalGuide(tab = 'units') {
+      if (!this.arsenalGuideModal) return;
+      if (this.helpOpen) this.closeHowToPlay();
+      if (this.zombieGuideOpen) this.closeZombieGuide();
+      this.arsenalGuideOpen = true;
+      this.arsenalGuidePausedGame = false;
+      if (this.inPlay && !this.isPaused && !this.isMultiplayer) {
+        this.setPaused(true);
+        this.arsenalGuidePausedGame = true;
+      }
+      this.setArsenalTab(tab || this.arsenalActiveTab || 'units');
+      showEl(this.arsenalGuideModal, 'flex');
+      this.sound.playClick();
+      this.updateTimerHud();
+    }
+
+    closeArsenalGuide() {
+      if (!this.arsenalGuideOpen) return;
+      this.arsenalGuideOpen = false;
+      hideEl(this.arsenalGuideModal);
+      if (this.arsenalGuidePausedGame && this.inPlay && !this.isMultiplayer) {
+        this.setPaused(false);
+      }
+      this.arsenalGuidePausedGame = false;
+      this.sound.playClick();
+      this.updateTimerHud();
+    }
+
+    renderArsenalPortraits() {
+      const unitPortraits = [
+        { id: 'aPortraitCivilian', kind: 'civilian' },
+        { id: 'aPortraitSoldier', kind: 'commando' },
+        { id: 'aPortraitGunner', kind: 'gunner' },
+        { id: 'aPortraitFlamethrower', kind: 'flamethrower' },
+        { id: 'aPortraitEngineer', kind: 'engineer' },
+        { id: 'aPortraitMedic', kind: 'medic' },
+        { id: 'aPortraitSapper', kind: 'sapper' }
+      ];
+      for (const u of unitPortraits) {
+        const cvs = document.getElementById(u.id);
+        if (!cvs || !cvs.getContext) continue;
+        const pctx = cvs.getContext('2d');
+        const cx = cvs.width * 0.5;
+        const cy = cvs.height * 0.5;
+        pctx.clearRect(0, 0, cvs.width, cvs.height);
+        pctx.save();
+        if (u.kind === 'civilian') {
+          pctx.fillStyle = '#FFFFFF';
+          pctx.beginPath();
+          pctx.arc(cx, cy, 9, 0, Math.PI * 2);
+          pctx.fill();
+          pctx.strokeStyle = '#00E08A';
+          pctx.lineWidth = 2;
+          pctx.beginPath();
+          pctx.arc(cx, cy, 13, 0, Math.PI * 2);
+          pctx.stroke();
+        } else if (u.kind === 'commando' || u.kind === 'gunner' || u.kind === 'flamethrower') {
+          const r = u.kind === 'gunner' ? 11.5 : 10;
+          const col = u.kind === 'flamethrower' ? '#FF6B1A' : u.kind === 'gunner' ? '#38B6FF' : '#00E5FF';
+          pctx.save();
+          pctx.translate(cx, cy);
+          pctx.rotate(-Math.PI / 6);
+          if (u.kind === 'flamethrower') {
+            pctx.fillStyle = '#B83D00';
+            pctx.fillRect(-12, -5, 5, 10);
+            pctx.fillStyle = '#FF9A1F';
+            pctx.fillRect(3, -2.5, 13, 5);
+          } else if (u.kind === 'gunner') {
+            pctx.strokeStyle = '#7CE0FF';
+            pctx.lineWidth = 3;
+            pctx.beginPath();
+            pctx.arc(2, 0, r + 2.5, -Math.PI * 0.42, Math.PI * 0.42);
+            pctx.stroke();
+            pctx.fillStyle = '#D6E2F3';
+            pctx.fillRect(3, -2.5, 13, 5);
+          } else {
+            pctx.fillStyle = '#D6E2F3';
+            pctx.fillRect(3, -2, 12, 4);
+          }
+          pctx.restore();
+          pctx.fillStyle = col;
+          pctx.beginPath();
+          pctx.arc(cx, cy, r, 0, Math.PI * 2);
+          pctx.fill();
+          pctx.strokeStyle = '#FFFFFF';
+          pctx.lineWidth = 2.2;
+          pctx.stroke();
+        } else {
+          const col = u.kind === 'medic' ? '#00FF9D' : u.kind === 'sapper' ? '#FFAE00' : '#FFD23F';
+          const border = u.kind === 'medic' ? '#FFFFFF' : u.kind === 'sapper' ? '#FF5522' : '#00E5FF';
+          pctx.save();
+          pctx.translate(cx, cy);
+          pctx.rotate(-Math.PI / 6);
+          pctx.fillStyle = u.kind === 'medic' ? '#00FF9D' : u.kind === 'sapper' ? '#FF6B1A' : '#00E5FF';
+          pctx.fillRect(3, -2.5, 12, 5);
+          pctx.restore();
+          pctx.fillStyle = col;
+          pctx.beginPath();
+          pctx.arc(cx, cy, 10, 0, Math.PI * 2);
+          pctx.fill();
+          pctx.strokeStyle = border;
+          pctx.lineWidth = 2;
+          pctx.stroke();
+          pctx.fillStyle = u.kind === 'medic' ? '#0A3B28' : '#18202c';
+          pctx.fillRect(cx - 4, cy - 1.5, 8, 3);
+          pctx.fillRect(cx - 1.5, cy - 4, 3, 8);
+        }
+        pctx.restore();
+      }
+
+      const towerPortraits = [
+        { id: 'aPortraitSentry', type: 'sentry' },
+        { id: 'aPortraitCryo', type: 'cryo' },
+        { id: 'aPortraitSniper', type: 'sniper' },
+        { id: 'aPortraitTesla', type: 'tesla' },
+        { id: 'aPortraitMortar', type: 'mortar' },
+        { id: 'aPortraitLaser', type: 'laser' },
+        { id: 'aPortraitRadar', type: 'radar' }
+      ];
+      for (const tp of towerPortraits) {
+        const cvs = document.getElementById(tp.id);
+        if (!cvs || !cvs.getContext) continue;
+        const pctx = cvs.getContext('2d');
+        const cx = cvs.width * 0.5;
+        const cy = cvs.height * 0.5;
+        const spec = STRUCTURE_SPECS[tp.type];
+        const lv = spec && spec.levels ? spec.levels[1] || spec.levels[0] : {};
+        pctx.clearRect(0, 0, cvs.width, cvs.height);
+        pctx.save();
+        pctx.fillStyle = '#141c28';
+        pctx.fillRect(cx - 16, cy - 16, 32, 32);
+        pctx.strokeStyle = lv.border || lv.color || '#00E5FF';
+        pctx.lineWidth = 2;
+        pctx.strokeRect(cx - 16, cy - 16, 32, 32);
+
+        pctx.translate(cx, cy);
+        if (tp.type === 'cryo') {
+          pctx.strokeStyle = lv.color || '#00FFFF';
+          pctx.lineWidth = 2.4;
+          for (let k = 0; k < 3; k++) {
+            pctx.rotate(Math.PI / 3);
+            pctx.beginPath();
+            pctx.moveTo(-12, 0);
+            pctx.lineTo(12, 0);
+            pctx.stroke();
+          }
+          pctx.fillStyle = lv.color || '#00FFFF';
+          pctx.beginPath();
+          pctx.arc(0, 0, 7, 0, Math.PI * 2);
+          pctx.fill();
+        } else if (tp.type === 'tesla') {
+          pctx.strokeStyle = lv.border || '#00E5FF';
+          pctx.lineWidth = 2;
+          pctx.beginPath();
+          pctx.arc(0, 0, 10, 0, Math.PI * 2);
+          pctx.stroke();
+          pctx.fillStyle = '#5CEEFF';
+          pctx.beginPath();
+          pctx.arc(0, 0, 6, 0, Math.PI * 2);
+          pctx.fill();
+          pctx.fillStyle = '#FFFFFF';
+          pctx.beginPath();
+          pctx.arc(0, 0, 2.5, 0, Math.PI * 2);
+          pctx.fill();
+        } else if (tp.type === 'mortar') {
+          pctx.rotate(-Math.PI / 6);
+          pctx.fillStyle = lv.color || '#E8882C';
+          pctx.fillRect(-3, -6, 17, 12);
+          pctx.fillStyle = '#2A1D12';
+          pctx.beginPath();
+          pctx.arc(0, 0, 7.5, 0, Math.PI * 2);
+          pctx.fill();
+        } else if (tp.type === 'laser') {
+          pctx.rotate(-Math.PI / 6);
+          pctx.fillStyle = lv.color || '#FF2A55';
+          pctx.fillRect(2, -3, 16, 6);
+          pctx.fillStyle = '#FF88AA';
+          pctx.beginPath();
+          pctx.arc(0, 0, 8, 0, Math.PI * 2);
+          pctx.fill();
+          pctx.fillStyle = '#FFFFFF';
+          pctx.beginPath();
+          pctx.arc(0, 0, 3, 0, Math.PI * 2);
+          pctx.fill();
+        } else if (tp.type === 'radar') {
+          pctx.rotate(-Math.PI / 5);
+          pctx.strokeStyle = '#00E5FF';
+          pctx.lineWidth = 2.4;
+          pctx.beginPath();
+          pctx.arc(0, 0, 10, -Math.PI * 0.45, Math.PI * 0.45);
+          pctx.stroke();
+          pctx.beginPath();
+          pctx.moveTo(0, 0);
+          pctx.lineTo(11, 0);
+          pctx.stroke();
+          pctx.fillStyle = '#00E5FF';
+          pctx.beginPath();
+          pctx.arc(0, 0, 3.5, 0, Math.PI * 2);
+          pctx.fill();
+        } else if (tp.type === 'sniper') {
+          pctx.rotate(-Math.PI / 6);
+          pctx.fillStyle = lv.color || '#AA33CC';
+          pctx.fillRect(0, -2.5, 19, 5);
+          pctx.beginPath();
+          pctx.arc(0, 0, 8, 0, Math.PI * 2);
+          pctx.fill();
+        } else {
+          pctx.rotate(-Math.PI / 6);
+          pctx.fillStyle = lv.color || '#225588';
+          pctx.fillRect(0, -6, 17, 4);
+          pctx.fillRect(0, 2, 17, 4);
+          pctx.beginPath();
+          pctx.arc(0, 0, 8.5, 0, Math.PI * 2);
+          pctx.fill();
+        }
+        pctx.restore();
+      }
     }
 
     deployFromStartScreen() {
@@ -3834,6 +4190,8 @@
             devZombieScrapMult: typeof this.devZombieScrapMult === 'number' ? this.devZombieScrapMult : 1.5,
             devZombieSpeedMult: typeof this.devZombieSpeedMult === 'number' ? this.devZombieSpeedMult : 1.0,
             devBreachCountMult: typeof this.devBreachCountMult === 'number' ? this.devBreachCountMult : 0.75,
+            dev10WaveToughnessMult: typeof this.dev10WaveToughnessMult === 'number' ? this.dev10WaveToughnessMult : 1.0,
+            dev10WaveSpeedMult: typeof this.dev10WaveSpeedMult === 'number' ? this.dev10WaveSpeedMult : 1.0,
             devZombieOverrides: devOvr
           },
           grid: this.grid,
@@ -3981,6 +4339,8 @@
         if (typeof dtCfg.devZombieScrapMult === 'number') this.devZombieScrapMult = dtCfg.devZombieScrapMult;
         if (typeof dtCfg.devZombieSpeedMult === 'number') this.devZombieSpeedMult = dtCfg.devZombieSpeedMult;
         if (typeof dtCfg.devBreachCountMult === 'number') this.devBreachCountMult = dtCfg.devBreachCountMult;
+        if (typeof dtCfg.dev10WaveToughnessMult === 'number') this.dev10WaveToughnessMult = dtCfg.dev10WaveToughnessMult;
+        if (typeof dtCfg.dev10WaveSpeedMult === 'number') this.dev10WaveSpeedMult = dtCfg.dev10WaveSpeedMult;
         const baseOverrides = this.createDefaultZombieOverrides();
         if (dtCfg.devZombieOverrides && typeof dtCfg.devZombieOverrides === 'object') {
           for (const zType of Object.keys(baseOverrides)) {
@@ -7026,27 +7386,32 @@
 
     computeThreatMultipliers() {
       const w = this.wave || 1;
+      const tier10 = Math.floor(Math.max(0, w - 1) / 10);
+      const tough10 = Math.pow(this.dev10WaveToughnessMult || 1.0, tier10);
+      const spd10 = Math.pow(this.dev10WaveSpeedMult || 1.0, tier10);
       if (this.isSurvivalMode) {
         const steps = Math.floor(Math.max(0, w - 1) / 5);
         const sMult = this.getSurvivalHpMult();
-        this.threatMult = sMult;
+        const effHp = sMult * tough10;
+        this.threatMult = effHp;
         return {
-          hp: sMult,
-          dmg: 1.0 + 0.10 * steps,
-          speed: 1.0,
+          hp: effHp,
+          dmg: (1.0 + 0.10 * steps) * tough10,
+          speed: 1.0 * spd10,
           tier: steps
         };
       }
-      const tier = Math.floor(Math.max(0, w - 1) / 10);
+      const tier = tier10;
       if (w < 11) {
         this.threatMult = 1.0;
         return { hp: 1.0, dmg: 1.0, speed: 1.0, tier: 0 };
       }
-      this.threatMult = this.hordeScale.hp;
+      const effHp = this.hordeScale.hp * tough10;
+      this.threatMult = effHp;
       return {
-        hp: this.hordeScale.hp,
-        dmg: this.hordeScale.dmg,
-        speed: this.hordeScale.speed,
+        hp: effHp,
+        dmg: this.hordeScale.dmg * tough10,
+        speed: this.hordeScale.speed * spd10,
         tier
       };
     }
@@ -7059,9 +7424,7 @@
       if (!this.inPlay || this.isPaused || this.modalBlocking) return false;
       if (this.isTutorialMode && this.tutorialStep < 7) return false;
       if (this.spawns.size === 0 && !this.isPostDefenseMode) return false;
-      if (this.isSurvivalMode && this.wave >= 1) return true;
-      if (this.spawns.size > 0 && Array.from(this.spawns.values()).every((sp) => sp.dormantTimer > 0)) return false;
-      if (this.isSurvivalMode && this.waveSpawnQueue.length > 0) return false;
+      if (this.waveSpawnQueue.length > 0) return false;
       return this.isEndlessMode || this.wave < this.totalWaves || this.spawns.size > 0;
     }
 
@@ -7090,6 +7453,7 @@
     launchNextWave(wasEarly = false, earlyBonus = 0) {
       this.wave += 1;
       this.waveState = STATE.ACTIVE;
+      this.waveSpawnQueue = [];
 
       if (this.isEndlessMode || !Number.isFinite(this.totalWaves) || this.wave < this.totalWaves || this.spawns.size > 0) {
         this.nextWaveTimer = (this.isEndlessMode || !Number.isFinite(this.totalWaves)) ? Math.max(25.0, 44.0 - this.wave * 1.0) : 45.0;
@@ -9421,11 +9785,58 @@
       }
     }
 
+    isSapperOutsideSafeZone(u) {
+      if (!u || u.unitKind !== 'sapper') return false;
+      const uc = Math.floor(u.x / TILE_SIZE);
+      const ur = Math.floor(u.y / TILE_SIZE);
+      return !inBounds(uc, ur) || !this.safeZones.has(`${uc},${ur}`);
+    }
+
+    hasWoundedFriendlyForMedic(excludeEng = null) {
+      for (const s of this.soldiers) {
+        if (s.hp > 0 && s.hp < s.maxHp) return true;
+      }
+      for (const e2 of this.engineers) {
+        if (e2 === excludeEng || this.isSapperOutsideSafeZone(e2)) continue;
+        if (e2.hp > 0 && e2.hp < e2.maxHp) return true;
+      }
+      return false;
+    }
+
+    findNearestAvailableEngineeringBay(x, y) {
+      let bestBay = null;
+      let bestBayD = Infinity;
+      for (const st of this.structures.values()) {
+        if (st.type !== 'engineering') continue;
+        const activeT = st.activeTrainers ? st.activeTrainers.length : 0;
+        if (st.occupants && st.occupants.length + activeT < this.getHubCapacity(st)) {
+          const d = Math.hypot(st.x - x, st.y - y);
+          if (d < bestBayD) {
+            bestBayD = d;
+            bestBay = st;
+          }
+        }
+      }
+      return bestBay;
+    }
+
     tryEnterEngineeringEngineer(eng, engIndex) {
       if (eng.unitKind === 'medic') {
-        if (!eng.manualOrder || !eng.targetEngineering) return false;
+        if (!eng.targetEngineering && !eng.manualOrder) return false;
+        if (!eng.manualOrder && this.hasWoundedFriendlyForMedic(eng)) {
+          eng.targetEngineering = null;
+          return false;
+        }
       } else if (eng.unitKind === 'sapper') {
         if (!eng.targetEngineering && !eng.manualOrder) return false;
+        if (!eng.manualOrder) {
+          const maxM = eng.maxMines || SAPPER_SPEC.maxMines || 5;
+          const ownM = this.mines ? this.mines.filter((m) => m.ownerUnitId === eng.id).length : 0;
+          if (ownM < maxM) {
+            eng.targetEngineering = null;
+            return false;
+          }
+        }
       }
       if ((eng.reenterCooldown || 0) > 0) return false;
       const col = Math.floor(eng.x / TILE_SIZE);
@@ -12309,16 +12720,10 @@
 
         if (this.tryEnterEngineeringEngineer(eng, i)) continue;
 
-        // Specialist Engineer Branch: Medic (squad-only heal beam & escort; excludes civilians & outside-Safe-Zone Sappers) & Sapper (5 barrier mines + Engineering return)
+        // Specialist Engineer Branch: Medic (squad-only heal beam & base return when idle) & Sapper (continuous 5 barrier mines + Engineering return when full)
         if (eng.unitKind === 'medic') {
           const hRange = eng.healRange || 110;
           const hRate = eng.healRate || 18;
-          const isSapperOutsideSafeZone = (u) => {
-            if (!u || u.unitKind !== 'sapper') return false;
-            const uc = Math.floor(u.x / TILE_SIZE);
-            const ur = Math.floor(u.y / TILE_SIZE);
-            return !inBounds(uc, ur) || !this.safeZones.has(`${uc},${ur}`);
-          };
           let bestMate = null;
           let lowestRatio = 0.999;
           for (const sol of this.soldiers) {
@@ -12328,13 +12733,14 @@
             }
           }
           for (const e2 of this.engineers) {
-            if (isSapperOutsideSafeZone(e2)) continue;
+            if (this.isSapperOutsideSafeZone(e2)) continue;
             if (e2.hp > 0 && e2.hp < e2.maxHp && Math.hypot(e2.x - eng.x, e2.y - eng.y) <= hRange) {
               const r = e2.hp / e2.maxHp;
               if (r < lowestRatio) { lowestRatio = r; bestMate = e2; }
             }
           }
           if (bestMate) {
+            if (!eng.manualOrder) eng.targetEngineering = null;
             const before = bestMate.hp;
             bestMate.hp = Math.min(bestMate.maxHp, bestMate.hp + hRate * dt);
             eng.repairedTotal = (eng.repairedTotal || 0) + (bestMate.hp - before);
@@ -12347,48 +12753,71 @@
             eng.healBeamTarget = null;
           }
 
-          if (!eng.manualOrder && !eng.manualMoveOrder && eng.path.length === 0) {
-            eng.scanTimer = (eng.scanTimer || 0) - dt;
-            if (eng.scanTimer <= 0) {
-              eng.scanTimer = 0.65;
-              let needTarget = null;
-              let minNeedD = Infinity;
-              for (const sol of this.soldiers) {
-                if (sol.hp > 0 && sol.hp < sol.maxHp) {
-                  const d = Math.hypot(sol.x - eng.x, sol.y - eng.y);
-                  if (d < minNeedD) { minNeedD = d; needTarget = sol; }
-                }
-              }
-              if (!needTarget) {
-                for (const e2 of this.engineers) {
-                  if (e2 === eng || isSapperOutsideSafeZone(e2)) continue;
-                  if (e2.hp > 0 && e2.hp < e2.maxHp) {
-                    const d = Math.hypot(e2.x - eng.x, e2.y - eng.y);
-                    if (d < minNeedD) { minNeedD = d; needTarget = e2; }
+          if (!eng.manualOrder && !eng.manualMoveOrder) {
+            if (eng.targetEngineering && this.hasWoundedFriendlyForMedic(eng)) {
+              eng.targetEngineering = null;
+              eng.path = [];
+            }
+            if (eng.path.length === 0) {
+              eng.scanTimer = (eng.scanTimer || 0) - dt;
+              if (eng.scanTimer <= 0) {
+                eng.scanTimer = 0.65;
+                let needTarget = null;
+                let minNeedD = Infinity;
+                for (const sol of this.soldiers) {
+                  if (sol.hp > 0 && sol.hp < sol.maxHp) {
+                    const d = Math.hypot(sol.x - eng.x, sol.y - eng.y);
+                    if (d < minNeedD) { minNeedD = d; needTarget = sol; }
                   }
                 }
-              }
-              // Escort active frontline combat squads when everyone is healthy
-              if (!needTarget && this.soldiers.length > 0) {
-                let escortLeader = null;
-                let bestSolD = Infinity;
-                for (const sol of this.soldiers) {
-                  if (sol.hp <= 0) continue;
-                  const d = Math.hypot(sol.x - eng.x, sol.y - eng.y);
-                  if (d < bestSolD) { bestSolD = d; escortLeader = sol; }
+                if (!needTarget) {
+                  for (const e2 of this.engineers) {
+                    if (e2 === eng || this.isSapperOutsideSafeZone(e2)) continue;
+                    if (e2.hp > 0 && e2.hp < e2.maxHp) {
+                      const d = Math.hypot(e2.x - eng.x, e2.y - eng.y);
+                      if (d < minNeedD) { minNeedD = d; needTarget = e2; }
+                    }
+                  }
                 }
-                if (escortLeader && bestSolD > TILE_SIZE * 1.8) {
-                  needTarget = escortLeader;
-                }
-              }
-              if (needTarget) {
-                const tc = Math.floor(needTarget.x / TILE_SIZE);
-                const tr = Math.floor(needTarget.y / TILE_SIZE);
-                const p = Math.hypot(needTarget.x - eng.x, needTarget.y - eng.y) <= TILE_SIZE * 1.4
-                  ? null
-                  : this.findPathToAdjacentTile(ec, er, tc, tr, (c, r) => this.unitBlocked(c, r));
-                if (p && p.length > 0) {
-                  eng.path = p.map(([c, r]) => tileCenter(c, r));
+                if (needTarget) {
+                  eng.targetEngineering = null;
+                  const tc = Math.floor(needTarget.x / TILE_SIZE);
+                  const tr = Math.floor(needTarget.y / TILE_SIZE);
+                  const p = Math.hypot(needTarget.x - eng.x, needTarget.y - eng.y) <= TILE_SIZE * 1.4
+                    ? null
+                    : this.findPathToAdjacentTile(ec, er, tc, tr, (c, r) => this.unitBlocked(c, r));
+                  if (p && p.length > 0) {
+                    eng.path = p.map(([c, r]) => tileCenter(c, r));
+                  }
+                } else if (!bestMate) {
+                  // Nobody needs healing: return to nearest Engineering bay or Safe Zone
+                  const bestBay = this.findNearestAvailableEngineeringBay(eng.x, eng.y);
+                  let routed = false;
+                  if (bestBay) {
+                    const p = this.findPathToAdjacentTile(ec, er, bestBay.col, bestBay.row, (c, r) => this.unitBlocked(c, r));
+                    if (p && p.length > 0) {
+                      eng.path = p.map(([c, r]) => tileCenter(c, r));
+                      eng.targetEngineering = bestBay;
+                      eng.reenterCooldown = 0;
+                      routed = true;
+                    }
+                  }
+                  if (!routed && !this.safeZones.has(`${ec},${er}`)) {
+                    let bestSz = null;
+                    let bestSzD = Infinity;
+                    for (const sz of this.safeZones.values()) {
+                      const k = `${sz.col},${sz.row}`;
+                      if (this.structures.has(k)) continue;
+                      const d = Math.hypot(sz.x - eng.x, sz.y - eng.y);
+                      if (d < bestSzD) { bestSzD = d; bestSz = sz; }
+                    }
+                    if (bestSz) {
+                      const p = findPath(ec, er, bestSz.col, bestSz.row, (c, r) => this.unitBlocked(c, r));
+                      if (p && p.length > 0) {
+                        eng.path = p.map(([c, r]) => tileCenter(c, r));
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -12401,6 +12830,10 @@
           const maxMines = eng.maxMines || SAPPER_SPEC.maxMines || 5;
           const mineCd = eng.mineCooldown || SAPPER_SPEC.mineCooldown || 3.0;
           const ownMines = this.mines ? this.mines.filter((m) => m.ownerUnitId === eng.id).length : 0;
+          if (ownMines < maxMines && !eng.manualOrder && eng.targetEngineering) {
+            eng.targetEngineering = null;
+            if (!eng.manualMoveOrder) eng.path = [];
+          }
           const eKey = `${ec},${er}`;
           const isAdjBarrier = (c, r) => {
             for (const [dc, dr] of DIRS_8) {
@@ -12420,8 +12853,7 @@
             && !this.structures.has(eKey) && !this.safeZones.has(eKey) && !this.spawns.has(eKey)
             && safeDistFromBreaches
             && !this.mines.some((m) => Math.hypot(m.x - eng.x, m.y - eng.y) < 24);
-          const standingBarrierAdj = isAdjBarrier(ec, er);
-          if (eng.mineTimer <= 0 && ownMines < maxMines && canPlantHere && (standingBarrierAdj || eng._sapperFallbackPlant)) {
+          if (eng.mineTimer <= 0 && ownMines < maxMines && canPlantHere) {
             const mp = tileCenter(ec, er);
             this.mines.push({
               id: Math.random().toString(36).slice(2, 11),
@@ -12435,7 +12867,6 @@
               ownerId: eng.ownerId || null,
               ownerUnitId: eng.id
             });
-            eng._sapperFallbackPlant = false;
             eng.minesPlanted = (eng.minesPlanted || 0) + 1;
             eng.mineTimer = mineCd;
             this.sound.playClick();
@@ -12445,16 +12876,7 @@
             eng.scanTimer = (eng.scanTimer || 0) - dt;
             if (eng.scanTimer <= 0) {
               eng.scanTimer = 0.7;
-              let bestBay = null;
-              let bestBayD = Infinity;
-              for (const st of this.structures.values()) {
-                if (st.type !== 'engineering') continue;
-                const activeT = st.activeTrainers ? st.activeTrainers.length : 0;
-                if (st.occupants && st.occupants.length + activeT < this.getHubCapacity(st)) {
-                  const d = Math.hypot(st.x - eng.x, st.y - eng.y);
-                  if (d < bestBayD) { bestBayD = d; bestBay = st; }
-                }
-              }
+              const bestBay = this.findNearestAvailableEngineeringBay(eng.x, eng.y);
               if (bestBay) {
                 const p = this.findPathToAdjacentTile(ec, er, bestBay.col, bestBay.row, (c, r) => this.unitBlocked(c, r));
                 if (p && p.length > 0) {
@@ -12467,7 +12889,7 @@
           } else if (!eng.manualOrder && !eng.manualMoveOrder && eng.path.length === 0 && ownMines < maxMines) {
             eng.scanTimer = (eng.scanTimer || 0) - dt;
             if (eng.scanTimer <= 0) {
-              eng.scanTimer = 0.7;
+              eng.scanTimer = 0.45;
               const openTiles = [];
               for (let r = 1; r < ROWS - 1; r++) {
                 for (let c = 1; c < COLS - 1; c++) {
@@ -12489,7 +12911,6 @@
               if (openTiles.length > 0) {
                 openTiles.sort((a, b) => (b.adjBarrier - a.adjBarrier) || (a.d - b.d));
                 const hasBarrierSpot = openTiles[0].adjBarrier;
-                eng._sapperFallbackPlant = !hasBarrierSpot;
                 const poolSize = hasBarrierSpot ? Math.min(2, openTiles.length) : Math.min(5, openTiles.length);
                 const pick = openTiles[Math.floor(Math.random() * poolSize)];
                 const p = findPath(ec, er, pick.c, pick.r, (c, r) => this.unitBlocked(c, r));
@@ -13432,44 +13853,46 @@
             }
             struct._deployCd = Math.max(0, (struct._deployCd || 0) - dt);
             if (struct._deployCd <= 0) {
-              struct._deployCd = 0.5;
+              struct._deployCd = 0.25;
+              const deployOcc = (occIdx) => {
+                const u = struct.occupants.splice(occIdx, 1)[0];
+                const exitPos = this.findSafeExitPos(struct, false, true);
+                u.x = exitPos.x;
+                u.y = exitPos.y;
+                u.path = [];
+                u.dest = null;
+                u.targetEngineering = null;
+                u.manualOrder = false;
+                u.manualMoveOrder = false;
+                u.reenterCooldown = 2.0;
+                this.engineers.push(u);
+                return u;
+              };
+
               const eIdx = struct.occupants.findIndex((u) => u.unitType === 'engineer' && (!u.unitKind || u.unitKind === 'engineer'));
               if (eIdx !== -1) {
                 const damagedTarget = this.findNearestDamagedStructureOrSafeZone(struct.x, struct.y);
                 if (damagedTarget) {
-                  const eng = struct.occupants.splice(eIdx, 1)[0];
-                  const exitPos = this.findSafeExitPos(struct, false, true);
-                  eng.x = exitPos.x;
-                  eng.y = exitPos.y;
-                  eng.path = [];
-                  eng.dest = null;
-                  eng.targetEngineering = null;
-                  eng.manualOrder = false;
-                  eng.manualMoveOrder = false;
-                  eng.reenterCooldown = 2.0;
-                  this.engineers.push(eng);
+                  const eng = deployOcc(eIdx);
                   this.commandEngineerToTarget(eng, damagedTarget);
                 }
-              } else {
-                const sIdx = struct.occupants.findIndex((u) => u.unitType === 'engineer' && u.unitKind === 'sapper');
-                if (sIdx !== -1) {
-                  const sap = struct.occupants[sIdx];
-                  const maxM = sap.maxMines || SAPPER_SPEC.maxMines || 5;
-                  const ownM = this.mines ? this.mines.filter((m) => m.ownerUnitId === sap.id).length : 0;
-                  if (ownM < maxM) {
-                    struct.occupants.splice(sIdx, 1);
-                    const exitPos = this.findSafeExitPos(struct, false, true);
-                    sap.x = exitPos.x;
-                    sap.y = exitPos.y;
-                    sap.path = [];
-                    sap.dest = null;
-                    sap.targetEngineering = null;
-                    sap.manualOrder = false;
-                    sap.manualMoveOrder = false;
-                    sap.reenterCooldown = 2.0;
-                    sap.mineTimer = Math.min(sap.mineTimer || 0, 0.6);
-                    this.engineers.push(sap);
-                  }
+              }
+
+              const sIdx = struct.occupants.findIndex((u) => {
+                if (u.unitType !== 'engineer' || u.unitKind !== 'sapper') return false;
+                const maxM = u.maxMines || SAPPER_SPEC.maxMines || 5;
+                const ownM = this.mines ? this.mines.filter((m) => m.ownerUnitId === u.id).length : 0;
+                return ownM < maxM;
+              });
+              if (sIdx !== -1) {
+                const sap = deployOcc(sIdx);
+                sap.mineTimer = Math.min(sap.mineTimer || 0, 0.25);
+              }
+
+              if (this.hasWoundedFriendlyForMedic()) {
+                const mIdx = struct.occupants.findIndex((u) => u.unitType === 'engineer' && u.unitKind === 'medic');
+                if (mIdx !== -1) {
+                  deployOcc(mIdx);
                 }
               }
             }
