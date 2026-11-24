@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.43.0 (Safe Zone Structure Slot Cap, HUD/Inspector Slot Readouts & Dev Safe Zones per Structure Slider)
+ * Version: v0.44.0 (Medic & Sapper Free-Roam Manual Move Orders)
  */
 
 (function () {
@@ -1627,7 +1627,7 @@
       this.arsenalTabUnits = $('arsenalTabUnits');
       this.arsenalTabTowers = $('arsenalTabTowers');
 
-      // Developer Tuning UI Elements (v0.43.0)
+      // Developer Tuning UI Elements (v0.44.0)
       this.developerModal = $('developerModal');
       this.btnCloseDeveloper = $('btnCloseDeveloper');
       this.btnDoneDeveloper = $('btnDoneDeveloper');
@@ -1869,7 +1869,7 @@
       on(this.tabArsenalUnits, 'click', () => { this.setArsenalTab('units'); this.sound.playClick(); });
       on(this.tabArsenalTowers, 'click', () => { this.setArsenalTab('towers'); this.sound.playClick(); });
 
-      // Developer Tuning Modal bindings (v0.43.0)
+      // Developer Tuning Modal bindings (v0.44.0)
       on(this.btnSettingsDeveloper, 'click', () => this.openDeveloperModal());
       on(this.btnCloseDeveloper, 'click', () => this.closeDeveloperModal());
       on(this.btnDoneDeveloper, 'click', () => this.closeDeveloperModal());
@@ -5546,14 +5546,16 @@
         const eng = this.engineers.find((e) => e.id === action.unitId);
         if (!eng) return;
         if (eng.ownerId && eng.ownerId !== actorId) return;
+        const isStandardEng = !eng.unitKind || eng.unitKind === 'engineer';
+        const engLabel = eng.unitKind === 'medic' ? 'Medic' : eng.unitKind === 'sapper' ? 'Sapper' : 'Engineer';
         if (clickedStruct && clickedStruct.type === 'engineering') {
           this.commandEngineerToEngineering(eng, clickedStruct);
-        } else if (clickedStruct && clickedStruct.type !== 'safezone' && !(clickedStruct.type === 'gate' && clickedStruct.hp >= clickedStruct.maxHp)) {
+        } else if (isStandardEng && clickedStruct && clickedStruct.type !== 'safezone' && !(clickedStruct.type === 'gate' && clickedStruct.hp >= clickedStruct.maxHp)) {
           this.commandEngineerToTarget(eng, clickedStruct);
         } else {
           eng.targetEngineering = null;
           eng.manualOrder = true;
-          if (this.commandUnitMove(eng, col, row, 'Engineer', true) && eng.path.length > 0) eng.manualMoveOrder = true;
+          if (this.commandUnitMove(eng, col, row, engLabel, isStandardEng) && eng.path.length > 0) eng.manualMoveOrder = true;
         }
       } else if (action.unitType === 'soldier') {
         const sol = this.soldiers.find((s) => s.id === action.unitId);
@@ -8542,7 +8544,9 @@
           }
           return;
         }
-        if (clickedStruct && clickedStruct.type !== 'safezone' && !(clickedStruct.type === 'gate' && clickedStruct.hp >= clickedStruct.maxHp)) {
+        const isStandardEng = !this.selectedEngineer.unitKind || this.selectedEngineer.unitKind === 'engineer';
+        const engLabel = this.selectedEngineer.unitKind === 'medic' ? 'Medic' : this.selectedEngineer.unitKind === 'sapper' ? 'Sapper' : 'Engineer';
+        if (isStandardEng && clickedStruct && clickedStruct.type !== 'safezone' && !(clickedStruct.type === 'gate' && clickedStruct.hp >= clickedStruct.maxHp)) {
           this.commandEngineerToTarget(this.selectedEngineer, clickedStruct);
           if (this.isMobileTouch) {
             this.selectedEngineer = null;
@@ -8552,7 +8556,7 @@
         }
         this.selectedEngineer.targetEngineering = null;
         this.selectedEngineer.manualOrder = true;
-        if (this.commandUnitMove(this.selectedEngineer, col, row, 'Engineer', true)) {
+        if (this.commandUnitMove(this.selectedEngineer, col, row, engLabel, isStandardEng)) {
           if (this.selectedEngineer.path.length > 0) this.selectedEngineer.manualMoveOrder = true;
         }
         if (this.isMobileTouch) {
@@ -9859,18 +9863,23 @@
       }
       const sc = Math.floor(eng.x / TILE_SIZE);
       const sr = Math.floor(eng.y / TILE_SIZE);
-      const path = findPath(sc, sr, engBuilding.col, engBuilding.row, (c, r) => {
-        if (c === engBuilding.col && r === engBuilding.row) return false;
-        return this.engineerBlocked(c, r);
-      });
+      const isSpecialist = eng.unitKind === 'medic' || eng.unitKind === 'sapper';
+      const path = isSpecialist
+        ? this.findPathToAdjacentTile(sc, sr, engBuilding.col, engBuilding.row, (c, r) => this.unitBlocked(c, r))
+        : findPath(sc, sr, engBuilding.col, engBuilding.row, (c, r) => {
+            if (c === engBuilding.col && r === engBuilding.row) return false;
+            return this.engineerBlocked(c, r);
+          });
       if (path) {
         eng.path = path.map(([c, r]) => tileCenter(c, r));
         eng.dest = { col: engBuilding.col, row: engBuilding.row };
         eng.targetEngineering = engBuilding;
         eng.repairTarget = null;
+        eng.manualOrder = true;
+        eng.reenterCooldown = 0;
         this.sound.playClick();
       } else {
-        this.showStatus('Engineering must be connected by Safe Zone territory!');
+        this.showStatus(isSpecialist ? 'Path to Engineering is blocked or unreachable!' : 'Engineering must be connected by Safe Zone territory!');
         this.sound.playHit();
       }
     }
@@ -10604,8 +10613,14 @@
       this.updateBuildPanelUI();
       this.sound.playClick();
       this.renderEngineerInspector(engineer);
-      const spec = ENGINEER_SPECS[engineer.level - 1];
-      this.showStatus(`${spec.name} (Lv${engineer.level}, +${spec.repairRate} HP/s) selected: patrols green Safe Zones & connected Barricades.`);
+      if (engineer.unitKind === 'medic') {
+        this.showStatus(`Medic (+${engineer.healRate || 18} HP/s) selected: click any walkable tile to move or Engineering to garrison.`);
+      } else if (engineer.unitKind === 'sapper') {
+        this.showStatus(`Sapper (max ${engineer.maxMines || 5} mines) selected: click any walkable tile to move or Engineering to garrison.`);
+      } else {
+        const spec = ENGINEER_SPECS[engineer.level - 1];
+        this.showStatus(`${spec.name} (Lv${engineer.level}, +${spec.repairRate} HP/s) selected: patrols green Safe Zones & connected Barricades.`);
+      }
     }
 
     getEngineerEligibleAnchors(targetStruct) {
@@ -10713,7 +10728,7 @@
     }
 
     commandUnitMove(unit, targetCol, targetRow, label, safeZoneOnly = false) {
-      const isEng = unit.unitType === 'engineer';
+      const isEng = unit.unitType === 'engineer' && (!unit.unitKind || unit.unitKind === 'engineer');
       const isComm = !!unit.isCommando;
       const blockedFn = safeZoneOnly
         ? (isEng ? (c, r) => this.engineerBlocked(c, r) : isComm ? (c, r) => this.commandoBlocked(c, r) : (c, r) => this.safeZoneOnlyBlocked(c, r))
