@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.33.0 (Auto-Dismiss Train Unit Box, Compact Counter Header & $Price Layout, 2-Tile Flamethrower Combat Fix, & Subtle Safe Zone Opacity)
+ * Version: v0.34.0 (20s Survival Rift Respawn +1 Breach, Dev Defaults 0.5x HP / 1.5x Scrap & 0.1x-10x Sliders, Clear Selection on Settings)
  */
 
 (function () {
@@ -1051,11 +1051,11 @@
       this.zombieSpeedMult = 1.0;
       this.infectionWindow = 2.0;
 
-      // Developer Tuning Live Multipliers (v0.31.0)
+      // Developer Tuning Live Multipliers (v0.34.0)
       this.devTowerStrengthMult = 1.0;
-      this.devZombieHpMult = 1.0;
-      this.devZombieScrapMult = 1.0;
-      this.devSliderStops = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0];
+      this.devZombieHpMult = 0.5;
+      this.devZombieScrapMult = 1.5;
+      this.devSliderStops = [0.1, 0.2, 0.35, 0.5, 0.75, 1.0, 1.5, 2.0, 3.5, 6.0, 10.0];
 
       this.scrap = 100;
       this.score = 0;
@@ -1967,6 +1967,7 @@
         if (this.mobileSettingsMenu) {
           const isHidden = this.mobileSettingsMenu.classList.contains('hidden');
           if (isHidden) {
+            this.clearSelection();
             this.closeMobileSubDrawer();
             this.mobileSettingsMenu.classList.remove('hidden');
             if (this.btnMobileSettings) this.btnMobileSettings.setAttribute('aria-expanded', 'true');
@@ -2803,6 +2804,8 @@
     // --- MENUS & MODALS ---
     openSettingsModal() {
       if (!this.settingsModal) return;
+      this.clearSelection();
+      this.closeMobileSubDrawer();
       this.syncSettingsUI();
       if (this.inPlay && !this.isPaused && !this.isMultiplayer) {
         this.setPaused(true);
@@ -2837,7 +2840,7 @@
 
     syncDeveloperUI() {
       const getStopIndex = (val) => {
-        let bestIdx = 3;
+        let bestIdx = 5;
         let minDiff = Infinity;
         for (let i = 0; i < this.devSliderStops.length; i++) {
           const diff = Math.abs(this.devSliderStops[i] - val);
@@ -2849,39 +2852,44 @@
         return bestIdx;
       };
 
+      const towerMult = typeof this.devTowerStrengthMult === 'number' ? this.devTowerStrengthMult : 1.0;
+      const hpMult = typeof this.devZombieHpMult === 'number' ? this.devZombieHpMult : 0.5;
+      const scrapMult = typeof this.devZombieScrapMult === 'number' ? this.devZombieScrapMult : 1.5;
+
       if (this.sliderDevTowerStrength) {
-        this.sliderDevTowerStrength.value = getStopIndex(this.devTowerStrengthMult || 1.0);
+        this.sliderDevTowerStrength.value = getStopIndex(towerMult);
       }
       if (this.valDevTowerStrength) {
-        this.valDevTowerStrength.textContent = (this.devTowerStrengthMult || 1.0) + 'x';
+        this.valDevTowerStrength.textContent = towerMult + 'x';
       }
 
       if (this.sliderDevZombieHp) {
-        this.sliderDevZombieHp.value = getStopIndex(this.devZombieHpMult || 1.0);
+        this.sliderDevZombieHp.value = getStopIndex(hpMult);
       }
       if (this.valDevZombieHp) {
-        this.valDevZombieHp.textContent = (this.devZombieHpMult || 1.0) + 'x';
+        this.valDevZombieHp.textContent = hpMult + 'x';
       }
 
       if (this.sliderDevZombieScrap) {
-        this.sliderDevZombieScrap.value = getStopIndex(this.devZombieScrapMult || 1.0);
+        this.sliderDevZombieScrap.value = getStopIndex(scrapMult);
       }
       if (this.valDevZombieScrap) {
-        this.valDevZombieScrap.textContent = (this.devZombieScrapMult || 1.0) + 'x';
+        this.valDevZombieScrap.textContent = scrapMult + 'x';
       }
     }
 
     resetDeveloperDefaults() {
-      const defaultIdx = 3; // corresponds to 1.0x in [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0]
-      if (this.sliderDevTowerStrength) this.sliderDevTowerStrength.value = defaultIdx;
-      if (this.sliderDevZombieHp) this.sliderDevZombieHp.value = defaultIdx;
-      if (this.sliderDevZombieScrap) this.sliderDevZombieScrap.value = defaultIdx;
+      // Defaults in [0.1, 0.2, 0.35, 0.5, 0.75, 1.0, 1.5, 2.0, 3.5, 6.0, 10.0]:
+      // Tower Strength = 1.0x (idx 5), Zombie HP = 0.5x (idx 3), Zombie Scrap Drops = 1.5x (idx 6)
+      if (this.sliderDevTowerStrength) this.sliderDevTowerStrength.value = 5;
+      if (this.sliderDevZombieHp) this.sliderDevZombieHp.value = 3;
+      if (this.sliderDevZombieScrap) this.sliderDevZombieScrap.value = 6;
       if (this.valDevTowerStrength) this.valDevTowerStrength.textContent = '1.0x';
-      if (this.valDevZombieHp) this.valDevZombieHp.textContent = '1.0x';
-      if (this.valDevZombieScrap) this.valDevZombieScrap.textContent = '1.0x';
+      if (this.valDevZombieHp) this.valDevZombieHp.textContent = '0.5x';
+      if (this.valDevZombieScrap) this.valDevZombieScrap.textContent = '1.5x';
       this.devTowerStrengthMult = 1.0;
-      this.devZombieScrapMult = 1.0;
-      this.setDevZombieHpMult(1.0);
+      this.devZombieScrapMult = 1.5;
+      this.setDevZombieHpMult(0.5);
       if (this.selectedStructure) this.updateUpgradePanel();
       this.sound.playClick();
     }
@@ -6040,8 +6048,9 @@
 
     reshuffleSurvivalSpawns() {
       if (this.safeZones.size === 0) return;
-      const cap = 6 * (this.isMultiplayer ? Math.max(1, this.mpPlayers.length) : 1);
-      const targetCount = Math.max(1, Math.min(cap, this.spawns.size || 4));
+      const cap = 12 * (this.isMultiplayer ? Math.max(1, this.mpPlayers.length) : 1);
+      const prevCount = this.spawns.size || 4;
+      const targetCount = Math.max(1, Math.min(cap, prevCount + 1));
       for (const sp of this.spawns.values()) {
         if (this.grid[sp.row] && this.grid[sp.row][sp.col] === 3) {
           this.grid[sp.row][sp.col] = 0;
@@ -6056,7 +6065,7 @@
         for (let c = 1; c < COLS - 1; c++) {
           if (this.grid[r][c] !== 0) continue;
           const key = `${c},${r}`;
-          if (this.structures.has(key) || this.safeZones.has(key)) continue;
+          if (this.structures.has(key) || this.safeZones.has(key) || this.spawns.has(key)) continue;
           let minSzD = Infinity;
           for (const sz of szTiles) {
             const d = Math.hypot(c - sz.col, r - sz.row);
@@ -6072,11 +6081,13 @@
       const breachHp = 750 + Math.floor((this.wave || 1) / 5) * 150;
       for (let i = 0; i < candidates.length && this.spawns.size < targetCount; i++) {
         const [bc, br] = candidates[i];
+        const key = `${bc},${br}`;
+        if (this.grid[br][bc] !== 0 || this.safeZones.has(key) || this.structures.has(key) || this.spawns.has(key)) continue;
         const path = findPath(bc, br, sampleSz.col, sampleSz.row, (c, r) => !inBounds(c, r) || this.grid[r][c] === 1);
         if (!path) continue;
         this.grid[br][bc] = 3;
         const p = tileCenter(bc, br);
-        this.spawns.set(`${bc},${br}`, {
+        this.spawns.set(key, {
           type: 'spawn',
           col: bc,
           row: br,
@@ -6087,17 +6098,17 @@
           flash: 0,
           timeSinceHit: 99,
           isRegenerating: false,
-          dormantTimer: 60.0
+          dormantTimer: 20.0
         });
         this.pulseRings.push({ x: p.x, y: p.y, radius: 10, maxRadius: 72, color: '#FFD23F', life: 1.2, maxLife: 1.2 });
       }
       this.sound.playWaveWarning();
-      this.addFloatingText('SPAWNS RESHUFFLED (60s COOLDOWN)!', WIDTH / 2, 165, '#FFD23F');
-      this.showStatus('Survival Wave 10-boundary: All Spawn Breaches reshuffled with a 60s cooldown!');
+      this.addFloatingText(`SPAWNS RESHUFFLED +1 (${this.spawns.size} RIFTS, 20s COOLDOWN)!`, WIDTH / 2, 165, '#FFD23F');
+      this.showStatus(`Survival Wave 10-boundary: ${this.spawns.size} Spawn Breaches (+1 added) reshuffled with a 20s cooldown!`);
     }
 
     spawnSurvivalDormantRift() {
-      const cap = 6 * (this.isMultiplayer ? Math.max(1, this.mpPlayers.length) : 1);
+      const cap = 12 * (this.isMultiplayer ? Math.max(1, this.mpPlayers.length) : 1);
       if (this.spawns.size >= cap || this.safeZones.size === 0) return false;
       const szTiles = Array.from(this.safeZones.values());
       const sampleSz = szTiles[0];
@@ -6119,14 +6130,16 @@
         const j = Math.floor(Math.random() * (i + 1));
         [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
       }
-      for (let attempt = 0; attempt < Math.min(25, candidates.length); attempt++) {
+      for (let attempt = 0; attempt < candidates.length; attempt++) {
         const [bc, br] = candidates[attempt];
+        const key = `${bc},${br}`;
+        if (this.grid[br][bc] !== 0 || this.safeZones.has(key) || this.structures.has(key) || this.spawns.has(key)) continue;
         const path = findPath(bc, br, sampleSz.col, sampleSz.row, (c, r) => !inBounds(c, r) || this.grid[r][c] === 1);
         if (!path) continue;
         this.grid[br][bc] = 3;
         const p = tileCenter(bc, br);
         const breachHp = 750 + Math.floor((this.wave || 1) / 5) * 150;
-        this.spawns.set(`${bc},${br}`, {
+        this.spawns.set(key, {
           type: 'spawn',
           col: bc,
           row: br,
@@ -6137,12 +6150,12 @@
           flash: 0,
           timeSinceHit: 99,
           isRegenerating: false,
-          dormantTimer: 60.0
+          dormantTimer: 20.0
         });
         this.pulseRings.push({ x: p.x, y: p.y, radius: 10, maxRadius: 72, color: '#FFD23F', life: 1.2, maxLife: 1.2 });
-        this.addFloatingText('NEW RIFT FORMING (60s)!', p.x, p.y - 16, '#FFD23F');
+        this.addFloatingText('NEW RIFT FORMING (20s)!', p.x, p.y - 16, '#FFD23F');
         this.sound.playWaveWarning();
-        this.showStatus('Warning: Dormant Survival Rift detected! Activates in 60s!');
+        this.showStatus('Warning: Dormant Survival Rift detected! Activates in 20s!');
         return true;
       }
       return false;
@@ -6281,7 +6294,7 @@
         }
       }
 
-      // Survival escalation (+60% HP per 5 waves; reshuffle spawns with 60s cooldown every 10 waves; dormant rift on Wave 6, 16, 26...)
+      // Survival escalation (+60% HP per 5 waves; reshuffle spawns with 20s cooldown every 10 waves; dormant rift on Wave 6, 16, 26...)
       if (this.isSurvivalMode && w >= 6 && (w - 1) % 5 === 0) {
         const sMult = this.getSurvivalHpMult();
         this.addFloatingText(`SURVIVAL ESCALATION (${sMult.toFixed(1)}x HP)!`, WIDTH / 2, 138, '#00E5FF');
