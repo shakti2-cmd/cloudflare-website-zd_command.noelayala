@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.36.0 (Survival Tiered Breach Reshuffle, Queue Remapping, Wave Timer/Dormancy Guards & Immediate Active-Breach Spawning)
+ * Version: v0.37.0 (Survival Invincible Rifts & Hidden HP Bars, Uncapped 5-Wave Reshuffle, Instant Wave Chaining, 0.75x Default Breach Count & Clean Desktop Card)
  */
 
 (function () {
@@ -1051,12 +1051,12 @@
       this.zombieSpeedMult = 1.0;
       this.infectionWindow = 2.0;
 
-      // Developer Tuning Live Multipliers (v0.35.0)
+      // Developer Tuning Live Multipliers (v0.37.0)
       this.devTowerStrengthMult = 1.0;
       this.devZombieHpMult = 0.5;
       this.devZombieScrapMult = 1.5;
       this.devZombieSpeedMult = 1.0;
-      this.devBreachCountMult = 1.0;
+      this.devBreachCountMult = 0.75;
       this.devSliderStops = [0.1, 0.2, 0.35, 0.5, 0.75, 1.0, 1.5, 2.0, 3.5, 6.0, 10.0];
 
       this.scrap = 100;
@@ -2868,7 +2868,7 @@
       const hpMult = typeof this.devZombieHpMult === 'number' ? this.devZombieHpMult : 0.5;
       const scrapMult = typeof this.devZombieScrapMult === 'number' ? this.devZombieScrapMult : 1.5;
       const speedMult = typeof this.devZombieSpeedMult === 'number' ? this.devZombieSpeedMult : 1.0;
-      const breachMult = typeof this.devBreachCountMult === 'number' ? this.devBreachCountMult : 1.0;
+      const breachMult = typeof this.devBreachCountMult === 'number' ? this.devBreachCountMult : 0.75;
 
       if (this.sliderDevTowerStrength) {
         this.sliderDevTowerStrength.value = getStopIndex(towerMult);
@@ -2908,20 +2908,20 @@
 
     resetDeveloperDefaults() {
       // Defaults in [0.1, 0.2, 0.35, 0.5, 0.75, 1.0, 1.5, 2.0, 3.5, 6.0, 10.0]:
-      // Tower = 1.0x (5), HP = 0.5x (3), Scrap = 1.5x (6), Speed = 1.0x (5), Breach Count = 1.0x (5)
+      // Tower = 1.0x (5), HP = 0.5x (3), Scrap = 1.5x (6), Speed = 1.0x (5), Breach Count = 0.75x (4)
       if (this.sliderDevTowerStrength) this.sliderDevTowerStrength.value = 5;
       if (this.sliderDevZombieHp) this.sliderDevZombieHp.value = 3;
       if (this.sliderDevZombieScrap) this.sliderDevZombieScrap.value = 6;
       if (this.sliderDevZombieSpeed) this.sliderDevZombieSpeed.value = 5;
-      if (this.sliderDevBreachCount) this.sliderDevBreachCount.value = 5;
+      if (this.sliderDevBreachCount) this.sliderDevBreachCount.value = 4;
       if (this.valDevTowerStrength) this.valDevTowerStrength.textContent = '1.0x';
       if (this.valDevZombieHp) this.valDevZombieHp.textContent = '0.5x';
       if (this.valDevZombieScrap) this.valDevZombieScrap.textContent = '1.5x';
       if (this.valDevZombieSpeed) this.valDevZombieSpeed.textContent = '1.0x';
-      if (this.valDevBreachCount) this.valDevBreachCount.textContent = '1.0x';
+      if (this.valDevBreachCount) this.valDevBreachCount.textContent = '0.75x';
       this.devTowerStrengthMult = 1.0;
       this.devZombieScrapMult = 1.5;
-      this.devBreachCountMult = 1.0;
+      this.devBreachCountMult = 0.75;
       this.setDevZombieHpMult(0.5);
       this.setDevZombieSpeedMult(1.0);
       if (this.selectedStructure) this.updateUpgradePanel();
@@ -6159,9 +6159,8 @@
 
     reshuffleSurvivalSpawns() {
       if (this.safeZones.size === 0) return;
-      const cap = 12 * (this.isMultiplayer ? Math.max(1, this.mpPlayers.length) : 1);
       const prevCount = this.spawns.size || 4;
-      const targetCount = Math.max(1, Math.min(cap, prevCount + 1));
+      const targetCount = Math.max(1, prevCount + 1);
       for (const sp of this.spawns.values()) {
         if (this.grid[sp.row] && this.grid[sp.row][sp.col] === 3) {
           this.grid[sp.row][sp.col] = 0;
@@ -6215,7 +6214,7 @@
 
       this.sound.playWaveWarning();
       this.addFloatingText(`SPAWNS RESHUFFLED +1 (${this.spawns.size} RIFTS, 20s COOLDOWN)!`, WIDTH / 2, 165, '#FFD23F');
-      this.showStatus(`Survival Wave 10-boundary: ${this.spawns.size} Spawn Breaches (+1 added) reshuffled with a 20s cooldown!`);
+      this.showStatus(`Survival Wave 5-boundary: ${this.spawns.size} Invincible Rifts (+1 added) reshuffled with a 20s cooldown!`);
     }
 
     spawnSurvivalDormantRift() {
@@ -6279,6 +6278,7 @@
       if (!this.inPlay || this.isPaused || this.modalBlocking) return false;
       if (this.isTutorialMode && this.tutorialStep < 7) return false;
       if (this.spawns.size === 0 && !this.isPostDefenseMode) return false;
+      if (this.isSurvivalMode && this.wave >= 1) return true;
       if (this.spawns.size > 0 && Array.from(this.spawns.values()).every((sp) => sp.dormantTimer > 0)) return false;
       if (this.isSurvivalMode && this.waveSpawnQueue.length > 0) return false;
       return this.isEndlessMode || this.wave < this.totalWaves || this.spawns.size > 0;
@@ -6336,21 +6336,17 @@
         }
       }
 
-      // Survival escalation (+60% HP per 5 waves; reshuffle spawns with 20s cooldown every 10 waves; dormant rift on Wave 6, 16, 26...)
+      // Survival escalation (+60% HP per 5 waves; uncapped +1 invincible rift reshuffle with 20s cooldown every 5 waves)
       // Executed BEFORE Survival per-breach queue generation so queued breachKeys match active/reshuffled spawns.
       if (this.isSurvivalMode && w >= 6 && (w - 1) % 5 === 0) {
         const sMult = this.getSurvivalHpMult();
         this.addFloatingText(`SURVIVAL ESCALATION (${sMult.toFixed(1)}x HP)!`, WIDTH / 2, 138, '#00E5FF');
-        if (w >= 11 && (w - 1) % 10 === 0) {
-          this.reshuffleSurvivalSpawns();
-        } else {
-          this.spawnSurvivalDormantRift();
-        }
+        this.reshuffleSurvivalSpawns();
       }
 
       let cfg = { walkers: 0, runners: 0, tanks: 0, demolishers: 0, wreckers: 0 };
       if (this.isSurvivalMode && !(this.isTutorialMode && w === 1)) {
-        const perBreach = Math.max(1, Math.round(6 * (this.devBreachCountMult || 1.0)));
+        const perBreach = Math.max(1, Math.round(6 * (this.devBreachCountMult || 0.75)));
         const activeOwners = (this.isMultiplayer && this.isMpHost)
           ? Array.from(new Set(Array.from(this.safeZones.values()).map((sz) => sz.ownerId).filter(Boolean)))
           : [];
@@ -6577,6 +6573,7 @@
 
     // --- DESTRUCTIBLE SPAWN BREACH DAMAGE, REGEN RESET & LOAD TRANSFER ---
     damageSpawnBreach(breach, dmg, sourceUnitOrStruct) {
+      if (this.isSurvivalMode) return;
       if (!breach || breach.hp <= 0) return;
       if (this.isTutorialMode && this.tutorialStep < 7) return;
       if (!sourceUnitOrStruct || !sourceUnitOrStruct.isCommando) return;
@@ -6626,6 +6623,7 @@
     }
 
     findSpawnBreachInRange(x, y, range) {
+      if (this.isSurvivalMode) return null;
       if (this.isTutorialMode && this.tutorialStep < 7) return null;
       let best = null;
       let bestD = range;
@@ -9097,7 +9095,7 @@
         } else {
           this.inspectTier.innerText = isAllyReadOnly
             ? `Lv${struct.level}/${maxLv} \u2022 Ally: ${struct.ownerName || 'Player'} [View-Only]`
-            : `Lv${struct.level}/${maxLv} \u2022 Tile (${struct.col}, ${struct.row})`;
+            : `Lv${struct.level}/${maxLv}`;
         }
       }
       if (this.inspectHpText) this.inspectHpText.innerText = `${Math.ceil(struct.hp)} / ${struct.maxHp}`;
@@ -9138,8 +9136,12 @@
         if (this.btnTrainUnit) hideEl(this.btnTrainUnit);
         if (this.btnCancelTrain) hideEl(this.btnCancelTrain);
         if (this.btnRelease) {
-          showEl(this.btnRelease, 'flex');
-          this.btnRelease.disabled = occ === 0;
+          if (this.isMobileTouch) {
+            showEl(this.btnRelease, 'flex');
+            this.btnRelease.disabled = occ === 0;
+          } else {
+            hideEl(this.btnRelease);
+          }
         }
         if (this.releaseCountLabel) this.releaseCountLabel.innerText = `${occ}/${cap}`;
         this.renderBuildingUnitFloatMenu(struct, isAllyReadOnly);
@@ -9172,8 +9174,12 @@
         if (this.btnTrainUnit) hideEl(this.btnTrainUnit);
         if (this.btnCancelTrain) hideEl(this.btnCancelTrain);
         if (this.btnRelease) {
-          showEl(this.btnRelease, 'flex');
-          this.btnRelease.disabled = occ === 0;
+          if (this.isMobileTouch) {
+            showEl(this.btnRelease, 'flex');
+            this.btnRelease.disabled = occ === 0;
+          } else {
+            hideEl(this.btnRelease);
+          }
         }
         if (this.releaseCountLabel) this.releaseCountLabel.innerText = `${occ}/${cap}`;
         this.renderBuildingUnitFloatMenu(struct, isAllyReadOnly);
@@ -9236,15 +9242,19 @@
       }
 
       if (this.inspectRepairStatus) {
-        const key = `${struct.col},${struct.row}`;
-        const canAutoRepair = struct.type === 'safezone'
-          || this.safeZones.has(key)
-          || ((struct.type === 'wall' || struct.type === 'gate') && this.isBarricadeConnectedToSafeZone(struct.col, struct.row));
-        this.inspectRepairStatus.innerText = canAutoRepair
-          ? 'Engineer Auto-Repair Active'
-          : 'Build Safe Zone Under to Repair';
-        this.inspectRepairStatus.classList.toggle('unfloored', !canAutoRepair);
-        showEl(this.inspectRepairStatus, 'inline-flex');
+        if (!this.isMobileTouch) {
+          hideEl(this.inspectRepairStatus);
+        } else {
+          const key = `${struct.col},${struct.row}`;
+          const canAutoRepair = struct.type === 'safezone'
+            || this.safeZones.has(key)
+            || ((struct.type === 'wall' || struct.type === 'gate') && this.isBarricadeConnectedToSafeZone(struct.col, struct.row));
+          this.inspectRepairStatus.innerText = canAutoRepair
+            ? 'Engineer Auto-Repair Active'
+            : 'Build Safe Zone Under to Repair';
+          this.inspectRepairStatus.classList.toggle('unfloored', !canAutoRepair);
+          showEl(this.inspectRepairStatus, 'inline-flex');
+        }
       }
 
       if (this.btnMoveStructure) {
@@ -10226,6 +10236,9 @@
         if (this.spawns.size === 0) {
           this.waveState = STATE.CLEARED;
           this.showStatus(`All Spawn Breaches destroyed! +$${clearBonus} bonus.${milestoneNote}`);
+        } else if (this.isSurvivalMode && this.wave >= 1) {
+          this.addFloatingText(`+$${clearBonus} Wave Bonus`, WIDTH / 2, HEIGHT / 2, '#FFD700');
+          this.launchNextWave(false, 0);
         } else {
           this.waveState = STATE.PREPARE;
           if (this.nextWaveTimer > 12.0) this.nextWaveTimer = 12.0;
@@ -10790,6 +10803,7 @@
     }
 
     findAssaultableSpawnBreach(x, y, radius = 120) {
+      if (this.isSurvivalMode) return null;
       if (this.isTutorialMode && this.tutorialStep < 7) return null;
       const tutReady = this.isTutorialMode && this.tutorialStep >= 7;
       let best = null;
@@ -12423,19 +12437,21 @@
         }
 
         // Visible Red HP bar above each destructible Spawn Breach (+ subtle crimson-gold regen pulse after 2.0s unhit)
-        const ratio = Math.max(0, sp.hp / sp.maxHp);
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-        ctx.fillRect(x + 3, y + 2, TILE_SIZE - 6, 5);
-        ctx.fillStyle = sp.isRegenerating ? '#FF6B4A' : '#FF3B3B';
-        ctx.fillRect(x + 3, y + 2, (TILE_SIZE - 6) * ratio, 5);
-        if (sp.isRegenerating) {
-          ctx.strokeStyle = Math.sin(t * 10) > 0 ? '#FFD23F' : '#FF6B4A';
-          ctx.lineWidth = 1.6;
-          ctx.strokeRect(x + 2.5, y + 1.5, TILE_SIZE - 5, 6);
-          ctx.lineWidth = 1;
-        } else {
-          ctx.strokeStyle = 'rgba(255, 210, 63, 0.5)';
-          ctx.strokeRect(x + 3, y + 2, TILE_SIZE - 6, 5);
+        if (!this.isSurvivalMode) {
+          const ratio = Math.max(0, sp.hp / sp.maxHp);
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+          ctx.fillRect(x + 3, y + 2, TILE_SIZE - 6, 5);
+          ctx.fillStyle = sp.isRegenerating ? '#FF6B4A' : '#FF3B3B';
+          ctx.fillRect(x + 3, y + 2, (TILE_SIZE - 6) * ratio, 5);
+          if (sp.isRegenerating) {
+            ctx.strokeStyle = Math.sin(t * 10) > 0 ? '#FFD23F' : '#FF6B4A';
+            ctx.lineWidth = 1.6;
+            ctx.strokeRect(x + 2.5, y + 1.5, TILE_SIZE - 5, 6);
+            ctx.lineWidth = 1;
+          } else {
+            ctx.strokeStyle = 'rgba(255, 210, 63, 0.5)';
+            ctx.strokeRect(x + 3, y + 2, TILE_SIZE - 6, 5);
+          }
         }
       }
     }

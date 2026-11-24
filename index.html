@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Zombie Defense Command - Tactical Grid Survival (v0.36.0)</title>
+  <title>Zombie Defense Command - Tactical Grid Survival (v0.37.0)</title>
 
   <!-- PWA & Mobile Web App Meta -->
   <meta name="theme-color" content="#07090d">
@@ -30,7 +30,7 @@
     <header id="topHud">
       <div class="hud-brand">
         <span class="hud-logo">&#9763;</span>
-        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.36.0</small></span>
+        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.37.0</small></span>
       </div>
 
       <div class="hud-stats">
@@ -133,7 +133,7 @@
         <div class="modal-card start-card">
           <div class="start-icon">&#9763;</div>
           <h1 class="start-title">ZOMBIE DEFENSE COMMAND</h1>
-          <div class="start-version-badge">v0.36.0</div>
+          <div class="start-version-badge">v0.37.0</div>
           <p class="start-subtitle">Expand green Safe Zones within 3 tiles of Red Spawn Breaches and deploy Commandos to destroy them (towers defend against zombies only).</p>
 
           <div id="startMainSection">
@@ -153,7 +153,7 @@
               </button>
               <button type="button" class="pick-card diff-card tag-survival" data-diff="survival">
                 <span class="pick-name">SURVIVAL &#8734;</span>
-                <span class="pick-desc">4.0&times; HP (+60% / 5w) &bull; 1.35&times; Spd &bull; 20s Rifts</span>
+                <span class="pick-desc">4.0&times; HP (+60% / 5w) &bull; +1 Invincible Rift / 5w (20s)</span>
               </button>
             </div>
             <select id="difficultySelect" class="sync-select" aria-label="Difficulty">
@@ -161,7 +161,7 @@
               <option value="easy">Easy - 160 Scrap, 1.0x zombies, 3.0s incubation</option>
               <option value="normal">Normal - 100 Scrap, 2.0x zombies, 2.0s incubation</option>
               <option value="hard">Hard - 100 Scrap, 4.0x zombies, 1.2s incubation</option>
-              <option value="survival">Survival - 110 Scrap, 4.0x HP (+60% / 5 waves), 1.35x speed, 10-wave rift reshuffle</option>
+              <option value="survival">Survival - 110 Scrap, 4.0x HP (+60% / 5 waves), 1.35x speed, 5-wave +1 uncapped invincible rift reshuffle (20s)</option>
             </select>
 
             <div class="option-label">MISSION MODE</div>
@@ -228,11 +228,11 @@
             <option value="tutorial">Tutorial: Basic Training</option>
           </select>
 
-          <div class="start-hint">v0.36.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; Settings</div>
+          <div class="start-hint">v0.37.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; Settings</div>
         </div>
       </div>
 
-      <!-- Settings Modal (v0.36.0) -->
+      <!-- Settings Modal (v0.37.0) -->
       <div id="settingsModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
         <div class="modal-card settings-card">
           <button id="btnCloseSettings" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
@@ -302,7 +302,7 @@
         </div>
       </div>
 
-      <!-- Developer Tuning Modal (v0.36.0: Live Multiplier Overrides) -->
+      <!-- Developer Tuning Modal (v0.37.0: Live Multiplier Overrides) -->
       <div id="developerModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="devTitle">
         <div class="modal-card dev-card">
           <button id="btnCloseDeveloper" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
@@ -408,10 +408,10 @@
             <div class="dev-group">
               <div class="dev-label-row">
                 <label class="dev-label" for="sliderDevBreachCount">Zombies per Breach</label>
-                <span id="valDevBreachCount" class="dev-val-badge">1.0x</span>
+                <span id="valDevBreachCount" class="dev-val-badge">0.75x</span>
               </div>
               <div class="dev-slider-wrap">
-                <input type="range" id="sliderDevBreachCount" class="dev-slider" min="0" max="10" step="1" value="5" />
+                <input type="range" id="sliderDevBreachCount" class="dev-slider" min="0" max="10" step="1" value="4" />
                 <div class="dev-ticks">
                   <span>0.1x</span>
                   <span>0.2x</span>
@@ -440,7 +440,7 @@
       <div id="howToPlayModal" class="modal-overlay hidden">
         <div class="modal-card help-card">
           <button id="btnCloseHowToPlay" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.36.0)</h2>
+          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.37.0)</h2>
           <div class="help-grid">
             <section>
               <h3>Single 3&times;3 Start &amp; Line-Drag Barricades</h3>
@@ -456,7 +456,7 @@
             </section>
             <section>
               <h3>Engineer Upgrades (+20/+40/+70 HP/s) &amp; Queues</h3>
-              <p><b>Habitat ($110)</b> queues up to 20 Civilians. Upgrading <b>Engineering</b> scales linked Engineers to <b class="c-yellow">+20 / +40 / +70 HP/s</b> ($0 linked welding across Safe Zones, Barricades &amp; Gates) and <b>4 / 8 / 10</b> hub slots. Survival spawns 6 randomized zombies per Breach!</p>
+              <p><b>Habitat ($110)</b> queues up to 20 Civilians. Upgrading <b>Engineering</b> scales linked Engineers to <b class="c-yellow">+20 / +40 / +70 HP/s</b> ($0 linked welding across Safe Zones, Barricades &amp; Gates) and <b>4 / 8 / 10</b> hub slots. Survival features invincible Rifts that reshuffle every 5 waves (+1 uncapped, 20s cooldown)!</p>
             </section>
             <section>
               <h3>Zombie-Only Towers &amp; Chain Tesla (35% Armor)</h3>
@@ -477,7 +477,7 @@
       <div id="zombieGuideModal" class="modal-overlay hidden">
         <div class="modal-card help-card zombie-guide-card">
           <button id="btnCloseZombieGuide" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.36.0)</h2>
+          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.37.0)</h2>
           <div id="bestiaryHardIndicator" class="bestiary-hard-indicator hidden">&#9888; HARD MODE ACTIVE: 3.0&times; ZOMBIE HP APPLIED</div>
           <p class="bestiary-note"><b class="c-orange">25% Random Brute-Breach Trait:</b> Any spawned Walker, Runner, Tank, or Wrecker has a 25% chance (100% on Demolisher) to smash straight toward Safe Zones, dealing a <b>fixed unscaled 12 damage</b> (<b>16 damage</b> for Demolishers) per strike against structures &amp; Safe Zones.</p>
           <div class="zombie-intel-list">
@@ -543,7 +543,7 @@
         </div>
       </div>
 
-      <!-- 4-Player Co-Op Multiplayer Modals (v0.36.0) -->
+      <!-- 4-Player Co-Op Multiplayer Modals (v0.37.0) -->
       <div id="mpRoleModal" class="modal-overlay hidden">
         <div class="modal-card mp-card">
           <h2 class="help-title mp-modal-title">&#127760; 4-PLAYER CO-OP MULTIPLAYER</h2>
@@ -675,7 +675,7 @@
         </div>
       </div>
 
-      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.36.0) -->
+      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.37.0) -->
       <div id="mpPauseModal" class="modal-overlay hidden">
         <div class="modal-card mp-card mp-pause-card">
           <h2 id="mpPauseTitle" class="help-title mp-modal-title">&#9208; MATCH PAUSED</h2>
@@ -851,7 +851,7 @@
         </div>
 
         <div id="deckHint">
-          <span class="hint-text">v0.36.0 &bull; Hubs scale 4/8/10 &bull; Lv3 Barracks unlocks Flamethrower ($100) &bull; Tesla ($200) chains 3/5/8 targets &bull; Engineers +20/+40/+70 HP/s</span>
+          <span class="hint-text">v0.37.0 &bull; Hubs scale 4/8/10 &bull; Lv3 Barracks unlocks Flamethrower ($100) &bull; Tesla ($200) chains 3/5/8 targets &bull; Engineers +20/+40/+70 HP/s</span>
         </div>
       </div>
     </footer>
