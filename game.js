@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.42.0 (Continuous Sapper Replanting, Idle Medic Base Return, 10 Wave Meter Dev Tab, Units & Towers Guide & Next Wave Stacking Fix)
+ * Version: v0.43.0 (Safe Zone Structure Slot Cap, HUD/Inspector Slot Readouts & Dev Safe Zones per Structure Slider)
  */
 
 (function () {
@@ -1242,6 +1242,8 @@
       this.devCountStops = [0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0];
       this.dev10WaveToughnessMult = 1.0;
       this.dev10WaveSpeedMult = 1.0;
+      this.devSafeZonesPerStructure = 3;
+      this.devStructRatioStops = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
       this.dev10WaveToughnessStops = [1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0];
       this.dev10WaveSpeedStops = [1.0, 1.1, 1.2, 1.35, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0];
       this.devActiveTab = 'general';
@@ -1467,6 +1469,7 @@
       this.hudTimer = $('hudTimer');
       this.hudBase = $('hudBase');
       this.hudSzDmg = $('hudSzDmg');
+      this.hudSzSlots = $('hudSzSlots');
 
       this.levelSelect = $('levelSelect');
       this.btnResetLevel = $('btnResetLevel');
@@ -1624,7 +1627,7 @@
       this.arsenalTabUnits = $('arsenalTabUnits');
       this.arsenalTabTowers = $('arsenalTabTowers');
 
-      // Developer Tuning UI Elements (v0.42.0)
+      // Developer Tuning UI Elements (v0.43.0)
       this.developerModal = $('developerModal');
       this.btnCloseDeveloper = $('btnCloseDeveloper');
       this.btnDoneDeveloper = $('btnDoneDeveloper');
@@ -1646,6 +1649,7 @@
       this.sliderDevBreachCount = $('sliderDevBreachCount');
       this.sliderDev10WaveToughness = $('sliderDev10WaveToughness');
       this.sliderDev10WaveSpeed = $('sliderDev10WaveSpeed');
+      this.sliderDevStructRatio = $('sliderDevStructRatio');
       this.valDevTowerStrength = $('valDevTowerStrength');
       this.valDevZombieHp = $('valDevZombieHp');
       this.valDevZombieScrap = $('valDevZombieScrap');
@@ -1653,6 +1657,7 @@
       this.valDevBreachCount = $('valDevBreachCount');
       this.valDev10WaveToughness = $('valDev10WaveToughness');
       this.valDev10WaveSpeed = $('valDev10WaveSpeed');
+      this.valDevStructRatio = $('valDevStructRatio');
       this.sliderDevZTypeHp = $('sliderDevZTypeHp');
       this.sliderDevZTypeSpeed = $('sliderDevZTypeSpeed');
       this.sliderDevZTypeDmg = $('sliderDevZTypeDmg');
@@ -1864,7 +1869,7 @@
       on(this.tabArsenalUnits, 'click', () => { this.setArsenalTab('units'); this.sound.playClick(); });
       on(this.tabArsenalTowers, 'click', () => { this.setArsenalTab('towers'); this.sound.playClick(); });
 
-      // Developer Tuning Modal bindings (v0.42.0)
+      // Developer Tuning Modal bindings (v0.43.0)
       on(this.btnSettingsDeveloper, 'click', () => this.openDeveloperModal());
       on(this.btnCloseDeveloper, 'click', () => this.closeDeveloperModal());
       on(this.btnDoneDeveloper, 'click', () => this.closeDeveloperModal());
@@ -1907,6 +1912,17 @@
       on(this.sliderDevZombieScrap, 'input', () => updateDevSlider(this.sliderDevZombieScrap, 'scrap', this.valDevZombieScrap));
       on(this.sliderDevZombieSpeed, 'input', () => updateDevSlider(this.sliderDevZombieSpeed, 'speed', this.valDevZombieSpeed));
       on(this.sliderDevBreachCount, 'input', () => updateDevSlider(this.sliderDevBreachCount, 'breach', this.valDevBreachCount));
+      on(this.sliderDevStructRatio, 'input', () => {
+        const stops = this.devStructRatioStops || [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        const idx = Math.max(0, Math.min(stops.length - 1, parseInt(this.sliderDevStructRatio.value, 10) || 0));
+        const val = stops[idx];
+        this.devSafeZonesPerStructure = val;
+        if (this.valDevStructRatio) {
+          this.valDevStructRatio.textContent = val <= 0 ? 'Off (\u221E)' : `${val} tile${val === 1 ? '' : 's'} (1:${val})`;
+        }
+        this.updateHUD();
+        if (this.selectedStructure) this.renderUpgradePanel(this.selectedStructure);
+      });
 
       on(this.sliderDevZTypeHp, 'input', () => {
         const idx = Math.max(0, Math.min(this.devSliderStops.length - 1, parseInt(this.sliderDevZTypeHp.value, 10) || 0));
@@ -3325,6 +3341,7 @@
       const scrapMult = typeof this.devZombieScrapMult === 'number' ? this.devZombieScrapMult : 1.5;
       const speedMult = typeof this.devZombieSpeedMult === 'number' ? this.devZombieSpeedMult : 1.0;
       const breachMult = typeof this.devBreachCountMult === 'number' ? this.devBreachCountMult : 0.75;
+      const structRatio = typeof this.devSafeZonesPerStructure === 'number' ? this.devSafeZonesPerStructure : 3;
 
       if (this.sliderDevTowerStrength) this.sliderDevTowerStrength.value = getStopIndex(this.devSliderStops, towerMult, 5);
       if (this.valDevTowerStrength) this.valDevTowerStrength.textContent = towerMult + 'x';
@@ -3336,6 +3353,10 @@
       if (this.valDevZombieSpeed) this.valDevZombieSpeed.textContent = speedMult + 'x';
       if (this.sliderDevBreachCount) this.sliderDevBreachCount.value = getStopIndex(this.devSliderStops, breachMult, 4);
       if (this.valDevBreachCount) this.valDevBreachCount.textContent = breachMult + 'x';
+      if (this.sliderDevStructRatio) this.sliderDevStructRatio.value = getStopIndex(this.devStructRatioStops, structRatio, 3);
+      if (this.valDevStructRatio) {
+        this.valDevStructRatio.textContent = structRatio <= 0 ? 'Off (\u221E)' : `${structRatio} tile${structRatio === 1 ? '' : 's'} (1:${structRatio})`;
+      }
 
       if (this.devZombiesDot) {
         this.devZombiesDot.classList.toggle('hidden', !this.hasAnyZombieOverrides());
@@ -3377,9 +3398,11 @@
       this.devTowerStrengthMult = 1.0;
       this.devZombieScrapMult = 1.5;
       this.devBreachCountMult = 0.75;
+      this.devSafeZonesPerStructure = 3;
       this.setDevZombieHpMult(0.5);
       this.setDevZombieSpeedMult(1.0);
-      if (this.selectedStructure) this.updateUpgradePanel();
+      this.updateHUD();
+      if (this.selectedStructure) this.renderUpgradePanel(this.selectedStructure);
     }
 
     resetWaveMeterDeveloperDefaults() {
@@ -4190,6 +4213,7 @@
             devZombieScrapMult: typeof this.devZombieScrapMult === 'number' ? this.devZombieScrapMult : 1.5,
             devZombieSpeedMult: typeof this.devZombieSpeedMult === 'number' ? this.devZombieSpeedMult : 1.0,
             devBreachCountMult: typeof this.devBreachCountMult === 'number' ? this.devBreachCountMult : 0.75,
+            devSafeZonesPerStructure: typeof this.devSafeZonesPerStructure === 'number' ? this.devSafeZonesPerStructure : 3,
             dev10WaveToughnessMult: typeof this.dev10WaveToughnessMult === 'number' ? this.dev10WaveToughnessMult : 1.0,
             dev10WaveSpeedMult: typeof this.dev10WaveSpeedMult === 'number' ? this.dev10WaveSpeedMult : 1.0,
             devZombieOverrides: devOvr
@@ -4339,6 +4363,7 @@
         if (typeof dtCfg.devZombieScrapMult === 'number') this.devZombieScrapMult = dtCfg.devZombieScrapMult;
         if (typeof dtCfg.devZombieSpeedMult === 'number') this.devZombieSpeedMult = dtCfg.devZombieSpeedMult;
         if (typeof dtCfg.devBreachCountMult === 'number') this.devBreachCountMult = dtCfg.devBreachCountMult;
+        if (typeof dtCfg.devSafeZonesPerStructure === 'number') this.devSafeZonesPerStructure = dtCfg.devSafeZonesPerStructure;
         if (typeof dtCfg.dev10WaveToughnessMult === 'number') this.dev10WaveToughnessMult = dtCfg.dev10WaveToughnessMult;
         if (typeof dtCfg.dev10WaveSpeedMult === 'number') this.dev10WaveSpeedMult = dtCfg.dev10WaveSpeedMult;
         const baseOverrides = this.createDefaultZombieOverrides();
@@ -7753,6 +7778,44 @@
       return this.wave >= 20 ? 2 : 1;
     }
 
+    isCappedStructureType(type) {
+      return Boolean(type && type !== 'wall' && type !== 'gate' && type !== 'safezone');
+    }
+
+    getOwnedSafeZoneCount(ownerId = null) {
+      if (!this.isMultiplayer) return this.safeZones.size;
+      const effActor = this.getEffectiveActorId(ownerId);
+      if (!effActor) return this.safeZones.size;
+      let count = 0;
+      for (const sz of this.safeZones.values()) {
+        if (!sz.ownerId || sz.ownerId === effActor) count++;
+      }
+      return count;
+    }
+
+    getSafeZoneStructureCap(ownerId = null) {
+      const ratio = typeof this.devSafeZonesPerStructure === 'number' ? this.devSafeZonesPerStructure : 3;
+      if (ratio <= 0) return Infinity;
+      return Math.floor(this.getOwnedSafeZoneCount(ownerId) / ratio);
+    }
+
+    getOwnedStructureCount(ownerId = null) {
+      const effActor = this.isMultiplayer ? this.getEffectiveActorId(ownerId) : null;
+      let count = 0;
+      for (const st of this.structures.values()) {
+        if (!this.isCappedStructureType(st.type)) continue;
+        if (this.isMultiplayer && effActor && st.ownerId && st.ownerId !== effActor) continue;
+        count++;
+      }
+      return count;
+    }
+
+    formatSlotLabel(ownerId = null) {
+      const used = this.getOwnedStructureCount(ownerId);
+      const cap = this.getSafeZoneStructureCap(ownerId);
+      return Number.isFinite(cap) ? `${used}/${cap}` : `${used}/\u221E`;
+    }
+
     // --- DESTRUCTIBLE SPAWN BREACH DAMAGE, REGEN RESET & LOAD TRANSFER ---
     damageSpawnBreach(breach, dmg, sourceUnitOrStruct) {
       if (this.isSurvivalMode) return;
@@ -8168,6 +8231,9 @@
       const maxHab = this.getMaxHabitats();
       const curHab = this.countStructures('habitat');
       const habCapped = curHab >= maxHab;
+      const usedSlots = this.getOwnedStructureCount(this.localPlayerId);
+      const maxSlots = this.getSafeZoneStructureCap(this.localPlayerId);
+      const slotsCapped = Number.isFinite(maxSlots) && usedSlots >= maxSlots;
       const syncButtons = (container) => {
         if (!container) return;
         container.querySelectorAll('[data-tool]').forEach((btn) => {
@@ -8176,9 +8242,20 @@
           btn.classList.toggle('unaffordable', !!spec && this.scrap < spec.baseCost);
           if (t === 'habitat') {
             btn.disabled = habCapped;
-            btn.classList.toggle('capped', habCapped);
+            btn.classList.toggle('capped', habCapped || slotsCapped);
             const costEl = btn.querySelector('.tool-cost');
-            if (costEl) costEl.innerText = habCapped ? `${curHab}/${maxHab}` : `$${spec.baseCost}`;
+            if (costEl) {
+              costEl.innerText = habCapped
+                ? `${curHab}/${maxHab}`
+                : slotsCapped
+                ? `${usedSlots}/${maxSlots}`
+                : `$${spec.baseCost}`;
+            }
+          } else if (spec && this.isCappedStructureType(t)) {
+            btn.disabled = false;
+            btn.classList.toggle('capped', slotsCapped);
+            const costEl = btn.querySelector('.tool-cost');
+            if (costEl) costEl.innerText = slotsCapped ? `${usedSlots}/${maxSlots}` : `$${spec.baseCost}`;
           }
         });
       };
@@ -8878,6 +8955,19 @@
         this.addFloatingText(`Max ${cap} Habitat${cap > 1 ? 's' : ''}!`, p.x, p.y - 12, '#FF3333');
         this.sound.playHit();
         return;
+      }
+
+      if (this.isCappedStructureType(type)) {
+        const cap = this.getSafeZoneStructureCap(effActor);
+        const used = this.getOwnedStructureCount(effActor);
+        if (Number.isFinite(cap) && used >= cap) {
+          const ratio = this.devSafeZonesPerStructure || 3;
+          const slotMsg = `Expand Safe Zones (1 slot / ${ratio} tile${ratio === 1 ? '' : 's'})!`;
+          this.showStatus(`Structure cap reached (${used}/${cap}) — ${slotMsg}`);
+          this.addFloatingText(slotMsg, p.x, p.y - 12, '#FF3333');
+          this.sound.playHit();
+          return;
+        }
       }
 
       if (type === 'safezone') {
@@ -10708,18 +10798,20 @@
       if (this.inspectIcon) this.inspectIcon.innerHTML = STRUCT_ICONS[struct.type] || '&#9646;';
       if (this.inspectName) this.inspectName.innerText = cur.name || spec.name;
       if (this.inspectTier) {
+        const showSlots = struct.type === 'safezone' || this.isCappedStructureType(struct.type);
+        const slotInfo = showSlots ? `Slots: ${this.formatSlotLabel(struct.ownerId || this.localPlayerId)}` : '';
         if (this.isMobileTouch) {
           if (isAllyReadOnly) {
-            this.inspectTier.innerText = `Ally: ${struct.ownerName || 'Player'} [View]`;
+            this.inspectTier.innerText = `Ally: ${struct.ownerName || 'Player'} [View]${slotInfo ? ` \u2022 ${slotInfo}` : ''}`;
           } else if (struct.type === 'safezone') {
-            this.inspectTier.innerText = '';
+            this.inspectTier.innerText = slotInfo;
           } else {
-            this.inspectTier.innerText = `Lv${struct.level}/${maxLv}`;
+            this.inspectTier.innerText = `Lv${struct.level}/${maxLv}${slotInfo ? ` \u2022 ${slotInfo}` : ''}`;
           }
         } else {
           this.inspectTier.innerText = isAllyReadOnly
-            ? `Lv${struct.level}/${maxLv} \u2022 Ally: ${struct.ownerName || 'Player'} [View-Only]`
-            : `Lv${struct.level}/${maxLv}`;
+            ? `Lv${struct.level}/${maxLv} \u2022 Ally: ${struct.ownerName || 'Player'} [View-Only]${slotInfo ? ` \u2022 ${slotInfo}` : ''}`
+            : `Lv${struct.level}/${maxLv}${slotInfo ? ` \u2022 ${slotInfo}` : ''}`;
         }
       }
       if (this.inspectHpText) this.inspectHpText.innerText = `${Math.ceil(struct.hp)} / ${struct.maxHp}`;
@@ -11477,6 +11569,22 @@
         }
         return;
       }
+      if (this.isCappedStructureType(struct.type)) {
+        const cap = this.getSafeZoneStructureCap(effActor);
+        const used = this.getOwnedStructureCount(effActor);
+        if (Number.isFinite(cap) && used > cap) {
+          if (!isRemoteActor) {
+            const ratio = this.devSafeZonesPerStructure || 3;
+            const slotMsg = `Expand Safe Zones (1 slot / ${ratio} tile${ratio === 1 ? '' : 's'})!`;
+            this.movingStructure = null;
+            this.renderUpgradePanel(struct);
+            this.showStatus(`Over Safe Zone slot cap (${used}/${cap}) — ${slotMsg}`);
+            this.addFloatingText(slotMsg, p.x, p.y - 12, '#FF3333');
+            this.sound.playHit();
+          }
+          return;
+        }
+      }
       if (this.isMultiplayer && struct.ownerId && effActor && struct.ownerId !== effActor) {
         if (!isRemoteActor) {
           this.showStatus('Cannot relocate another player\'s structure.');
@@ -11674,6 +11782,10 @@
         }
       }
 
+      if (entity.type && (entity.type === 'safezone' || this.isCappedStructureType(entity.type))) {
+        parts.push(`Slots: ${this.formatSlotLabel(entity.ownerId || this.localPlayerId)}`);
+      }
+
       if (parts.length > 0) {
         this.mobileFloatingDetails.innerText = parts.join(' • ');
         this.mobileFloatingDetails.classList.remove('hidden');
@@ -11743,6 +11855,13 @@
       if (this.hudSzDmg) {
         const bonusPct = Math.round((this.getSafeZoneDmgMult() - 1) * 100);
         this.hudSzDmg.innerText = `+${bonusPct}% DMG`;
+      }
+      if (this.hudSzSlots) {
+        const used = this.getOwnedStructureCount(this.localPlayerId);
+        const cap = this.getSafeZoneStructureCap(this.localPlayerId);
+        this.hudSzSlots.innerText = `SLOTS ${this.formatSlotLabel(this.localPlayerId)}`;
+        this.hudSzSlots.classList.toggle('at-cap', Number.isFinite(cap) && used === cap);
+        this.hudSzSlots.classList.toggle('over-cap', Number.isFinite(cap) && used > cap);
       }
       this.updateAffordability();
     }
@@ -13079,6 +13198,7 @@
       this.sound.playBarricadeBreak();
       this.addParticles(st.x, st.y, '#888888', 18, 90);
       if (this.selectedStructure === st) this.closeUpgradePanel();
+      this.updateHUD();
     }
 
     destroySafeZoneBlock(sz) {
@@ -15693,8 +15813,11 @@
         if (!inBounds(mc, mr)) return;
         const key = `${mc},${mr}`;
         const destSz = this.safeZones.get(key);
+        const slotMoveOk = !this.isCappedStructureType(s.type)
+          || this.getOwnedStructureCount(effActor) <= this.getSafeZoneStructureCap(effActor);
         const ok = this.grid[mr][mc] === 2 && !!destSz && !this.structures.has(key)
-          && (!this.isMultiplayer || !destSz.ownerId || !effActor || destSz.ownerId === effActor);
+          && (!this.isMultiplayer || !destSz.ownerId || !effActor || destSz.ownerId === effActor)
+          && slotMoveOk;
         const x = mc * TILE_SIZE;
         const y = mr * TILE_SIZE;
         const col = ok ? '0,229,255' : '255,51,51';
@@ -15831,7 +15954,9 @@
         // All buildings & towers except Barricades require an unoccupied green Safe Zone tile
         const sz = this.safeZones.get(key);
         const ownerOk = !this.isMultiplayer || !sz || !sz.ownerId || !effActor || sz.ownerId === effActor;
-        ok = this.grid[mr][mc] === 2 && !!sz && !this.structures.has(key) && ownerOk
+        const slotOk = !this.isCappedStructureType(this.selectedBuildType)
+          || this.getOwnedStructureCount(effActor) < this.getSafeZoneStructureCap(effActor);
+        ok = this.grid[mr][mc] === 2 && !!sz && !this.structures.has(key) && ownerOk && slotOk
           && (this.selectedBuildType !== 'habitat' || this.countStructures('habitat', effActor) < this.getMaxHabitats());
       }
       const afford = this.scrap >= spec.baseCost;

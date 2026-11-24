@@ -1,4 +1,4 @@
-/* Zombie Defense Command v0.42.0 - tactical command-center theme (offline, zero layout shift) */
+/* Zombie Defense Command v0.43.0 - tactical command-center theme (offline, zero layout shift) */
 :root {
   --bg: #07090d;
   --panel: #0e131b;
@@ -100,6 +100,20 @@ body {
   color: var(--color-green); background: rgba(0, 224, 138, 0.14);
   border: 1px solid rgba(0, 224, 138, 0.38); border-radius: 3px;
   padding: 1px 4px; white-space: nowrap;
+}
+.sz-slot-tag {
+  font-family: var(--mono); font-size: 9px; font-weight: 700; line-height: 1.1;
+  color: var(--color-cyan); background: rgba(0, 229, 255, 0.12);
+  border: 1px solid rgba(0, 229, 255, 0.38); border-radius: 3px;
+  padding: 1px 4px; white-space: nowrap;
+}
+.sz-slot-tag.at-cap {
+  color: var(--color-orange); background: rgba(255, 154, 31, 0.16);
+  border-color: rgba(255, 154, 31, 0.55);
+}
+.sz-slot-tag.over-cap {
+  color: #ffb8b8; background: rgba(255, 59, 59, 0.22);
+  border-color: rgba(255, 59, 59, 0.72);
 }
 @keyframes blink { 50% { opacity: 0.45; } }
 

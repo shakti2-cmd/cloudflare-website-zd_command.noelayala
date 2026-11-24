@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Zombie Defense Command - Tactical Grid Survival (v0.42.0)</title>
+  <title>Zombie Defense Command - Tactical Grid Survival (v0.43.0)</title>
 
   <!-- PWA & Mobile Web App Meta -->
   <meta name="theme-color" content="#07090d">
@@ -30,7 +30,7 @@
     <header id="topHud">
       <div class="hud-brand">
         <span class="hud-logo">&#9763;</span>
-        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.42.0</small></span>
+        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.43.0</small></span>
       </div>
 
       <div class="hud-stats">
@@ -57,7 +57,7 @@
         </div>
         <div class="stat-badge base-badge" title="Aggregated Safe Zone integrity &amp; global +1% damage aura per active Safe Zone (max +50%)">
           <span class="stat-label">&#9962; BASE &amp; AURA</span>
-          <div class="base-val-row"><span id="hudBase" class="stat-value">100%</span><span id="hudSzDmg" class="sz-dmg-tag" title="Global friendly damage bonus: +1% per active Safe Zone (max +50%)">+4% DMG</span></div>
+          <div class="base-val-row"><span id="hudBase" class="stat-value">100%</span><span id="hudSzDmg" class="sz-dmg-tag" title="Global friendly damage bonus: +1% per active Safe Zone (max +50%)">+4% DMG</span><span id="hudSzSlots" class="sz-slot-tag" title="Placed Towers &amp; Buildings vs. Safe Zone structure capacity">SLOTS 0/3</span></div>
         </div>
       </div>
 
@@ -112,7 +112,7 @@
         <button id="btnCamFocusBase" class="cam-btn cam-base-btn" type="button" title="Center Camera on Safe Zone Base">&#8982; Base</button>
       </div>
 
-      <!-- Tactical Active Abilities Bar (v0.42.0: Overcharge & Napalm) -->
+      <!-- Tactical Active Abilities Bar (v0.43.0: Overcharge & Napalm) -->
       <div id="abilityBar" class="ability-bar hidden" role="toolbar" aria-label="Tactical Abilities">
         <button id="btnAbilityOvercharge" class="ability-btn" type="button" title="Overcharge ($200, 25s CD): +50% turret fire rate for 10s">
           <span class="ability-icon">&#9889;</span>
@@ -143,12 +143,12 @@
         <span id="tutorialUiArrowGlyph" class="tutorial-ui-arrow-glyph">&#9660;</span>
       </div>
 
-      <!-- Startup screen (v0.42.0: 3-Card Threat Level + Campaign / Post Defense / Survival Picker) -->
+      <!-- Startup screen (v0.43.0: 3-Card Threat Level + Campaign / Post Defense / Survival Picker) -->
       <div id="startScreenOverlay" class="modal-overlay">
         <div class="modal-card start-card">
           <div class="start-icon">&#9763;</div>
           <h1 class="start-title">ZOMBIE DEFENSE COMMAND</h1>
-          <div class="start-version-badge">v0.42.0</div>
+          <div class="start-version-badge">v0.43.0</div>
           <p class="start-subtitle">Expand green Safe Zones within 3 tiles of Red Spawn Breaches and deploy Commandos to destroy them (towers defend against zombies only).</p>
 
           <div id="startMainSection">
@@ -238,11 +238,11 @@
             <option value="tutorial">Tutorial: Basic Training</option>
           </select>
 
-          <div class="start-hint">v0.42.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; Settings</div>
+          <div class="start-hint">v0.43.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; Settings</div>
         </div>
       </div>
 
-      <!-- Settings Modal (v0.42.0) -->
+      <!-- Settings Modal (v0.43.0) -->
       <div id="settingsModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
         <div class="modal-card settings-card">
           <button id="btnCloseSettings" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
@@ -313,7 +313,7 @@
         </div>
       </div>
 
-      <!-- Developer Tuning Modal (v0.42.0: Live Multiplier Overrides) -->
+      <!-- Developer Tuning Modal (v0.43.0: Live Multiplier Overrides) -->
       <div id="developerModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="devTitle">
         <div class="modal-card dev-card">
           <button id="btnCloseDeveloper" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
@@ -444,6 +444,30 @@
               </div>
               <div class="dev-hint">Multiplies the fixed per-breach zombie count spawned each wave in Survival Mode.</div>
             </div>
+
+            <div class="dev-group">
+              <div class="dev-label-row">
+                <label class="dev-label" for="sliderDevStructRatio">Safe Zones per Structure</label>
+                <span id="valDevStructRatio" class="dev-val-badge">3 tiles (1:3)</span>
+              </div>
+              <div class="dev-slider-wrap">
+                <input type="range" id="sliderDevStructRatio" class="dev-slider" min="0" max="10" step="1" value="3" />
+                <div class="dev-ticks">
+                  <span>Off</span>
+                  <span>1</span>
+                  <span>2</span>
+                  <span class="tick-mid">3</span>
+                  <span>4</span>
+                  <span>5</span>
+                  <span>6</span>
+                  <span>7</span>
+                  <span>8</span>
+                  <span>9</span>
+                  <span>10</span>
+                </div>
+              </div>
+              <div class="dev-hint">Safe Zone tiles required per non-wall, non-gate structure slot (Off = unlimited; Barricades &amp; Gates uncapped).</div>
+            </div>
           </div>
 
           <div id="devTabZombies" class="dev-tab-panel dev-content hidden">
@@ -565,7 +589,7 @@
       <div id="howToPlayModal" class="modal-overlay hidden">
         <div class="modal-card help-card">
           <button id="btnCloseHowToPlay" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.42.0)</h2>
+          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.43.0)</h2>
           <div class="help-grid">
             <section>
               <h3>Single 3&times;3 Start &amp; Line-Drag Barricades</h3>
@@ -602,7 +626,7 @@
       <div id="zombieGuideModal" class="modal-overlay hidden">
         <div class="modal-card help-card zombie-guide-card">
           <button id="btnCloseZombieGuide" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.42.0)</h2>
+          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.43.0)</h2>
           <div id="bestiaryHardIndicator" class="bestiary-hard-indicator hidden">&#9888; HARD MODE ACTIVE: 4.0&times; ZOMBIE HP APPLIED</div>
           <p class="bestiary-note"><b class="c-orange">25% Random Brute-Breach Trait:</b> Any spawned Walker, Runner, Tank, or Wrecker has a 25% chance (100% on Demolisher) to smash straight toward Safe Zones, dealing a <b>fixed unscaled 12 damage</b> (<b>16 damage</b> for Demolishers) per strike against structures &amp; Safe Zones.</p>
           <div class="zombie-intel-list">
@@ -662,11 +686,11 @@
         </div>
       </div>
 
-      <!-- Units & Towers Field Guide Modal (v0.42.0) -->
+      <!-- Units & Towers Field Guide Modal (v0.43.0) -->
       <div id="arsenalGuideModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="arsenalTitle">
         <div class="modal-card help-card arsenal-guide-card">
           <button id="btnCloseArsenalGuide" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 id="arsenalTitle" class="help-title">&#9876; UNITS &amp; TOWERS FIELD GUIDE (v0.42.0)</h2>
+          <h2 id="arsenalTitle" class="help-title">&#9876; UNITS &amp; TOWERS FIELD GUIDE (v0.43.0)</h2>
           <div class="arsenal-tabs" role="tablist" aria-label="Units and Towers Tabs">
             <button type="button" id="tabArsenalUnits" class="arsenal-tab-btn active" data-arsenal-tab="units" role="tab" aria-selected="true">Units</button>
             <button type="button" id="tabArsenalTowers" class="arsenal-tab-btn" data-arsenal-tab="towers" role="tab" aria-selected="false">Towers</button>
@@ -802,7 +826,7 @@
         </div>
       </div>
 
-      <!-- 4-Player Co-Op Multiplayer Modals (v0.42.0) -->
+      <!-- 4-Player Co-Op Multiplayer Modals (v0.43.0) -->
       <div id="mpRoleModal" class="modal-overlay hidden">
         <div class="modal-card mp-card">
           <h2 class="help-title mp-modal-title">&#127760; 4-PLAYER CO-OP MULTIPLAYER</h2>
@@ -934,7 +958,7 @@
         </div>
       </div>
 
-      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.42.0) -->
+      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.43.0) -->
       <div id="mpPauseModal" class="modal-overlay hidden">
         <div class="modal-card mp-card mp-pause-card">
           <h2 id="mpPauseTitle" class="help-title mp-modal-title">&#9208; MATCH PAUSED</h2>
@@ -1128,7 +1152,7 @@
         </div>
 
         <div id="deckHint">
-          <span class="hint-text">v0.42.0 &bull; Mortar ($240) / Laser ($260) / Radar ($175) &bull; Gunner / Medic / Sapper &bull; Barracks Hold Stance &bull; Overcharge &amp; Napalm</span>
+          <span class="hint-text">v0.43.0 &bull; Mortar ($240) / Laser ($260) / Radar ($175) &bull; Gunner / Medic / Sapper &bull; Barracks Hold Stance &bull; Overcharge &amp; Napalm</span>
         </div>
       </div>
     </footer>
