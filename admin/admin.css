@@ -1,15 +1,15 @@
 :root {
-  --bg: #07090d;
-  --panel: #0e131b;
-  --panel-2: #141b26;
-  --line: #243044;
-  --text: #d6e2f3;
-  --dim: #7d8ca3;
+  --bg: #050c14;
+  --panel: rgba(10, 22, 36, 0.94);
+  --panel-2: rgba(7, 16, 27, 0.92);
+  --line: rgba(0, 229, 255, 0.28);
+  --text: #dcebf9;
+  --dim: #88a4bf;
   --cyan: #00e5ff;
-  --green: #00e08a;
+  --green: #36ff88;
   --yellow: #ffd23f;
   --orange: #ff9a1f;
-  --red: #ff3b3b;
+  --red: #ff5555;
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, 'Cascadia Mono', 'Consolas', monospace;
 }
@@ -17,7 +17,10 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   min-height: 100dvh;
-  background: radial-gradient(circle at top center, #0e1928 0%, var(--bg) 70%);
+  background:
+    linear-gradient(180deg, rgba(5, 12, 20, 0.35) 0%, rgba(5, 12, 20, 0.84) 38%, #050c14 75%),
+    url("../assets/hero-bg.jpg") center top / cover no-repeat fixed,
+    #050c14;
   color: var(--text);
   font-family: var(--font);
   padding: 18px 14px 36px;
@@ -34,8 +37,9 @@ body {
 .admin-header {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-top: 3px solid var(--yellow);
-  border-radius: 10px;
+  border-top: 2px solid var(--cyan);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6), 0 0 22px rgba(0, 229, 255, 0.12);
   padding: 14px 16px;
   display: flex;
   flex-wrap: wrap;
@@ -49,13 +53,13 @@ body {
   font-family: var(--mono);
   font-size: 10.5px;
   font-weight: 800;
-  color: var(--yellow);
-  background: rgba(255, 210, 63, 0.14);
-  border: 1px solid rgba(255, 210, 63, 0.4);
+  color: var(--green);
+  background: rgba(54, 255, 136, 0.14);
+  border: 1px solid rgba(54, 255, 136, 0.45);
   border-radius: 999px;
-  padding: 2px 9px;
+  padding: 2px 10px;
   margin-bottom: 6px;
-  letter-spacing: 0.8px;
+  letter-spacing: 1px;
 }
 
 .admin-title-wrap h1 {

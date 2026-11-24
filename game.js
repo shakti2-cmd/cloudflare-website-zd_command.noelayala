@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.46.1 (Medic Zombie-Kiting & Reliable Engineering Garrisoning)
+ * Version: v0.47.0 (Medic Zombie-Kiting & Reliable Engineering Garrisoning)
  */
 
 (function () {
@@ -64,8 +64,8 @@
     survival: {
       name: 'Survival',
       startingScrap: 110,
-      zombieHpMult: 4.0,
-      zombieSpeedMult: 1.35,
+      zombieHpMult: 2.0,
+      zombieSpeedMult: 1.0,
       infectionWindow: 2.0,
       isSurvival: true
     }
@@ -1189,13 +1189,11 @@
       this.sound = new SoundFX();
 
       this.currentLevel = 0;
-      this.startMenuMode = null; // 'campaign', 'post_defense', 'survival'
+      this.startMenuMode = null; // 'campaign', 'survival'
       this.selectedDifficulty = null;
       this.selectedCampaignLevel = null;
       this._nonSurvivalDifficulty = 'normal';
       this.isRandomMode = false;
-      this.isPostDefenseMode = false;
-      this.postDefenseGrid = null;
       this.randomSectorCount = 0;
       this.randomArchetype = '';
       this.elapsedTime = 0;
@@ -1427,7 +1425,7 @@
     }
 
     get isEndlessMode() {
-      return this.isPostDefenseMode || this.isSurvivalMode;
+      return this.isSurvivalMode;
     }
 
     get requiredQuota() {
@@ -1506,7 +1504,9 @@
       this.btnStartCampaignSector = $('btnStartCampaignSector');
       this.btnStartTutorial = $('btnStartTutorial');
       this.btnStartZombies = $('btnStartZombies');
+      this.btnStartArsenal = $('btnStartArsenal');
       this.btnHowToPlay = $('btnHowToPlay');
+      this.btnTutorialHowToPlay = $('btnTutorialHowToPlay');
 
       this.gameContainer = $('gameContainer');
       this.tutorialOverlay = $('tutorialOverlay');
@@ -1630,7 +1630,7 @@
       this.arsenalTabUnits = $('arsenalTabUnits');
       this.arsenalTabTowers = $('arsenalTabTowers');
 
-      // Developer Tuning UI Elements (v0.46.1)
+      // Developer Tuning UI Elements (v0.47.0)
       this.developerModal = $('developerModal');
       this.btnCloseDeveloper = $('btnCloseDeveloper');
       this.btnDoneDeveloper = $('btnDoneDeveloper');
@@ -1749,21 +1749,17 @@
 
       // Startup screen difficulty cards (Easy / Normal / Hard)
       document.querySelectorAll('[data-diff]').forEach((card) => {
-        on(card, 'click', () => {
+        on(card, 'click', (e) => {
+          e.stopPropagation();
           this.selectedDifficulty = card.dataset.diff;
           if (this.difficultySelect) this.difficultySelect.value = card.dataset.diff;
-          if (this.startMenuMode === 'survival') {
-            this.startMenuMode = null;
-            if (this.startLevelSelect && this.startLevelSelect.value === 'survival') {
-              this.startLevelSelect.value = '';
-            }
-          }
+          this.startMenuMode = 'campaign';
           this.syncStartCards();
           this.sound.playClick();
         });
       });
 
-      // Startup screen primary mode cards (Campaign / Post Defense / Survival)
+      // Startup screen primary mode cards (Campaign / Survival)
       document.querySelectorAll('[data-mode]').forEach((card) => {
         on(card, 'click', () => {
           const mode = card.dataset.mode;
@@ -1775,10 +1771,6 @@
             this.selectedDifficulty = null;
             if (this.difficultySelect) this.difficultySelect.value = '';
             if (this.startLevelSelect) this.startLevelSelect.value = 'survival';
-          } else {
-            if (this.startLevelSelect) {
-              this.startLevelSelect.value = 'post_defense';
-            }
           }
           this.syncStartCards();
           this.sound.playClick();
@@ -1818,8 +1810,6 @@
           this.startMenuMode = 'survival';
           this.selectedDifficulty = null;
           if (this.difficultySelect) this.difficultySelect.value = '';
-        } else if (v === 'post_defense') {
-          this.startMenuMode = 'post_defense';
         } else if (v) {
           this.startMenuMode = 'campaign';
           this.selectedCampaignLevel = v;
@@ -1834,7 +1824,9 @@
       on(this.btnStartTutorial, 'click', () => this.startTutorial());
       on(this.btnSkipTutorial, 'click', () => this.returnToStartMenu());
       on(this.btnStartZombies, 'click', () => this.openZombieGuide());
+      on(this.btnStartArsenal, 'click', () => this.openArsenalGuide());
       on(this.btnHowToPlay, 'click', () => this.openHowToPlay());
+      on(this.btnTutorialHowToPlay, 'click', () => this.openHowToPlay());
       on(this.btnCloseHowToPlay, 'click', () => this.closeHowToPlay());
       on(this.btnDismissHelp, 'click', () => this.closeHowToPlay());
       on(this.btnHudHelp, 'click', () => this.openHowToPlay());
@@ -1872,7 +1864,7 @@
       on(this.tabArsenalUnits, 'click', () => { this.setArsenalTab('units'); this.sound.playClick(); });
       on(this.tabArsenalTowers, 'click', () => { this.setArsenalTab('towers'); this.sound.playClick(); });
 
-      // Developer Tuning Modal bindings (v0.46.1)
+      // Developer Tuning Modal bindings (v0.47.0)
       on(this.btnSettingsDeveloper, 'click', () => this.openDeveloperModal());
       on(this.btnCloseDeveloper, 'click', () => this.closeDeveloperModal());
       on(this.btnDoneDeveloper, 'click', () => this.closeDeveloperModal());
@@ -2013,17 +2005,6 @@
           }
           this.randomSectorCount = 0;
           this.initLevel('survival');
-        } else if (val === 'post_defense') {
-          if (this.difficulty === 'survival') {
-            const restoreDiff = DIFFICULTY_PRESETS[this._nonSurvivalDifficulty] ? this._nonSurvivalDifficulty : 'normal';
-            const restorePreset = DIFFICULTY_PRESETS[restoreDiff];
-            this.difficulty = restoreDiff;
-            this.zombieHpMult = restorePreset.zombieHpMult;
-            this.zombieSpeedMult = restorePreset.zombieSpeedMult;
-            this.infectionWindow = restorePreset.infectionWindow;
-          }
-          this.postDefenseGrid = null;
-          this.initLevel('post_defense');
         } else {
           if (this.difficulty === 'survival') {
             const restoreDiff = DIFFICULTY_PRESETS[this._nonSurvivalDifficulty] ? this._nonSurvivalDifficulty : 'normal';
@@ -2229,8 +2210,6 @@
           return;
         } else if (this.isSurvivalMode) {
           this.initLevel('survival');
-        } else if (this.isPostDefenseMode) {
-          this.initLevel('post_defense');
         } else {
           this.initLevel(this.currentLevel);
         }
@@ -2243,11 +2222,8 @@
         if (this.isTutorialMode) {
           this.clearTutorial();
           this.initLevel(0);
-        } else if (this.isSurvivalMode) {
+        } else if (this.isSurvivalMode || this.currentLevel >= LEVEL_MAPS.length - 1) {
           this.initLevel('survival');
-        } else if (this.isPostDefenseMode || this.currentLevel >= LEVEL_MAPS.length - 1) {
-          this.postDefenseGrid = null;
-          this.initLevel('post_defense');
         } else {
           this.initLevel(this.currentLevel + 1);
         }
@@ -4044,8 +4020,6 @@
 
       const rawLvl = isSurvival
         ? 'survival'
-        : this.startMenuMode === 'post_defense'
-        ? 'post_defense'
         : (this.selectedCampaignLevel || '1');
       if (rawLvl === 'tutorial') {
         this.startTutorial();
@@ -4053,9 +4027,6 @@
       } else if (rawLvl === 'survival') {
         this.randomSectorCount = 0;
         this.initLevel('survival');
-      } else if (rawLvl === 'post_defense') {
-        this.postDefenseGrid = null;
-        this.initLevel('post_defense');
       } else {
         const startLvl = Math.max(0, Math.min(LEVEL_MAPS.length - 1, (parseInt(rawLvl, 10) || 1) - 1));
         this.initLevel(startLvl);
@@ -4069,9 +4040,7 @@
       this.updateHUD();
       this.updateTimerHud();
       const modeDesc = this.isSurvivalMode
-        ? `Survival #${this.randomSectorCount} (${this.randomArchetype} - Endless 4.0x HP Siege)`
-        : this.isPostDefenseMode
-        ? `Post Defense (${this.randomArchetype} - Endless Single-Outpost Siege)`
+        ? `Survival #${this.randomSectorCount} (${this.randomArchetype} - Endless Normal Scaling)`
         : `Sector ${this.currentLevel + 1}`;
       this.showStatus(
         this.isSurvivalMode
@@ -4257,7 +4226,6 @@
           isSurvivalMode: !!this.isSurvivalMode,
           currentLevel: this.currentLevel,
           isRandomMode: false,
-          isPostDefenseMode: !!this.isPostDefenseMode,
           randomSectorCount: this.randomSectorCount || 0,
           randomArchetype: this.randomArchetype || '',
           wave: this.wave || 0,
@@ -4409,8 +4377,6 @@
 
       this.currentLevel = saved.currentLevel || 0;
       this.isRandomMode = false;
-      this.isPostDefenseMode = !!saved.isPostDefenseMode;
-      this.postDefenseGrid = this.isPostDefenseMode ? saved.grid.map((row) => [...row]) : null;
       this.randomSectorCount = saved.randomSectorCount || 0;
       this.randomArchetype = saved.randomArchetype || '';
       this.totalWaves = this.isEndlessMode ? Infinity : 5;
@@ -4551,7 +4517,7 @@
         ...c, radius: 6, speed: 60, path: [], dest: null, repathTimer: 0.2, targetBarracks: null
       }));
 
-      const modeVal = this.isSurvivalMode ? 'survival' : this.isPostDefenseMode ? 'post_defense' : String(this.currentLevel + 1);
+      const modeVal = this.isSurvivalMode ? 'survival' : String(this.currentLevel + 1);
       if (this.levelSelect) this.levelSelect.value = modeVal;
       if (this.startLevelSelect) this.startLevelSelect.value = modeVal;
 
@@ -5214,7 +5180,6 @@
       }
 
       this.isTutorialMode = false;
-      this.isPostDefenseMode = false;
       this.isRandomMode = false;
       this.currentLevel = 0;
 
@@ -6255,9 +6220,6 @@
         return;
       } else if (this.isSurvivalMode) {
         this.initLevel('survival');
-      } else if (this.isPostDefenseMode) {
-        this.postDefenseGrid = null;
-        this.initLevel('post_defense');
       } else {
         this.initLevel(this.currentLevel);
       }
@@ -6499,7 +6461,6 @@
       }
       if (levelTarget === 'tutorial') {
         this.isTutorialMode = true;
-        this.isPostDefenseMode = false;
         this.isRandomMode = false;
         this.currentLevel = 0;
         this.tutorialStep = 1;
@@ -6518,22 +6479,8 @@
         if (this.startLevelSelect) this.startLevelSelect.value = 'tutorial';
       } else {
         this.clearTutorial();
-        if (levelTarget === 'post_defense') {
-          this.isPostDefenseMode = true;
+        if (levelTarget === 'survival') {
           this.isRandomMode = false;
-          this.currentLevel = 3;
-          if (!this.postDefenseGrid) {
-            this.randomSectorCount += 1;
-            const gen = generateRandomSector(this.randomSectorCount);
-            this.postDefenseGrid = gen.grid.map((row) => [...row]);
-            this.randomArchetype = gen.archetype;
-          }
-          this.grid = this.postDefenseGrid.map((row) => [...row]);
-          if (this.levelSelect) this.levelSelect.value = 'post_defense';
-          if (this.startLevelSelect) this.startLevelSelect.value = 'post_defense';
-        } else if (levelTarget === 'survival') {
-          this.isRandomMode = false;
-          this.isPostDefenseMode = false;
           this.difficulty = 'survival';
           const sPreset = DIFFICULTY_PRESETS.survival;
           this.zombieHpMult = sPreset.zombieHpMult;
@@ -6548,7 +6495,6 @@
           if (this.startLevelSelect) this.startLevelSelect.value = 'survival';
         } else {
           this.isRandomMode = false;
-          this.isPostDefenseMode = false;
           this.currentLevel = Math.max(0, Math.min(LEVEL_MAPS.length - 1, Number(levelTarget) || 0));
           if (this.levelSelect) this.levelSelect.value = String(this.currentLevel + 1);
           if (this.startLevelSelect) this.startLevelSelect.value = String(this.currentLevel + 1);
@@ -6672,9 +6618,7 @@
       if (this.isTutorialMode) {
         this.showStatus('Tutorial active! Follow the glowing spotlight arrows on screen & map.');
       } else if (this.isSurvivalMode) {
-        this.showStatus(`Survival Mode #${this.randomSectorCount} (${this.randomArchetype}, 4.0x HP, +1 Rift / 5w) active!`);
-      } else if (this.isPostDefenseMode) {
-        this.showStatus(`Post Defense (${this.randomArchetype}, 3x3 Safe Zone) active!`);
+        this.showStatus(`Survival Mode #${this.randomSectorCount} (${this.randomArchetype}, Normal Scaling, +1 Rift / 5w) active!`);
       } else {
         this.showStatus(`Sector ${this.currentLevel + 1} loaded (${rolledClusters}x 3x3 Safe Zone). Destroy all Red Spawn Breaches!`);
       }
@@ -7524,7 +7468,7 @@
     canLaunchNextWave() {
       if (!this.inPlay || this.isPaused || this.modalBlocking) return false;
       if (this.isTutorialMode && this.tutorialStep < 7) return false;
-      if (this.spawns.size === 0 && !this.isPostDefenseMode) return false;
+      if (this.spawns.size === 0) return false;
       if (this.waveSpawnQueue.length > 0) return false;
       return this.isEndlessMode || this.wave < this.totalWaves || this.spawns.size > 0;
     }
@@ -7545,10 +7489,6 @@
       this.score += bonus * 2;
       this.addFloatingText(`+$${bonus} Early Wave!`, WIDTH / 2, 70, '#FFD700');
       this.launchNextWave(true, bonus);
-    }
-
-    reopenPostDefenseBreaches() {
-      // v2.2.0: Destroyed Spawn Breaches are permanently eradicated and never respawn in any mode.
     }
 
     launchNextWave(wasEarly = false, earlyBonus = 0) {
@@ -14595,10 +14535,8 @@
             ? 'Start Sector 1 &rarr;'
             : this.isSurvivalMode
             ? 'New Survival Map &rarr;'
-            : this.isPostDefenseMode
-            ? 'New Post Defense Map &rarr;'
             : this.currentLevel >= LEVEL_MAPS.length - 1
-            ? 'Play Post Defense &#8734; &rarr;'
+            ? 'Play Survival &#8734; &rarr;'
             : 'Next Sector &rarr;';
           showEl(this.btnNextLevel, 'inline-flex');
         } else {

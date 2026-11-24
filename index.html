@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Zombie Defense Command - Tactical Grid Survival (v0.46.1)</title>
+  <title>Zombie Defense Command - Tactical Grid Survival (v0.47.0)</title>
 
   <!-- PWA & Mobile Web App Meta -->
   <meta name="theme-color" content="#07090d">
@@ -30,7 +30,7 @@
     <header id="topHud">
       <div class="hud-brand">
         <span class="hud-logo">&#9763;</span>
-        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.46.1</small></span>
+        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.47.0</small></span>
       </div>
 
       <div class="hud-stats">
@@ -67,7 +67,6 @@
           <option value="2">Sector 2: Choke Alley</option>
           <option value="3">Sector 3: Twin Fronts</option>
           <option value="4">Sector 4: Citadel</option>
-          <option value="post_defense">Post Defense (Endless)</option>
           <option value="survival">Survival Mode (Endless)</option>
           <option value="tutorial">Tutorial: Basic Training</option>
         </select>
@@ -112,7 +111,7 @@
         <button id="btnCamFocusBase" class="cam-btn cam-base-btn" type="button" title="Center Camera on Safe Zone Base">&#8982; Base</button>
       </div>
 
-      <!-- Tactical Active Abilities Bar (v0.46.1: Overcharge & Napalm) -->
+      <!-- Tactical Active Abilities Bar (v0.47.0: Overcharge & Napalm) -->
       <div id="abilityBar" class="ability-bar hidden" role="toolbar" aria-label="Tactical Abilities">
         <button id="btnAbilityOvercharge" class="ability-btn" type="button" title="Overcharge ($200, 25s CD): +50% turret fire rate for 10s">
           <span class="ability-icon">&#9889;</span>
@@ -133,6 +132,7 @@
             <span id="tutorialStepBadge" class="tutorial-step-badge">Step 1 / 7</span>
             <span id="tutorialIcon" class="tutorial-step-icon" aria-hidden="true">&#10010;</span>
             <span id="tutorialTitle" class="tutorial-title">Click [7] Safe Zone &rarr; Paint 3 Green Tiles</span>
+            <button id="btnTutorialHowToPlay" class="hud-btn tutorial-help-btn" title="Open How to Play Manual">How to Play</button>
             <button id="btnSkipTutorial" class="hud-btn tutorial-skip-btn" title="Exit tutorial">Skip</button>
           </div>
           <p id="tutorialBody" class="tutorial-body hidden"></p>
@@ -143,30 +143,73 @@
         <span id="tutorialUiArrowGlyph" class="tutorial-ui-arrow-glyph">&#9660;</span>
       </div>
 
-      <!-- Startup screen (v0.46.1: 3-Card Threat Level + Campaign / Post Defense / Survival Picker) -->
+      <!-- Startup screen (v0.47.0: Quarantine Outpost Tactical Theme) -->
       <div id="startScreenOverlay" class="modal-overlay">
         <div class="modal-card start-card">
-          <div class="start-icon">&#9763;</div>
-          <h1 class="start-title">ZOMBIE DEFENSE COMMAND</h1>
-          <div class="start-version-badge">v0.46.1</div>
-          <p class="start-subtitle">Expand green Safe Zones within 3 tiles of Red Spawn Breaches and deploy Commandos to destroy them (towers defend against zombies only).</p>
+          <div class="start-hero-header">
+            <div class="start-icon" aria-hidden="true">
+              <svg viewBox="0 0 64 64" width="46" height="46" fill="none">
+                <circle cx="32" cy="32" r="7" stroke="currentColor" stroke-width="2.6"/>
+                <path d="M32 10a15 15 0 0 1 13 22.5M51 43a15 15 0 0 1-26 0M13 43a15 15 0 0 1 13-22.5" stroke="currentColor" stroke-width="4.2" stroke-linecap="round"/>
+                <circle cx="32" cy="21" r="6" stroke="currentColor" stroke-width="2.4"/>
+                <circle cx="41.5" cy="37.5" r="6" stroke="currentColor" stroke-width="2.4"/>
+                <circle cx="22.5" cy="37.5" r="6" stroke="currentColor" stroke-width="2.4"/>
+              </svg>
+            </div>
+            <h1 class="start-title">
+              <span class="title-top">ZOMBIE DEFENSE</span>
+              <span class="title-sub">COMMAND</span>
+            </h1>
+            <div class="start-version-badge">v0.47.0</div>
+          </div>
 
           <div id="startMainSection">
-            <div id="threatLevelLabel" class="option-label">THREAT LEVEL</div>
-            <div class="card-row" id="difficultyCards">
-              <button type="button" class="pick-card diff-card tag-easy" data-diff="easy">
-                <span class="pick-name">EASY</span>
-                <span class="pick-desc">1.0&times; HP &bull; $160 Scrap</span>
-              </button>
-              <button type="button" class="pick-card diff-card tag-normal" data-diff="normal">
-                <span class="pick-name">NORMAL</span>
-                <span class="pick-desc">2.0&times; HP &bull; $100 Scrap</span>
-              </button>
-              <button type="button" class="pick-card diff-card tag-hard" data-diff="hard">
-                <span class="pick-name">HARD</span>
-                <span class="pick-desc">4.0&times; HP &bull; $100 Scrap</span>
-              </button>
+            <div class="mode-stack" id="modeCards">
+              <div class="pick-card mode-card mode-card-hero" data-mode="campaign" role="button" tabindex="0">
+                <div class="mode-thumb">
+                  <img src="assets/card-campaign.jpg" alt="" loading="eager" />
+                </div>
+                <div class="mode-body">
+                  <div class="mode-head">
+                    <span class="mode-icon-svg" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+                    </span>
+                    <span class="pick-name">CAMPAIGN</span>
+                  </div>
+                  <span class="pick-desc">Story-based missions with increasing difficulty.</span>
+                  <div class="card-row mode-diff-pills" id="difficultyCards">
+                    <button type="button" class="pick-card diff-card tag-easy" data-diff="easy">
+                      <span class="skull-dot" aria-hidden="true">&#9760;</span>
+                      <span class="pick-name">EASY</span>
+                    </button>
+                    <button type="button" class="pick-card diff-card tag-normal" data-diff="normal">
+                      <span class="skull-dot" aria-hidden="true">&#9760;</span>
+                      <span class="pick-name">NORMAL</span>
+                    </button>
+                    <button type="button" class="pick-card diff-card tag-hard" data-diff="hard">
+                      <span class="skull-dot" aria-hidden="true">&#9760;</span>
+                      <span class="pick-name">HARD</span>
+                    </button>
+                  </div>
+                </div>
+                <span class="mode-chevron" aria-hidden="true">&#8250;</span>
+              </div>
+
+              <div class="pick-card mode-card mode-card-hero tag-survival" data-mode="survival" role="button" tabindex="0">
+                <div class="mode-thumb">
+                  <img src="assets/card-survival.jpg" alt="" loading="eager" />
+                </div>
+                <div class="mode-body">
+                  <div class="mode-head">
+                    <span class="mode-icon-svg survival-inf" aria-hidden="true">&#8734;</span>
+                    <span class="pick-name">SURVIVAL</span>
+                  </div>
+                  <span class="pick-desc">Endless waves. Normal scaling. Survive as long as you can.</span>
+                </div>
+                <span class="mode-chevron" aria-hidden="true">&#8250;</span>
+              </div>
             </div>
+
             <select id="difficultySelect" class="sync-select" aria-label="Difficulty">
               <option value="" disabled selected>Select Threat Level</option>
               <option value="easy">Easy - 160 Scrap, 1.0x zombies, 3.0s incubation</option>
@@ -174,40 +217,81 @@
               <option value="hard">Hard - 100 Scrap, 4.0x zombies, 1.2s incubation</option>
             </select>
 
-            <div class="option-label">MISSION MODE</div>
-            <div class="card-row" id="modeCards">
-              <button type="button" class="pick-card mode-card" data-mode="campaign">
-                <span class="pick-name">CAMPAIGN</span>
-                <span class="pick-desc">Sectors 1&ndash;4</span>
-              </button>
-              <button type="button" class="pick-card mode-card tag-post" data-mode="post_defense">
-                <span class="pick-name">POST DEFENSE &#8734;</span>
-                <span class="pick-desc">Endless Outpost</span>
-              </button>
-              <button type="button" class="pick-card mode-card tag-survival" data-mode="survival">
-                <span class="pick-name">SURVIVAL &#8734;</span>
-                <span class="pick-desc">4.0&times; HP (+60% / 5w) &bull; +1 Invincible Rift / 5w (20s)</span>
-              </button>
-            </div>
-
-            <div class="option-label">MAP SIZE</div>
-            <div class="card-row map-size-row" id="mapSizeCards">
-              <button type="button" class="pick-card map-card selected" data-map-size="auto"><span class="pick-name">AUTO FIT</span><span class="pick-desc">Fit Device</span></button>
-              <button type="button" class="pick-card map-card" data-map-size="portrait"><span class="pick-name">PORTRAIT</span><span class="pick-desc">18&times;32</span></button>
-              <button type="button" class="pick-card map-card" data-map-size="classic"><span class="pick-name">CLASSIC</span><span class="pick-desc">32&times;24</span></button>
-              <button type="button" class="pick-card map-card" data-map-size="widescreen"><span class="pick-name">WIDE</span><span class="pick-desc">36&times;18</span></button>
+            <div class="tactical-panel map-size-panel">
+              <div class="option-label">
+                <span class="label-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 12 12 17 22 12"/><polyline points="2 17 12 22 22 17"/></svg>
+                </span>
+                MAP SIZE
+              </div>
+              <div class="card-row map-size-row" id="mapSizeCards">
+                <button type="button" class="pick-card map-card selected" data-map-size="auto">
+                  <span class="map-ico" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                  </span>
+                  <span class="map-txt"><span class="pick-name">AUTO FIT</span><span class="pick-desc">Fit Device</span></span>
+                </button>
+                <button type="button" class="pick-card map-card" data-map-size="portrait">
+                  <span class="map-ico" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="3" width="12" height="18" rx="2"/><line x1="12" y1="18" x2="12" y2="18.01"/></svg>
+                  </span>
+                  <span class="map-txt"><span class="pick-name">PORTRAIT</span><span class="pick-desc">18&times;32</span></span>
+                </button>
+                <button type="button" class="pick-card map-card" data-map-size="classic">
+                  <span class="map-ico" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                  </span>
+                  <span class="map-txt"><span class="pick-name">CLASSIC</span><span class="pick-desc">32&times;24</span></span>
+                </button>
+                <button type="button" class="pick-card map-card" data-map-size="widescreen">
+                  <span class="map-ico" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/></svg>
+                  </span>
+                  <span class="map-txt"><span class="pick-name">WIDE</span><span class="pick-desc">36&times;18</span></span>
+                </button>
+              </div>
             </div>
 
             <div id="startValidationMsg" class="start-validation-msg hidden" role="alert"></div>
 
-            <div class="modal-actions" id="mainModalActions">
-              <button id="btnResumeLastMatch" class="modal-btn primary-btn resume-btn hidden">&#8634; Resume Last Match</button>
-              <button id="btnStartMission" class="modal-btn primary-btn">&#9654; Start Mission</button>
-              <button id="btnStartMultiplayer" class="modal-btn secondary-btn mp-start-btn">&#127760; Multiplayer</button>
-              <button id="btnStartSettings" class="modal-btn secondary-btn">&#9881; Settings</button>
-              <button id="btnStartTutorial" class="modal-btn secondary-btn tutorial-start-btn">&#9733; Tutorial</button>
-              <button id="btnStartZombies" class="modal-btn secondary-btn zombies-modal-btn">&#9760; Zombies</button>
-              <button id="btnHowToPlay" class="modal-btn secondary-btn">How to Play</button>
+            <div class="modal-actions start-primary-actions" id="mainModalActions">
+              <button id="btnStartMission" class="modal-btn primary-btn hero-start-btn">
+                <span class="btn-tri" aria-hidden="true">&#9654;</span> START GAME
+              </button>
+              <button id="btnStartMultiplayer" class="modal-btn secondary-btn mp-start-btn">
+                <span class="btn-ico" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a13 13 0 0 1 0 18M12 3a13 13 0 0 0 0 18"/></svg>
+                </span>
+                MULTIPLAYER
+              </button>
+              <button id="btnResumeLastMatch" class="modal-btn secondary-btn resume-btn hidden">&#8634; RESUME LAST MATCH</button>
+            </div>
+
+            <div class="start-footer-dock">
+              <button id="btnStartSettings" class="dock-btn" type="button">
+                <span class="dock-ico" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.77 1.02 1.51 1H21a2 2 0 0 1 0 4h-.09c-.74-.02-1.25.4-1.51 1z"/></svg>
+                </span>
+                <span class="dock-label">SETTINGS</span>
+              </button>
+              <button id="btnStartTutorial" class="dock-btn" type="button">
+                <span class="dock-ico" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                </span>
+                <span class="dock-label">TUTORIAL</span>
+              </button>
+              <button id="btnStartZombies" class="dock-btn dock-zombies" type="button">
+                <span class="dock-ico" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 2a8 8 0 0 0-8 8c0 2.9 1.5 5.4 3.8 6.8L8 20h8l.2-3.2A8 8 0 0 0 20 10a8 8 0 0 0-8-8zm-3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm6 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>
+                </span>
+                <span class="dock-label">ZOMBIES</span>
+              </button>
+              <button id="btnStartArsenal" class="dock-btn" type="button">
+                <span class="dock-ico" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v8M8 12h8"/></svg>
+                </span>
+                <span class="dock-label">ARSENAL</span>
+              </button>
             </div>
           </div>
 
@@ -223,7 +307,7 @@
             <div id="campaignValidationMsg" class="start-validation-msg hidden" role="alert"></div>
             <div class="modal-actions campaign-actions">
               <button id="btnCampaignBack" type="button" class="modal-btn secondary-btn">&#8592; Back</button>
-              <button id="btnStartCampaignSector" type="button" class="modal-btn primary-btn">&#9654; Start Mission</button>
+              <button id="btnStartCampaignSector" type="button" class="modal-btn primary-btn">&#9654; START GAME</button>
             </div>
           </div>
 
@@ -233,16 +317,15 @@
             <option value="2">Sector 2: Choke Alley</option>
             <option value="3">Sector 3: Twin Fronts</option>
             <option value="4">Sector 4: Citadel</option>
-            <option value="post_defense">Post Defense (Endless)</option>
             <option value="survival">Survival Mode (Endless)</option>
             <option value="tutorial">Tutorial: Basic Training</option>
           </select>
 
-          <div class="start-hint">v0.46.1 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; Settings</div>
+          <div class="start-hint">v0.47.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause</div>
         </div>
       </div>
 
-      <!-- Settings Modal (v0.46.1) -->
+      <!-- Settings Modal (v0.47.0) -->
       <div id="settingsModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
         <div class="modal-card settings-card">
           <button id="btnCloseSettings" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
@@ -313,7 +396,7 @@
         </div>
       </div>
 
-      <!-- Developer Tuning Modal (v0.46.1: Live Multiplier Overrides) -->
+      <!-- Developer Tuning Modal (v0.47.0: Live Multiplier Overrides) -->
       <div id="developerModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="devTitle">
         <div class="modal-card dev-card">
           <button id="btnCloseDeveloper" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
@@ -589,7 +672,7 @@
       <div id="howToPlayModal" class="modal-overlay hidden">
         <div class="modal-card help-card">
           <button id="btnCloseHowToPlay" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.46.1)</h2>
+          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.47.0)</h2>
           <div class="help-grid">
             <section>
               <h3>Single 3&times;3 Start &amp; Line-Drag Barricades</h3>
@@ -626,7 +709,7 @@
       <div id="zombieGuideModal" class="modal-overlay hidden">
         <div class="modal-card help-card zombie-guide-card">
           <button id="btnCloseZombieGuide" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.46.1)</h2>
+          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.47.0)</h2>
           <div id="bestiaryHardIndicator" class="bestiary-hard-indicator hidden">&#9888; HARD MODE ACTIVE: 4.0&times; ZOMBIE HP APPLIED</div>
           <p class="bestiary-note"><b class="c-orange">25% Random Brute-Breach Trait:</b> Any spawned Walker, Runner, Tank, or Wrecker has a 25% chance (100% on Demolisher) to smash straight toward Safe Zones, dealing a <b>fixed unscaled 12 damage</b> (<b>16 damage</b> for Demolishers) per strike against structures &amp; Safe Zones.</p>
           <div class="zombie-intel-list">
@@ -686,11 +769,11 @@
         </div>
       </div>
 
-      <!-- Units & Towers Field Guide Modal (v0.46.1) -->
+      <!-- Units & Towers Field Guide Modal (v0.47.0) -->
       <div id="arsenalGuideModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="arsenalTitle">
         <div class="modal-card help-card arsenal-guide-card">
           <button id="btnCloseArsenalGuide" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 id="arsenalTitle" class="help-title">&#9876; UNITS &amp; TOWERS FIELD GUIDE (v0.46.1)</h2>
+          <h2 id="arsenalTitle" class="help-title">&#9876; UNITS &amp; TOWERS FIELD GUIDE (v0.47.0)</h2>
           <div class="arsenal-tabs" role="tablist" aria-label="Units and Towers Tabs">
             <button type="button" id="tabArsenalUnits" class="arsenal-tab-btn active" data-arsenal-tab="units" role="tab" aria-selected="true">Units</button>
             <button type="button" id="tabArsenalTowers" class="arsenal-tab-btn" data-arsenal-tab="towers" role="tab" aria-selected="false">Towers</button>
@@ -826,7 +909,7 @@
         </div>
       </div>
 
-      <!-- 4-Player Co-Op Multiplayer Modals (v0.46.1) -->
+      <!-- 4-Player Co-Op Multiplayer Modals (v0.47.0) -->
       <div id="mpRoleModal" class="modal-overlay hidden">
         <div class="modal-card mp-card">
           <h2 class="help-title mp-modal-title">&#127760; 4-PLAYER CO-OP MULTIPLAYER</h2>
@@ -958,7 +1041,7 @@
         </div>
       </div>
 
-      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.46.1) -->
+      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.47.0) -->
       <div id="mpPauseModal" class="modal-overlay hidden">
         <div class="modal-card mp-card mp-pause-card">
           <h2 id="mpPauseTitle" class="help-title mp-modal-title">&#9208; MATCH PAUSED</h2>
@@ -1152,7 +1235,7 @@
         </div>
 
         <div id="deckHint">
-          <span class="hint-text">v0.46.1 &bull; Mortar ($240) / Laser ($260) / Radar ($175) &bull; Gunner / Medic / Sapper &bull; Barracks Hold Stance &bull; Overcharge &amp; Napalm</span>
+          <span class="hint-text">v0.47.0 &bull; Mortar ($240) / Laser ($260) / Radar ($175) &bull; Gunner / Medic / Sapper &bull; Barracks Hold Stance &bull; Overcharge &amp; Napalm</span>
         </div>
       </div>
     </footer>
