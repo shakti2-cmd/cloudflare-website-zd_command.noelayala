@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.38.0 (Mortar/Laser/Radar Towers, Gunner/Medic/Sapper Specialists, Barracks Hold Stance & Rally Point, Overcharge/Napalm Abilities & Survival 10-Wave Hive Behemoth)
+ * Version: v0.39.0 (Gate Pathing Fix, Medic Beam & Escort, Sapper Outside 5-Mine Click-to-Detonate, Sniper -50% ROF & Boss Headshot Immunity, Wave 6+ Mini-Boss)
  */
 
 (function () {
@@ -235,9 +235,9 @@
       baseCost: 225,
       requiresAdjacency: true,
       levels: [
-        { range: 250, rate: 2.0, dmg: 80, hp: 90, cost: 225, repairCost: 90, color: '#8833AA' },
-        { range: 320, rate: 1.5, dmg: 160, hp: 160, cost: 330, repairCost: 132, color: '#AA33CC' },
-        { range: 400, rate: 1.0, dmg: 300, hp: 250, cost: 525, repairCost: 210, color: '#CC33FF' }
+        { range: 250, rate: 4.0, dmg: 80, hp: 90, cost: 225, repairCost: 90, color: '#8833AA' },
+        { range: 320, rate: 3.0, dmg: 160, hp: 160, cost: 330, repairCost: 132, color: '#AA33CC' },
+        { range: 400, rate: 2.0, dmg: 300, hp: 250, cost: 525, repairCost: 210, color: '#CC33FF' }
       ]
     },
     tesla: {
@@ -407,10 +407,10 @@
     unitKind: 'sapper',
     name: 'Sapper',
     maxHp: 130,
-    mineCooldown: 5.5,
+    mineCooldown: 3.0,
     mineDmg: 75,
     mineRadius: 48,
-    maxMines: 6,
+    maxMines: 5,
     armorMult: 0.35,
     speed: 76,
     trainCost: 90,
@@ -729,6 +729,37 @@
       ctx.arc(z.x, z.y, Math.max(4, z.radius * 0.34), 0, Math.PI * 2);
       ctx.fill();
       ctx.lineWidth = 1;
+    } else if (z.type === 'miniboss') {
+      ctx.save();
+      ctx.translate(z.x, z.y);
+      ctx.rotate(z.angle || 0);
+      ctx.fillStyle = '#FFD23F';
+      for (const sy of [-6, 6]) {
+        ctx.beginPath();
+        ctx.moveTo(z.radius - 2, sy - 3);
+        ctx.lineTo(z.radius + 6, sy);
+        ctx.lineTo(z.radius - 2, sy + 3);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+
+      ctx.fillStyle = z.color || '#8B1E3F';
+      ctx.beginPath();
+      ctx.arc(z.x, z.y, z.radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#FFD23F';
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.arc(z.x, z.y, z.radius - 0.5, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = Math.sin(t * 8) > 0 ? '#FFD23F' : '#FF3366';
+      ctx.beginPath();
+      ctx.arc(z.x, z.y, Math.max(3.5, z.radius * 0.3), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 1;
     } else if (z.type === 'tank') {
       ctx.fillStyle = z.color;
       ctx.beginPath();
@@ -752,6 +783,7 @@
   const bfsVisited = new Uint8Array(TOTAL_CELLS);
   const BFS_DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0]];
   const DIRS_8 = [[0, -1], [1, 0], [0, 1], [-1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]];
+  let activeGateCheckFn = null;
 
   function findPath(startCol, startRow, goalCol, goalRow, isBlockedFn) {
     if (!inBounds(startCol, startRow) || !inBounds(goalCol, goalRow)) return null;
@@ -792,7 +824,10 @@
         const nIdx = ny * COLS + nx;
         if (bfsVisited[nIdx]) continue;
         if (isBlockedFn(nx, ny)) continue;
-        if (dx !== 0 && dy !== 0 && (isBlockedFn(cx + dx, cy) || isBlockedFn(cx, cy + dy))) continue;
+        if (dx !== 0 && dy !== 0) {
+          const gateCornerFree = activeGateCheckFn && (activeGateCheckFn(cx, cy) || activeGateCheckFn(nx, ny));
+          if (!gateCornerFree && (isBlockedFn(cx + dx, cy) || isBlockedFn(cx, cy + dy))) continue;
+        }
 
         bfsVisited[nIdx] = 1;
         bfsParent[nIdx] = curIdx;
@@ -1161,6 +1196,10 @@
       this.structures = new Map(); // "c,r" -> structure (wall, gate, sentry, cryo, sniper, bunker, barracks)
       this.safeZones = new Map();  // "c,r" -> destructible/upgradeable Safe Zone block (tile === 2)
       this.spawns = new Map();     // "c,r" -> destructible Spawn Breach (tile === 3)
+      activeGateCheckFn = (c, r) => {
+        const st = this.structures.get(`${c},${r}`);
+        return !!(st && st.type === 'gate');
+      };
       this.sealedSpawns = [];      // Post Defense temporarily sealed spawns: { col, row, reopenWave }
       this.civilians = [];
       this.soldiers = [];
@@ -2974,6 +3013,7 @@
         { id: 'zPortraitTank', type: 'tank', radius: 15, color: '#990000' },
         { id: 'zPortraitDemolisher', type: 'demolisher', radius: 15, color: '#3B0910' },
         { id: 'zPortraitWrecker', type: 'wrecker', radius: 13, color: '#B833FF' },
+        { id: 'zPortraitMiniBoss', type: 'miniboss', radius: 14, color: '#8B1E3F' },
         { id: 'zPortraitBehemoth', type: 'behemoth', radius: 16, color: '#6E0D25' }
       ];
       for (const p of portraits) {
@@ -4578,6 +4618,11 @@
         case 'napalm':
           this.triggerNapalmStrike(action.x, action.y, senderId);
           break;
+        case 'detonate_mine': {
+          const mine = (this.mines || []).find((m) => m.id === action.mineId);
+          if (mine) this.detonateMine(mine, senderId, true);
+          break;
+        }
       }
       if (this.mp) this.mp.broadcastState(this.serializeMpState(), true);
     }
@@ -6682,6 +6727,15 @@
           this.waveSpawnQueue.push(...batch);
         }
       }
+      let miniBossSpawned = false;
+      if (w >= 6 && !this.isTutorialMode && this.spawns.size > 0) {
+        const spawnKeys = Array.from(this.spawns.keys());
+        const mbKey = spawnKeys[Math.floor(Math.random() * spawnKeys.length)];
+        this.waveSpawnQueue.push({ type: 'miniboss', breachKey: mbKey });
+        miniBossSpawned = true;
+        this.addFloatingText('MINI-BOSS INCOMING!', WIDTH / 2, 165, '#FFD23F');
+        this.sound.playWaveWarning();
+      }
       if (this.isSurvivalMode && w >= 10 && w % 10 === 0 && this.spawns.size > 0) {
         const firstKey = this.spawns.keys().next().value;
         this.waveSpawnQueue.push({ type: 'behemoth', breachKey: firstKey });
@@ -6696,6 +6750,7 @@
         ? `Wave ${this.wave} (Threat ${this.threatMult.toFixed(2)}x)`
         : `Wave ${this.wave}/${Math.max(this.totalWaves, this.wave)}`;
       const specials = [];
+      if (miniBossSpawned) specials.push('Mini-Boss');
       if (cfg.wreckers > 0) specials.push(`${cfg.wreckers} Wrecker${cfg.wreckers > 1 ? 's' : ''}`);
       if (cfg.demolishers > 0) specials.push(`${cfg.demolishers} Demolisher${cfg.demolishers > 1 ? 's' : ''}`);
       const specialNote = specials.length > 0 ? ` [${specials.join(' + ')}!]` : '';
@@ -6727,6 +6782,7 @@
         tank: { hp: 220, speed: 25, dmg: 32, radius: 11, color: '#990000', reward: 20 },
         demolisher: { hp: 180, speed: 38, dmg: 20, radius: 12, color: '#3B0910', reward: 18 },
         wrecker: { hp: 110, speed: 62, dmg: 14, radius: 9, color: '#B833FF', reward: 14 },
+        miniboss: { hp: 450, speed: 30, dmg: 24, radius: 14, color: '#8B1E3F', reward: 90 },
         behemoth: { hp: 900, speed: 24, dmg: 35, radius: 17, color: '#6E0D25', reward: 80 }
       }[type] || { hp: 40, speed: 45, dmg: 10, radius: 7, color: '#FF3333', reward: 5 };
 
@@ -6917,7 +6973,7 @@
     applyZombieDamage(z, rawDmg, ownerId = null, heavyArmorMult = 1.0) {
       if (!z || z.hp <= 0) return false;
       let dmg = rawDmg;
-      if (heavyArmorMult < 1.0 && (z.type === 'tank' || z.type === 'demolisher' || z.type === 'wrecker' || z.type === 'behemoth')) {
+      if (heavyArmorMult < 1.0 && (z.type === 'tank' || z.type === 'demolisher' || z.type === 'wrecker' || z.type === 'miniboss' || z.type === 'behemoth')) {
         dmg *= heavyArmorMult;
       }
       if (z.broodBuffed && z.type !== 'behemoth') {
@@ -7603,6 +7659,28 @@
         }
         this.selectStructure(clickedStruct);
         return;
+      }
+
+      // Click-to-Detonate Sapper mines within <= 3 tiles of any Safe Zone when clicking directly on ground
+      if (this.mines && this.mines.length > 0) {
+        let bestMine = null;
+        let bestMD = 20;
+        for (const m of this.mines) {
+          const d = Math.hypot(m.x - mx, m.y - my);
+          if (d <= bestMD) {
+            bestMD = d;
+            bestMine = m;
+          }
+        }
+        if (bestMine) {
+          if (this.isMineDetonatable(bestMine)) {
+            this.detonateMine(bestMine, this.localPlayerId, true);
+            return;
+          }
+          this.showStatus('Mines can only be manually detonated within 3 tiles of a green Safe Zone.');
+          this.sound.playHit();
+          return;
+        }
       }
 
       this.clearSelection();
@@ -11235,16 +11313,21 @@
             }
           }
 
-          if (nearestZ && nearestD < kiteDist && sol.isIntercepting && sol.path.length > 0) {
-            sol.path = [];
-            sol.isIntercepting = false;
-            sol.aiTimer = 0;
-          } else if (nearestZ && nearestD >= kiteDist && nearestD <= effSolRange && sol.isIntercepting && sol.path.length > 0) {
-            sol.path = [];
-            sol.isIntercepting = false;
+          const scGate = Math.floor(sol.x / TILE_SIZE);
+          const srGate = Math.floor(sol.y / TILE_SIZE);
+          const onGateNow = this.structures.get(`${scGate},${srGate}`)?.type === 'gate';
+          if (!onGateNow || sol.path.length === 0) {
+            if (nearestZ && nearestD < kiteDist && sol.isIntercepting && sol.path.length > 0) {
+              sol.path = [];
+              sol.isIntercepting = false;
+              sol.aiTimer = 0;
+            } else if (nearestZ && nearestD >= kiteDist && nearestD <= effSolRange && sol.isIntercepting && sol.path.length > 0) {
+              sol.path = [];
+              sol.isIntercepting = false;
+            }
           }
 
-          if (sol.path.length === 0) {
+          if (sol.path.length === 0 && !onGateNow) {
             sol.aiTimer = (sol.aiTimer || 0) - dt;
             const scNow = Math.floor(sol.x / TILE_SIZE);
             const srNow = Math.floor(sol.y / TILE_SIZE);
@@ -11689,10 +11772,11 @@
 
         if (this.tryEnterEngineeringEngineer(eng, i)) continue;
 
-        // Specialist Engineer Branch: Medic (heals wounded teammates + cures infected civilians) & Sapper (plants proximity mines)
+        // Specialist Engineer Branch: Medic (heals wounded teammates + cures infected civilians + squad escort) & Sapper (plants 5 mines outside Safe Zones)
         if (eng.unitKind === 'medic') {
           const hRange = eng.healRange || 110;
           const hRate = eng.healRate || 18;
+          if ((eng.cureBeamTimer || 0) > 0) eng.cureBeamTimer = Math.max(0, eng.cureBeamTimer - dt);
           let curedAny = false;
           for (const civ of this.civilians) {
             if (civ.isIncubating && Math.hypot(civ.x - eng.x, civ.y - eng.y) <= hRange) {
@@ -11703,6 +11787,7 @@
               this.addFloatingText('CURED!', civ.x, civ.y - 14, '#00FF9D');
               this.addParticles(civ.x, civ.y, '#00FF9D', 10, 40);
               eng.healBeamTarget = { x: civ.x, y: civ.y };
+              eng.cureBeamTimer = 0.45;
               curedAny = true;
               break;
             }
@@ -11726,18 +11811,19 @@
             bestMate.hp = Math.min(bestMate.maxHp, bestMate.hp + hRate * dt);
             eng.repairedTotal = (eng.repairedTotal || 0) + (bestMate.hp - before);
             eng.healBeamTarget = { x: bestMate.x, y: bestMate.y };
+            eng.cureBeamTimer = 0;
             eng.angle = Math.atan2(bestMate.y - eng.y, bestMate.x - eng.x);
             if (Math.random() < 0.18) {
               this.addParticles(bestMate.x, bestMate.y, '#00FF9D', 1, 20);
             }
-          } else if (!curedAny) {
+          } else if (!curedAny && !(eng.cureBeamTimer > 0)) {
             eng.healBeamTarget = null;
           }
 
           if (!eng.manualOrder && !eng.manualMoveOrder && eng.path.length === 0) {
             eng.scanTimer = (eng.scanTimer || 0) - dt;
             if (eng.scanTimer <= 0) {
-              eng.scanTimer = 0.7;
+              eng.scanTimer = 0.65;
               let needTarget = null;
               let minNeedD = Infinity;
               for (const civ of this.civilians) {
@@ -11754,10 +11840,33 @@
                   }
                 }
               }
+              if (!needTarget) {
+                for (const e2 of this.engineers) {
+                  if (e2 !== eng && e2.hp > 0 && e2.hp < e2.maxHp) {
+                    const d = Math.hypot(e2.x - eng.x, e2.y - eng.y);
+                    if (d < minNeedD) { minNeedD = d; needTarget = e2; }
+                  }
+                }
+              }
+              // Escort active frontline squads when everyone is healthy
+              if (!needTarget && this.soldiers.length > 0) {
+                let escortLeader = null;
+                let bestSolD = Infinity;
+                for (const sol of this.soldiers) {
+                  if (sol.hp <= 0) continue;
+                  const d = Math.hypot(sol.x - eng.x, sol.y - eng.y);
+                  if (d < bestSolD) { bestSolD = d; escortLeader = sol; }
+                }
+                if (escortLeader && bestSolD > TILE_SIZE * 1.8) {
+                  needTarget = escortLeader;
+                }
+              }
               if (needTarget) {
                 const tc = Math.floor(needTarget.x / TILE_SIZE);
                 const tr = Math.floor(needTarget.y / TILE_SIZE);
-                const p = this.findPathToAdjacentTile(ec, er, tc, tr, (c, r) => this.commandoBlocked(c, r));
+                const p = Math.hypot(needTarget.x - eng.x, needTarget.y - eng.y) <= TILE_SIZE * 1.4
+                  ? null
+                  : this.findPathToAdjacentTile(ec, er, tc, tr, (c, r) => this.unitBlocked(c, r));
                 if (p && p.length > 0) {
                   eng.path = p.map(([c, r]) => tileCenter(c, r));
                 }
@@ -11769,13 +11878,22 @@
 
         if (eng.unitKind === 'sapper') {
           eng.mineTimer = Math.max(0, (eng.mineTimer || 0) - dt);
+          const maxMines = eng.maxMines || SAPPER_SPEC.maxMines || 5;
+          const mineCd = eng.mineCooldown || SAPPER_SPEC.mineCooldown || 3.0;
           const ownMines = this.mines ? this.mines.filter((m) => m.ownerUnitId === eng.id).length : 0;
           const eKey = `${ec},${er}`;
+          let safeDistFromBreaches = true;
+          for (const sp of this.spawns.values()) {
+            if (Math.max(Math.abs(ec - sp.col), Math.abs(er - sp.row)) < 3) {
+              safeDistFromBreaches = false;
+              break;
+            }
+          }
           const canPlantHere = inBounds(ec, er) && this.grid[er][ec] === 0
             && !this.structures.has(eKey) && !this.safeZones.has(eKey) && !this.spawns.has(eKey)
-            && this.minChebyshevDistToSafeZone(ec, er) <= 3
+            && safeDistFromBreaches
             && !this.mines.some((m) => Math.hypot(m.x - eng.x, m.y - eng.y) < 24);
-          if (eng.mineTimer <= 0 && ownMines < (eng.maxMines || 6) && canPlantHere) {
+          if (eng.mineTimer <= 0 && ownMines < maxMines && canPlantHere) {
             const mp = tileCenter(ec, er);
             this.mines.push({
               id: Math.random().toString(36).slice(2, 11),
@@ -11790,20 +11908,26 @@
               ownerUnitId: eng.id
             });
             eng.minesPlanted = (eng.minesPlanted || 0) + 1;
-            eng.mineTimer = eng.mineCooldown || 5.5;
+            eng.mineTimer = mineCd;
             this.sound.playClick();
             this.addFloatingText('MINE SET', mp.x, mp.y - 10, '#FFAE00');
-          } else if (!eng.manualOrder && !eng.manualMoveOrder && eng.path.length === 0 && eng.mineTimer <= 1.0 && ownMines < (eng.maxMines || 6)) {
+          } else if (!eng.manualOrder && !eng.manualMoveOrder && eng.path.length === 0 && eng.mineTimer <= 1.0 && ownMines < maxMines) {
             eng.scanTimer = (eng.scanTimer || 0) - dt;
             if (eng.scanTimer <= 0) {
-              eng.scanTimer = 0.85;
+              eng.scanTimer = 0.75;
               const openTiles = [];
               for (let r = 1; r < ROWS - 1; r++) {
                 for (let c = 1; c < COLS - 1; c++) {
                   const k = `${c},${r}`;
                   if (this.grid[r][c] !== 0 || this.structures.has(k) || this.safeZones.has(k) || this.spawns.has(k)) continue;
-                  const cheb = this.minChebyshevDistToSafeZone(c, r);
-                  if (cheb < 1 || cheb > 3) continue;
+                  let tooCloseToBreach = false;
+                  for (const sp of this.spawns.values()) {
+                    if (Math.max(Math.abs(c - sp.col), Math.abs(r - sp.row)) < 3) {
+                      tooCloseToBreach = true;
+                      break;
+                    }
+                  }
+                  if (tooCloseToBreach) continue;
                   const tp = tileCenter(c, r);
                   if (this.mines.some((m) => Math.hypot(m.x - tp.x, m.y - tp.y) < 24)) continue;
                   openTiles.push({ c, r, d: Math.hypot(tp.x - eng.x, tp.y - eng.y) });
@@ -11811,8 +11935,8 @@
               }
               if (openTiles.length > 0) {
                 openTiles.sort((a, b) => a.d - b.d);
-                const pick = openTiles[Math.floor(Math.random() * Math.min(4, openTiles.length))];
-                const p = findPath(ec, er, pick.c, pick.r, (c, r) => this.commandoBlocked(c, r));
+                const pick = openTiles[Math.floor(Math.random() * Math.min(5, openTiles.length))];
+                const p = findPath(ec, er, pick.c, pick.r, (c, r) => this.unitBlocked(c, r));
                 if (p && p.length > 0) {
                   eng.path = p.map(([c, r]) => tileCenter(c, r));
                 }
@@ -11994,6 +12118,48 @@
       this.updateHUD();
     }
 
+    isMineDetonatable(mine) {
+      if (!mine || this.safeZones.size === 0) return false;
+      const mc = mine.col !== undefined ? mine.col : Math.floor(mine.x / TILE_SIZE);
+      const mr = mine.row !== undefined ? mine.row : Math.floor(mine.y / TILE_SIZE);
+      return this.minChebyshevDistToSafeZone(mc, mr) <= 3;
+    }
+
+    detonateMine(mine, actorId = null, manual = false) {
+      if (!mine || !this.mines) return false;
+      const idx = this.mines.indexOf(mine);
+      if (idx === -1) return false;
+      if (manual && !this.isMineDetonatable(mine)) return false;
+      if (manual && this.isMultiplayer && !this.isMpHost) {
+        if (this.mp) this.mp.sendAction({ kind: 'detonate_mine', mineId: mine.id });
+        return true;
+      }
+      this.mines.splice(idx, 1);
+      const radius = mine.radius || 48;
+      const armorMult = mine.armorMult || 0.35;
+      const ownerId = actorId || mine.ownerId || null;
+      for (const z of this.zombies) {
+        if (z.hp <= 0) continue;
+        if (Math.hypot(z.x - mine.x, z.y - mine.y) <= radius) {
+          this.applyZombieDamage(z, mine.dmg || 75, ownerId, armorMult);
+        }
+      }
+      if (mine.ownerUnitId) {
+        for (const e of this.engineers) {
+          if (e.id === mine.ownerUnitId && e.unitKind === 'sapper') {
+            e.mineTimer = e.mineCooldown || SAPPER_SPEC.mineCooldown || 3.0;
+            break;
+          }
+        }
+      }
+      this.sound.playExplosion();
+      this.pulseRings.push({ x: mine.x, y: mine.y, radius: 6, maxRadius: radius, color: '#FF9A1F', life: 0.45, maxLife: 0.45 });
+      this.addParticles(mine.x, mine.y, '#FF9A1F', 18, 80);
+      this.addFloatingText(manual ? 'DETONATED!' : 'BOOM!', mine.x, mine.y - 12, '#FFAE00');
+      if (manual) this.showStatus('Mine manually detonated! Sapper will plant a replacement in 3s.');
+      return true;
+    }
+
     updateMines(dt) {
       if (!this.mines || this.mines.length === 0) return;
       for (let i = this.mines.length - 1; i >= 0; i--) {
@@ -12006,19 +12172,7 @@
           }
         }
         if (!triggered) continue;
-        this.mines.splice(i, 1);
-        const radius = m.radius || 48;
-        const armorMult = m.armorMult || 0.35;
-        for (const z of this.zombies) {
-          if (z.hp <= 0) continue;
-          if (Math.hypot(z.x - m.x, z.y - m.y) <= radius) {
-            this.applyZombieDamage(z, m.dmg || 75, m.ownerId || null, armorMult);
-          }
-        }
-        this.sound.playExplosion();
-        this.pulseRings.push({ x: m.x, y: m.y, radius: 6, maxRadius: radius, color: '#FF9A1F', life: 0.45, maxLife: 0.45 });
-        this.addParticles(m.x, m.y, '#FF9A1F', 18, 80);
-        this.addFloatingText('BOOM!', m.x, m.y - 12, '#FFAE00');
+        this.detonateMine(m, m.ownerId || null, false);
       }
     }
 
@@ -12813,7 +12967,7 @@
             if (z.hp <= 0) continue;
             const d = Math.hypot(z.x - struct.x, z.y - struct.y);
             if (d > effRange) continue;
-            if (z.type === 'demolisher' || z.type === 'wrecker' || z.type === 'behemoth') {
+            if (z.type === 'demolisher' || z.type === 'wrecker' || z.type === 'miniboss' || z.type === 'behemoth') {
               if (z.hp > maxSiegeHp) {
                 maxSiegeHp = z.hp;
                 bestSiege = z;
@@ -12874,6 +13028,7 @@
             const d = Math.hypot(z.x - struct.x, z.y - struct.y);
             if (d > effRange) continue;
             const prio = z.type === 'behemoth' ? 5e6
+              : z.type === 'miniboss' ? 4.5e6
               : (z.type === 'demolisher' || z.type === 'wrecker') ? 4e6
               : z.type === 'tank' ? 3e6
               : z.bruteBreach ? 2e6
@@ -12957,7 +13112,8 @@
         maxLife: 0.2
       });
       target.lastAttackerOwnerId = t.ownerId || target.lastAttackerOwnerId || null;
-      if (Math.random() < 0.30) {
+      const headshotImmune = target.type === 'behemoth' || target.type === 'miniboss';
+      if (!headshotImmune && Math.random() < 0.30) {
         target.hp = 0;
         t.kills = (t.kills || 0) + 1;
         this.addFloatingText('HEADSHOT!', target.x, target.y - 16, '#FF00FF');
@@ -13288,6 +13444,15 @@
       if (!this.mines || this.mines.length === 0) return;
       const blink = Math.sin(t * 7) > 0;
       for (const m of this.mines) {
+        if (this.isMineDetonatable(m)) {
+          ctx.strokeStyle = blink ? 'rgba(255, 174, 0, 0.7)' : 'rgba(255, 90, 31, 0.35)';
+          ctx.lineWidth = 1.2;
+          ctx.setLineDash([3, 3]);
+          ctx.beginPath();
+          ctx.arc(m.x, m.y, 11, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
         ctx.fillStyle = '#332610';
         ctx.beginPath();
         ctx.arc(m.x, m.y, 5, 0, Math.PI * 2);
@@ -14239,13 +14404,23 @@
 
         // Medical beam or Welding torch beam
         if (eng.unitKind === 'medic' && eng.healBeamTarget) {
-          ctx.strokeStyle = Math.sin(t * 16) > 0 ? '#00FF9D' : '#88FFCC';
-          ctx.lineWidth = 2.2;
+          ctx.save();
+          ctx.strokeStyle = 'rgba(0, 255, 157, 0.35)';
+          ctx.lineWidth = 5.5;
           ctx.beginPath();
           ctx.moveTo(eng.x, eng.y);
           ctx.lineTo(eng.healBeamTarget.x, eng.healBeamTarget.y);
           ctx.stroke();
-          ctx.lineWidth = 1;
+
+          ctx.strokeStyle = Math.sin(t * 16) > 0 ? '#00FF9D' : '#88FFCC';
+          ctx.lineWidth = 2.4;
+          ctx.stroke();
+
+          ctx.fillStyle = '#00FF9D';
+          ctx.beginPath();
+          ctx.arc(eng.healBeamTarget.x, eng.healBeamTarget.y, 3 + Math.sin(t * 12) * 1.2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
         } else if (eng.repairTarget && Math.hypot(eng.repairTarget.x - eng.x, eng.repairTarget.y - eng.y) <= TILE_SIZE * 1.45) {
           ctx.strokeStyle = Math.sin(t * 25) > 0 ? '#00E5FF' : '#FFD23F';
           ctx.lineWidth = 1.8;

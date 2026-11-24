@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Zombie Defense Command - Tactical Grid Survival (v0.38.0)</title>
+  <title>Zombie Defense Command - Tactical Grid Survival (v0.39.0)</title>
 
   <!-- PWA & Mobile Web App Meta -->
   <meta name="theme-color" content="#07090d">
@@ -30,7 +30,7 @@
     <header id="topHud">
       <div class="hud-brand">
         <span class="hud-logo">&#9763;</span>
-        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.38.0</small></span>
+        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.39.0</small></span>
       </div>
 
       <div class="hud-stats">
@@ -111,7 +111,7 @@
         <button id="btnCamFocusBase" class="cam-btn cam-base-btn" type="button" title="Center Camera on Safe Zone Base">&#8982; Base</button>
       </div>
 
-      <!-- Tactical Active Abilities Bar (v0.38.0: Overcharge & Napalm) -->
+      <!-- Tactical Active Abilities Bar (v0.39.0: Overcharge & Napalm) -->
       <div id="abilityBar" class="ability-bar hidden" role="toolbar" aria-label="Tactical Abilities">
         <button id="btnAbilityOvercharge" class="ability-btn" type="button" title="Overcharge ($200, 25s CD): +50% turret fire rate for 10s">
           <span class="ability-icon">&#9889;</span>
@@ -147,7 +147,7 @@
         <div class="modal-card start-card">
           <div class="start-icon">&#9763;</div>
           <h1 class="start-title">ZOMBIE DEFENSE COMMAND</h1>
-          <div class="start-version-badge">v0.38.0</div>
+          <div class="start-version-badge">v0.39.0</div>
           <p class="start-subtitle">Expand green Safe Zones within 3 tiles of Red Spawn Breaches and deploy Commandos to destroy them (towers defend against zombies only).</p>
 
           <div id="startMainSection">
@@ -242,11 +242,11 @@
             <option value="tutorial">Tutorial: Basic Training</option>
           </select>
 
-          <div class="start-hint">v0.38.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; Settings</div>
+          <div class="start-hint">v0.39.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; Settings</div>
         </div>
       </div>
 
-      <!-- Settings Modal (v0.38.0) -->
+      <!-- Settings Modal (v0.39.0) -->
       <div id="settingsModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
         <div class="modal-card settings-card">
           <button id="btnCloseSettings" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
@@ -316,7 +316,7 @@
         </div>
       </div>
 
-      <!-- Developer Tuning Modal (v0.38.0: Live Multiplier Overrides) -->
+      <!-- Developer Tuning Modal (v0.39.0: Live Multiplier Overrides) -->
       <div id="developerModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="devTitle">
         <div class="modal-card dev-card">
           <button id="btnCloseDeveloper" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
@@ -454,7 +454,7 @@
       <div id="howToPlayModal" class="modal-overlay hidden">
         <div class="modal-card help-card">
           <button id="btnCloseHowToPlay" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.38.0)</h2>
+          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.39.0)</h2>
           <div class="help-grid">
             <section>
               <h3>Single 3&times;3 Start &amp; Line-Drag Barricades</h3>
@@ -465,16 +465,16 @@
               <p><b>Barracks</b> &amp; <b>Engineering</b> scale <b>4 / 8 / 10</b> slots! Train <b class="c-cyan">Commandos</b>, Lv2 <b class="c-cyan">Gunners ($110)</b>, Lv3 <b class="c-orange">Flamethrowers ($100)</b> &amp; set <b>Hold Position</b> rally tiles, or train <b>Engineers</b>, Lv2 <b class="c-green">Medics ($85)</b> &amp; Lv3 <b class="c-yellow">Sappers ($90)</b>.</p>
             </section>
             <section>
-              <h3>Abilities, Hive Boss &amp; Supply Drops</h3>
-              <p>Spend Scrap on <b>Overcharge ($200)</b> &amp; <b>Napalm ($300)</b>! In Survival, every 5 waves reshuffles +1 invincible rift and Wave 10 boundaries unleash the <b>Hive Behemoth</b> boss.</p>
+              <h3>Abilities, Mini-Boss &amp; Supply Drops</h3>
+              <p>Spend Scrap on <b>Overcharge ($200)</b> &amp; <b>Napalm ($300)</b>! Wave 6+ spawns a <b>Brood Warden</b> Mini-Boss every wave across all modes; Survival Wave 10s unleash the <b>Hive Behemoth</b> boss.</p>
             </section>
             <section>
               <h3>Engineer Upgrades (+20/+40/+70 HP/s) &amp; Queues</h3>
-              <p><b>Habitat ($110)</b> queues 20 Civilians. <b>Medics</b> heal squads &amp; cure infections; <b>Sappers</b> plant proximity mines; <b>Engineers</b> weld Safe Zones, Barricades &amp; Gates at $0!</p>
+              <p><b>Habitat ($110)</b> queues 20 Civilians. <b>Medics</b> escort squads with green healing beams; <b>Sappers</b> plant up to 5 mines every 3s outside Safe Zones (click within 3 tiles to detonate); <b>Engineers</b> weld at $0!</p>
             </section>
             <section>
               <h3>7 Safe-Zone Towers (Mortar, Laser &amp; Radar)</h3>
-              <p><b>Sentry</b>, <b>Cryo</b>, <b>Sniper</b> (30% HEADSHOT), <b>Tesla</b> (chains 3/5/8), <b class="c-orange">Mortar ($240)</b> splash, <b class="c-red">Laser ($260)</b> heavy beam (1.0x&rarr;3.0x), and <b class="c-cyan">Radar ($175)</b> +15&ndash;25% range/rate aura target zombies exclusively.</p>
+              <p><b>Sentry</b>, <b>Cryo</b>, <b>Sniper</b> (30% HEADSHOT, Boss immune), <b>Tesla</b> (3/5/8), <b class="c-orange">Mortar ($240)</b> splash, <b class="c-red">Laser ($260)</b> heavy beam (1.0x&rarr;3.0x), and <b class="c-cyan">Radar ($175)</b> +15&ndash;25% aura target zombies only.</p>
             </section>
             <section>
               <h3>Visual Spotlight Tutorial &amp; Controls</h3>
@@ -491,7 +491,7 @@
       <div id="zombieGuideModal" class="modal-overlay hidden">
         <div class="modal-card help-card zombie-guide-card">
           <button id="btnCloseZombieGuide" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.38.0)</h2>
+          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.39.0)</h2>
           <div id="bestiaryHardIndicator" class="bestiary-hard-indicator hidden">&#9888; HARD MODE ACTIVE: 3.0&times; ZOMBIE HP APPLIED</div>
           <p class="bestiary-note"><b class="c-orange">25% Random Brute-Breach Trait:</b> Any spawned Walker, Runner, Tank, or Wrecker has a 25% chance (100% on Demolisher) to smash straight toward Safe Zones, dealing a <b>fixed unscaled 12 damage</b> (<b>16 damage</b> for Demolishers) per strike against structures &amp; Safe Zones.</p>
           <div class="zombie-intel-list">
@@ -531,10 +531,17 @@
               </div>
             </div>
             <div class="zombie-intel-row">
+              <canvas id="zPortraitMiniBoss" class="z-portrait" width="52" height="52"></canvas>
+              <div class="z-info">
+                <div class="z-head"><span class="z-name c-orange">6. BROOD WARDEN (miniboss)</span><span class="z-stats">HP: 450 &bull; Speed: 30 px/s &bull; Dmg: 24 / 0.5s &bull; Bounty: +$45 &bull; Wave 6+ (All Modes)</span></div>
+                <p>Heavily plated crimson-gold field Mini-Boss deploying every wave from Wave 6 onward across all modes. Immune to Sniper instant-kill headshots — focus sustained Laser beams or Gunner crossfire.</p>
+              </div>
+            </div>
+            <div class="zombie-intel-row">
               <canvas id="zPortraitBehemoth" class="z-portrait" width="52" height="52"></canvas>
               <div class="z-info">
-                <div class="z-head"><span class="z-name c-red">6. HIVE BEHEMOTH (behemoth)</span><span class="z-stats">HP: 900 &bull; Speed: 24 px/s &bull; Dmg: 35 / 0.5s &bull; Bounty: +$40 &bull; Survival Wave 10, 20, 30...</span></div>
-                <p>Survival Mode apex brood boss spawning every 10th wave. Radiates a 120px crimson brood aura granting nearby zombies +20% movement speed and 25% damage reduction until eliminated. Focus Laser lock-on beams to melt it fast!</p>
+                <div class="z-head"><span class="z-name c-red">7. HIVE BEHEMOTH (behemoth)</span><span class="z-stats">HP: 900 &bull; Speed: 24 px/s &bull; Dmg: 35 / 0.5s &bull; Bounty: +$40 &bull; Survival Wave 10, 20, 30...</span></div>
+                <p>Survival Mode apex brood boss spawning every 10th wave (Sniper headshot immune). Radiates a 120px crimson brood aura granting nearby zombies +20% movement speed and 25% damage reduction until eliminated.</p>
               </div>
             </div>
           </div>
@@ -564,7 +571,7 @@
         </div>
       </div>
 
-      <!-- 4-Player Co-Op Multiplayer Modals (v0.38.0) -->
+      <!-- 4-Player Co-Op Multiplayer Modals (v0.39.0) -->
       <div id="mpRoleModal" class="modal-overlay hidden">
         <div class="modal-card mp-card">
           <h2 class="help-title mp-modal-title">&#127760; 4-PLAYER CO-OP MULTIPLAYER</h2>
@@ -696,7 +703,7 @@
         </div>
       </div>
 
-      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.38.0) -->
+      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.39.0) -->
       <div id="mpPauseModal" class="modal-overlay hidden">
         <div class="modal-card mp-card mp-pause-card">
           <h2 id="mpPauseTitle" class="help-title mp-modal-title">&#9208; MATCH PAUSED</h2>
@@ -838,7 +845,7 @@
             <button id="toolCryo" class="tool-btn" data-tool="cryo" title="Cryo $180: Safe Zone Only; slows zombie movement + attack speed &amp; deals AoE chip damage (towers target zombies only) (9)">
               <span class="tool-key">9</span><span class="tool-icon">&#10052;</span><span class="tool-name">Cryo</span><span class="tool-cost">$180</span>
             </button>
-            <button id="toolSniper" class="tool-btn" data-tool="sniper" title="Sniper $225: Safe Zone Only; targets Demolishers, Wreckers &amp; high-HP zombies with 30% HEADSHOT instakill (towers target zombies only) (0)">
+            <button id="toolSniper" class="tool-btn" data-tool="sniper" title="Sniper $225: Safe Zone Only; high-damage railgun (-50% ROF: 4.0s/3.0s/2.0s; 30% HEADSHOT, Boss/Mini-Boss immune) (0)">
               <span class="tool-key">0</span><span class="tool-icon">&#8982;</span><span class="tool-name">Sniper</span><span class="tool-cost">$225</span>
             </button>
             <button id="toolTesla" class="tool-btn" data-tool="tesla" title="Tesla Tower $200: Safe Zone Only; chain-lightning turret hitting 3/5/8 zombies (35% vs. heavy armor) (3)">
@@ -890,7 +897,7 @@
         </div>
 
         <div id="deckHint">
-          <span class="hint-text">v0.38.0 &bull; Mortar ($240) / Laser ($260) / Radar ($175) &bull; Gunner / Medic / Sapper &bull; Barracks Hold Stance &bull; Overcharge &amp; Napalm</span>
+          <span class="hint-text">v0.39.0 &bull; Mortar ($240) / Laser ($260) / Radar ($175) &bull; Gunner / Medic / Sapper &bull; Barracks Hold Stance &bull; Overcharge &amp; Napalm</span>
         </div>
       </div>
     </footer>
