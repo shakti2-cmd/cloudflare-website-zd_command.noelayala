@@ -1,4 +1,4 @@
-/* Zombie Defense Command v0.31.0 - tactical command-center theme (offline, zero layout shift) */
+/* Zombie Defense Command v0.32.0 - tactical command-center theme (offline, zero layout shift) */
 :root {
   --bg: #07090d;
   --panel: #0e131b;
@@ -477,7 +477,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: #1b2638; border: 1p
   border-top: 1px solid var(--line);
   position: relative;
   z-index: 40;
-  overflow: hidden;
+  overflow: visible;
 }
 .deck-section { display: flex; gap: 6px; align-items: stretch; }
 #buildPanel {
@@ -2112,4 +2112,113 @@ body.is-multiplayer #btnMobileReset {
 .dev-tools-btn:hover {
   border-color: var(--color-yellow);
   background: rgba(255, 210, 63, 0.15);
+}
+
+/* ---------- Bottom-Left Floating Vertical Unit Picker & Mobile 4-Tower Row (v0.32.0) ---------- */
+#buildingUnitFloatMenu {
+  position: absolute;
+  bottom: calc(54px + 10px);
+  left: max(12px, calc(50% - 510px));
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px;
+  background: rgba(11, 16, 25, 0.96);
+  border: 1px solid var(--color-cyan);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
+  min-width: 176px;
+}
+#buildingUnitFloatMenu.hidden {
+  display: none !important;
+}
+body.is-mobile-touch #buildingUnitFloatMenu {
+  bottom: calc(100% + 64px);
+  left: 8px;
+  z-index: 30;
+  min-width: 168px;
+}
+.float-unit-title {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: var(--color-cyan);
+  text-align: left;
+  padding: 0 2px 2px;
+  border-bottom: 1px solid rgba(36, 48, 68, 0.7);
+}
+.float-unit-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: border-color 0.12s, background 0.12s, opacity 0.12s;
+}
+.float-unit-btn:hover:not(:disabled) {
+  border-color: var(--color-cyan);
+  background: #14273c;
+}
+.float-unit-btn:disabled,
+.float-unit-btn.locked {
+  opacity: 0.52;
+  cursor: not-allowed;
+}
+.float-unit-name {
+  white-space: nowrap;
+  text-align: left;
+}
+.float-unit-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.float-unit-q {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--color-cyan);
+  background: rgba(0, 229, 255, 0.14);
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+.float-unit-cost {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--color-yellow);
+}
+.float-unit-lock {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--color-orange);
+  background: rgba(255, 154, 31, 0.14);
+  border: 1px solid rgba(255, 154, 31, 0.35);
+  border-radius: 4px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+
+body.is-mobile-touch #subGroupTowers .mobile-sub-btns {
+  gap: 5px;
+}
+body.is-mobile-touch #subGroupTowers .mobile-sub-item.tool-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 100px;
+  padding: 2px 2px;
 }

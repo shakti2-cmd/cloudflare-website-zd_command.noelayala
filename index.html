@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Zombie Defense Command - Tactical Grid Survival (v0.31.0)</title>
+  <title>Zombie Defense Command - Tactical Grid Survival (v0.32.0)</title>
 
   <!-- PWA & Mobile Web App Meta -->
   <meta name="theme-color" content="#07090d">
@@ -30,7 +30,7 @@
     <header id="topHud">
       <div class="hud-brand">
         <span class="hud-logo">&#9763;</span>
-        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.31.0</small></span>
+        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.32.0</small></span>
       </div>
 
       <div class="hud-stats">
@@ -133,7 +133,7 @@
         <div class="modal-card start-card">
           <div class="start-icon">&#9763;</div>
           <h1 class="start-title">ZOMBIE DEFENSE COMMAND</h1>
-          <div class="start-version-badge">v0.31.0</div>
+          <div class="start-version-badge">v0.32.0</div>
           <p class="start-subtitle">Expand green Safe Zones within 3 tiles of Red Spawn Breaches and deploy Commandos to destroy them (towers defend against zombies only).</p>
 
           <div id="startMainSection">
@@ -228,11 +228,11 @@
             <option value="tutorial">Tutorial: Basic Training</option>
           </select>
 
-          <div class="start-hint">v0.31.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; Settings</div>
+          <div class="start-hint">v0.32.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; Settings</div>
         </div>
       </div>
 
-      <!-- Settings Modal (v0.31.0) -->
+      <!-- Settings Modal (v0.32.0) -->
       <div id="settingsModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
         <div class="modal-card settings-card">
           <button id="btnCloseSettings" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
@@ -302,7 +302,7 @@
         </div>
       </div>
 
-      <!-- Developer Tuning Modal (v0.31.0: Live Multiplier Overrides) -->
+      <!-- Developer Tuning Modal (v0.32.0: Live Multiplier Overrides) -->
       <div id="developerModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="devTitle">
         <div class="modal-card dev-card">
           <button id="btnCloseDeveloper" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
@@ -386,15 +386,15 @@
       <div id="howToPlayModal" class="modal-overlay hidden">
         <div class="modal-card help-card">
           <button id="btnCloseHowToPlay" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.31.0)</h2>
+          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.32.0)</h2>
           <div class="help-grid">
             <section>
               <h3>Single 3&times;3 Start &amp; Line-Drag Barricades</h3>
               <p>Every map opens with a single <b>3&times;3 Safe Zone (+9% DMG)</b>. Expand <b>Safe Zones ($10, Key 7)</b> toward breaches; all other buildings &amp; towers build <b>only on Safe Zones</b>. <b>Only Engineers</b> can step over Safe-Zone structures &mdash; all other units route around structures and enter/exit hubs from adjacent tiles.</p>
             </section>
             <section>
-              <h3>Perimeter Commandos &amp; Breach Destruction</h3>
-              <p><b>Commandos</b> (<span class="c-cyan">150/210/280 HP, 24/34/46 dmg, 120/140/160px</span>) actively intercept zombies/breaches within <b>&le;3 tiles of Safe Zones</b>, gain <b class="c-green">+15% RoF</b> on Safe Zones, kite backward at &lt;120px, and are the <b class="c-red">ONLY unit able to destroy Spawn Breaches (1.25&times; dmg)</b>!</p>
+              <h3>Commandos, Lv3 Flamethrowers &amp; 4/8/10 Hubs</h3>
+              <p><b>Barracks</b> &amp; <b>Engineering</b> scale capacity to <b class="c-cyan">4 / 8 / 10 units</b> across Lv1&ndash;Lv3! <b>Commandos</b> destroy Breaches (<b>1.25&times; dmg</b>); <b>Barracks Lv3</b> unlocks the <b class="c-orange">Flamethrower ($100)</b> for AoE flame splash (<b>35%</b> dmg vs. Tank/Demolisher/Wrecker).</p>
             </section>
             <section>
               <h3>Bidirectional 10-Wave Scaling &amp; Supply Drops</h3>
@@ -402,11 +402,11 @@
             </section>
             <section>
               <h3>Engineer Upgrades (+20/+40/+70 HP/s) &amp; Queues</h3>
-              <p><b>Habitat ($110)</b> queues up to 20 Civilians. Upgrading <b>Engineering</b> scales linked Engineers to <b class="c-yellow">+20 / +40 / +70 HP/s</b> ($0 welding across Safe Zones &amp; Barricades). Randomized zombie paths fan across perimeter lanes.</p>
+              <p><b>Habitat ($110)</b> queues up to 20 Civilians. Upgrading <b>Engineering</b> scales linked Engineers to <b class="c-yellow">+20 / +40 / +70 HP/s</b> ($0 welding across Safe Zones &amp; Barricades) and <b>4 / 8 / 10</b> hub slots.</p>
             </section>
             <section>
-              <h3>Zombie-Only Towers &amp; 40% Sniper HEADSHOT</h3>
-              <p><b>Sentries</b>, <b>Cryo</b> (slows movement + <b>attack speed</b>) &amp; <b>Snipers</b> (<b class="c-violet">30% HEADSHOT</b>) target <b>zombies exclusively</b> &mdash; expand <b>$10 Safe Zones within 3 tiles of a Spawn Breach</b> so Commandos can assault it!</p>
+              <h3>Zombie-Only Towers &amp; Chain Tesla (35% Armor)</h3>
+              <p><b>Sentries</b>, <b>Cryo</b>, <b>Snipers</b> (<b class="c-violet">30% HEADSHOT</b>) &amp; <b class="c-cyan">Tesla Towers ($200, Key 3)</b> arcing lightning across <b>3 / 5 / 8</b> zombies (<b>35%</b> dmg vs. heavy armor) target <b>zombies exclusively</b> &mdash; use Commandos on Breaches!</p>
             </section>
             <section>
               <h3>Visual Spotlight Tutorial &amp; Controls</h3>
@@ -423,7 +423,7 @@
       <div id="zombieGuideModal" class="modal-overlay hidden">
         <div class="modal-card help-card zombie-guide-card">
           <button id="btnCloseZombieGuide" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.31.0)</h2>
+          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.32.0)</h2>
           <div id="bestiaryHardIndicator" class="bestiary-hard-indicator hidden">&#9888; HARD MODE ACTIVE: 3.0&times; ZOMBIE HP APPLIED</div>
           <p class="bestiary-note"><b class="c-orange">25% Random Brute-Breach Trait:</b> Any spawned Walker, Runner, Tank, or Wrecker has a 25% chance (100% on Demolisher) to smash straight toward Safe Zones, dealing a <b>fixed unscaled 12 damage</b> (<b>16 damage</b> for Demolishers) per strike against structures &amp; Safe Zones.</p>
           <div class="zombie-intel-list">
@@ -489,7 +489,7 @@
         </div>
       </div>
 
-      <!-- 4-Player Co-Op Multiplayer Modals (v0.31.0) -->
+      <!-- 4-Player Co-Op Multiplayer Modals (v0.32.0) -->
       <div id="mpRoleModal" class="modal-overlay hidden">
         <div class="modal-card mp-card">
           <h2 class="help-title mp-modal-title">&#127760; 4-PLAYER CO-OP MULTIPLAYER</h2>
@@ -621,7 +621,7 @@
         </div>
       </div>
 
-      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.31.0) -->
+      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.32.0) -->
       <div id="mpPauseModal" class="modal-overlay hidden">
         <div class="modal-card mp-card mp-pause-card">
           <h2 id="mpPauseTitle" class="help-title mp-modal-title">&#9208; MATCH PAUSED</h2>
@@ -682,6 +682,9 @@
             <button class="mobile-sub-item tool-btn" data-tool="sniper" title="Sniper $225">
               <span class="tool-icon">&#8982;</span><span class="tool-name">Sniper</span><span class="tool-cost">$225</span>
             </button>
+            <button class="mobile-sub-item tool-btn" data-tool="tesla" title="Tesla Tower $200">
+              <span class="tool-icon">&#9889;</span><span class="tool-name">Tesla</span><span class="tool-cost">$200</span>
+            </button>
           </div>
         </div>
       </div>
@@ -727,10 +730,10 @@
             <button id="toolGate" class="tool-btn" data-tool="gate" title="Security Gate $100: Friendly units &amp; Commandos pass freely while blocking zombies (only Engineers step over other Safe-Zone structures) (2)">
               <span class="tool-key">2</span><span class="tool-icon">&#9638;</span><span class="tool-name">Gate</span><span class="tool-cost">$100</span>
             </button>
-            <button id="toolBarracks" class="tool-btn" data-tool="barracks" title="Barracks $80: Safe Zone Only; trains Commandos (4-unit cap) &mdash; ONLY unit that destroys Red Spawn Breaches (1.25x dmg); intercepts &amp; kites within 3 tiles of Safe Zones (4)">
+            <button id="toolBarracks" class="tool-btn" data-tool="barracks" title="Barracks $80: Safe Zone Only; trains Commandos (4/8/10-unit cap by level) &amp; Lv3 unlocks AoE Flamethrower ($100) — ONLY units that destroy Red Spawn Breaches (1.25x dmg) (4)">
               <span class="tool-key">4</span><span class="tool-icon">&#9874;</span><span class="tool-name">Barracks</span><span class="tool-cost">$80</span>
             </button>
-            <button id="toolEngineering" class="tool-btn" data-tool="engineering" title="Engineering $90: Safe Zone Only; trains linked Engineers scaling +20 / +40 / +70 HP/s $0 repair (4-unit cap) (5)">
+            <button id="toolEngineering" class="tool-btn" data-tool="engineering" title="Engineering $90: Safe Zone Only; trains linked Engineers scaling +20 / +40 / +70 HP/s $0 repair (4/8/10-unit cap by level) (5)">
               <span class="tool-key">5</span><span class="tool-icon">&#9881;</span><span class="tool-name">Engineering</span><span class="tool-cost">$90</span>
             </button>
             <button id="toolHabitat" class="tool-btn" data-tool="habitat" title="Habitat $110 (Max 1/1): Safe Zone Only; queues up to 20 white-dot Civilians at $65 Scrap (6)">
@@ -754,10 +757,14 @@
             <button id="toolSniper" class="tool-btn" data-tool="sniper" title="Sniper $225: Safe Zone Only; targets Demolishers, Wreckers &amp; high-HP zombies with 30% HEADSHOT instakill (towers target zombies only) (0)">
               <span class="tool-key">0</span><span class="tool-icon">&#8982;</span><span class="tool-name">Sniper</span><span class="tool-cost">$225</span>
             </button>
+            <button id="toolTesla" class="tool-btn" data-tool="tesla" title="Tesla Tower $200: Safe Zone Only; chain-lightning turret hitting 3/5/8 zombies (35% vs. Tank/Demolisher/Wrecker) (3)">
+              <span class="tool-key">3</span><span class="tool-icon">&#9889;</span><span class="tool-name">Tesla</span><span class="tool-cost">$200</span>
+            </button>
           </div>
         </div>
       </div>
 
+      <div id="buildingUnitFloatMenu" class="building-unit-float hidden" role="region" aria-label="Unit Training Menu"></div>
       <div id="inspectorSlot">
         <div id="upgradePanel" class="deck-section hidden">
           <div class="inspector-head">
@@ -790,7 +797,7 @@
         </div>
 
         <div id="deckHint">
-          <span class="hint-text">v0.31.0 &bull; Towers target zombies only &bull; Expand $10 Safe Zones &le;3 tiles of a Breach so Commandos destroy it! &bull; Engineers +20/+40/+70 HP/s</span>
+          <span class="hint-text">v0.32.0 &bull; Hubs scale 4/8/10 &bull; Lv3 Barracks unlocks Flamethrower ($100) &bull; Tesla ($200) chains 3/5/8 targets &bull; Engineers +20/+40/+70 HP/s</span>
         </div>
       </div>
     </footer>

@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.31.0 (Developer Tuning Modal with 1.0x Centered Multipliers, Top Nav Mute Removal & Centered Main Menu)
+ * Version: v0.32.0 (4/8/10 Hub Scaling, Lv3 Flamethrower AoE, Bottom-Left Unit Picker, Chain Tesla Tower & Full-Width Mobile Framing)
  */
 
 (function () {
@@ -240,6 +240,18 @@
         { range: 400, rate: 1.0, dmg: 300, hp: 250, cost: 525, repairCost: 210, color: '#CC33FF' }
       ]
     },
+    tesla: {
+      name: 'Tesla Tower',
+      role: 'turret',
+      baseCost: 200,
+      requiresAdjacency: true,
+      armorMult: 0.35,
+      levels: [
+        { range: 130, rate: 0.85, dmg: 20, chainCount: 3, chainRange: 85, hp: 110, cost: 200, repairCost: 80, color: '#1E3A6E', border: '#38E8FF' },
+        { range: 165, rate: 0.75, dmg: 36, chainCount: 5, chainRange: 100, hp: 200, cost: 320, repairCost: 128, color: '#244A8F', border: '#00E5FF' },
+        { range: 200, rate: 0.65, dmg: 58, chainCount: 8, chainRange: 115, hp: 310, cost: 500, repairCost: 200, color: '#2B5BB8', border: '#80F5FF' }
+      ]
+    },
     barracks: {
       name: 'Barracks',
       role: 'barracks',
@@ -256,8 +268,8 @@
       fireDmg: 24,
       levels: [
         { hp: 200, cost: 80, repairCost: 32, capacity: 4, range: 120, color: '#4B3A1E', border: '#FFD23F' },
-        { hp: 360, cost: 140, repairCost: 56, capacity: 4, range: 140, color: '#634C22', border: '#FF9A1F' },
-        { hp: 580, cost: 240, repairCost: 96, capacity: 4, range: 160, color: '#7D6028', border: '#00E5FF' }
+        { hp: 360, cost: 140, repairCost: 56, capacity: 8, range: 140, color: '#634C22', border: '#FF9A1F' },
+        { hp: 580, cost: 240, repairCost: 96, capacity: 10, range: 160, color: '#7D6028', border: '#00E5FF' }
       ]
     },
     engineering: {
@@ -273,8 +285,8 @@
       healRate: 6,
       levels: [
         { hp: 200, cost: 90, repairCost: 36, capacity: 4, color: '#2E3D4F', border: '#00E5FF' },
-        { hp: 360, cost: 150, repairCost: 60, capacity: 4, color: '#274E6B', border: '#38E8FF' },
-        { hp: 580, cost: 250, repairCost: 100, capacity: 4, color: '#1F628A', border: '#FFD23F' }
+        { hp: 360, cost: 150, repairCost: 60, capacity: 8, color: '#274E6B', border: '#38E8FF' },
+        { hp: 580, cost: 250, repairCost: 100, capacity: 10, color: '#1F628A', border: '#FFD23F' }
       ]
     },
     habitat: {
@@ -316,6 +328,21 @@
     { level: 3, name: 'Spec-Ops Commando', maxHp: 280, range: 160, dmg: 23, rate: 0.30, speed: 90, color: '#FFD23F' }
   ];
 
+  const FLAMETHROWER_SPEC = {
+    level: 3,
+    unitKind: 'flamethrower',
+    name: 'Flamethrower',
+    maxHp: 170,
+    range: 105,
+    dmg: 24,
+    rate: 0.45,
+    speed: 80,
+    aoeRadius: 46,
+    armorMult: 0.35,
+    trainCost: 100,
+    color: '#FF6B1A'
+  };
+
   // --- AUTO-REPAIR ENGINEER SPECS (Trained in Engineering from Lv1 Recruits over 4.0s; upgrades linked to Engineering Lv1-Lv3) ---
   const ENGINEER_SPECS = [
     { level: 1, name: 'Engineer', maxHp: 70, speed: 70, repairRate: 20, upgradeCost: 0, color: '#FFB800' },
@@ -329,6 +356,7 @@
     sentry: '&#9881;',
     cryo: '&#10052;',
     sniper: '&#8982;',
+    tesla: '&#9889;',
     barracks: '&#9874;',
     engineering: '&#9881;',
     habitat: '&#8962;',
@@ -414,6 +442,15 @@
       this.tone(1100, 140, 0.16, 'square', 0.065);
       this.emitCue('sniper');
     }
+    playFlameBurst() {
+      this.tone(240, 110, 0.12, 'sawtooth', 0.05);
+      this.emitCue('flame');
+    }
+    playTeslaZap() {
+      this.tone(920, 480, 0.09, 'sawtooth', 0.055);
+      setTimeout(() => this.tone(1280, 740, 0.06, 'square', 0.04), 28);
+      this.emitCue('tesla');
+    }
     playHit() {
       this.tone(190, 95, 0.06, 'square', 0.05);
       this.emitCue('hit');
@@ -454,6 +491,10 @@
           this.playCryoPulse();
         } else if (cue.k === 'sniper') {
           this.playSniperRail();
+        } else if (cue.k === 'flame') {
+          this.playFlameBurst();
+        } else if (cue.k === 'tesla') {
+          this.playTeslaZap();
         } else if (cue.k === 'hit') {
           this.playHit();
         } else if (cue.k === 'break') {
@@ -1302,6 +1343,7 @@
       this.inspectStatKills = $('inspectStatKills');
 
       this.unitTrainSelect = $('unitTrainSelect');
+      this.buildingUnitFloatMenu = $('buildingUnitFloatMenu');
       this.btnTrainUnit = $('btnTrainUnit');
       this.trainCostLabel = $('trainCostLabel');
       this.btnCancelTrain = $('btnCancelTrain');
@@ -1906,6 +1948,12 @@
       }
 
       // Inspector buttons
+      on(this.buildingUnitFloatMenu, 'click', (e) => {
+        const btn = e.target ? e.target.closest('.float-unit-btn') : null;
+        if (!btn || btn.disabled) return;
+        const unitKind = btn.dataset.unitKind || null;
+        this.trainFromSelectedBuilding(this.selectedStructure, this.localPlayerId, unitKind);
+      });
       on(this.btnTrainUnit, 'click', () => this.trainFromSelectedBuilding(this.selectedStructure));
       on(this.btnCancelTrain, 'click', () => this.cancelLastQueuedTraining(this.selectedStructure));
       on(this.btnRelease, 'click', () => this.releaseGarrisonedUnits(this.selectedStructure));
@@ -2316,7 +2364,7 @@
 
       on(this.btnCamZoomIn, 'click', () => this.setCameraZoom(this.camera.zoom + 0.35));
       on(this.btnCamZoomOut, 'click', () => this.setCameraZoom(this.camera.zoom - 0.35));
-      on(this.btnCamReset, 'click', () => this.setCameraZoom(1.0));
+      on(this.btnCamReset, 'click', () => this.setCameraZoom(this.isMobileTouch ? this.getWidthFitZoom() : 1.0));
       on(this.btnCamFocusBase, 'click', () => this.focusCameraOnSafeZones(Math.max(1.6, this.camera.zoom)));
 
       const handleLayoutChange = () => {
@@ -2368,6 +2416,7 @@
         if (key === 'q') this.quickConscript();
         else if (key === '1') this.setBuildType('wall');
         else if (key === '2') this.setBuildType('gate');
+        else if (key === '3') this.setBuildType('tesla');
         else if (key === '4') this.setBuildType('barracks');
         else if (key === '5') this.setBuildType('engineering');
         else if (key === '6') this.setBuildType('habitat');
@@ -2422,12 +2471,15 @@
             this.canvas.height = targetH;
           }
         }
-        this.camera.maxZoom = Math.max(2.8, this.getCoverZoom() * 2.2);
+        const widthFit = this.getWidthFitZoom();
+        this.camera.minZoom = widthFit;
+        this.camera.maxZoom = Math.max(2.8, widthFit * 2.4);
       } else {
         if (this.canvas.width !== WIDTH || this.canvas.height !== HEIGHT) {
           this.canvas.width = WIDTH;
           this.canvas.height = HEIGHT;
         }
+        this.camera.minZoom = 1.0;
         this.camera.maxZoom = 2.8;
       }
       this.canvas.style.aspectRatio = this.isMobileTouch ? 'auto' : `${COLS} / ${ROWS}`;
@@ -2442,8 +2494,10 @@
         const forceLandscape = document.body && document.body.classList.contains('force-landscape');
         const effW = forceLandscape && vh > vw ? vh : forcePortrait && vw > vh ? vh : vw;
         const effH = forceLandscape && vh > vw ? vw : forcePortrait && vw > vh ? vw : vh;
-        if (effH > effW) return { cols: 18, rows: 32 };
-        if (this.isMobileTouch && effW / effH >= 1.65) return { cols: 36, rows: 18 };
+        const chromeH = this.isMobileTouch ? (effH > effW ? 156 : 110) : 168;
+        const playableH = Math.max(200, effH - chromeH);
+        if (playableH > effW) return { cols: 18, rows: 32 };
+        if (this.isMobileTouch && effW / playableH >= 1.65) return { cols: 36, rows: 18 };
         return { cols: 32, rows: 24 };
       }
       return MAP_SIZE_PRESETS[key] || { cols: 32, rows: 24 };
@@ -2560,6 +2614,12 @@
       return fit > 0 ? cover / fit : 1;
     }
 
+    getWidthFitZoom() {
+      const cw = this.canvas ? this.canvas.width : WIDTH;
+      const fit = this.getFitScale();
+      return fit > 0 ? Math.max(1.0, (cw / WIDTH) / fit) : 1.0;
+    }
+
     getCameraScale() {
       return this.getFitScale() * this.camera.zoom;
     }
@@ -2609,8 +2669,8 @@
       this.camera.zoom = Math.max(this.camera.minZoom, Math.min(this.camera.maxZoom, this.camera.zoom));
       const cw = this.canvas ? this.canvas.width : WIDTH;
       const ch = this.canvas ? this.canvas.height : HEIGHT;
-      if (this.camera.zoom <= 1.001) {
-        this.camera.zoom = 1;
+      if (this.camera.zoom <= this.camera.minZoom + 0.001) {
+        this.camera.zoom = this.camera.minZoom;
       }
       const s = this.getCameraScale();
       const worldW = WIDTH * s;
@@ -3029,6 +3089,9 @@
       this.zombieSpeedMult = preset.zombieSpeedMult;
       this.infectionWindow = preset.infectionWindow;
 
+      hideEl(this.startScreenOverlay);
+      if (document.body) document.body.classList.remove('in-start-menu');
+
       const rawLvl = this.startMenuMode === 'random'
         ? 'random'
         : this.startMenuMode === 'post_defense'
@@ -3048,8 +3111,10 @@
         this.initLevel(startLvl);
       }
 
-      hideEl(this.startScreenOverlay);
-      if (document.body) document.body.classList.remove('in-start-menu');
+      if (this.isMobileTouch) {
+        this.syncCanvasViewportSize();
+        this.focusCameraOnSafeZones(this.getWidthFitZoom());
+      }
       this.waveState = STATE.PREPARE;
       this.updateHUD();
       this.updateTimerHud();
@@ -3280,10 +3345,7 @@
       this.updateTimerHud();
       if (this.isMobileTouch) {
         this.syncCanvasViewportSize();
-        const startZoom = this.mapSizePreset === 'auto'
-          ? Math.max(1.0, this.getCoverZoom())
-          : Math.min(this.camera.maxZoom, Math.max(1.45, this.getCoverZoom()));
-        this.focusCameraOnSafeZones(startZoom);
+        this.focusCameraOnSafeZones(this.getWidthFitZoom());
       } else {
         this.setCameraZoom(1.0);
       }
@@ -3904,6 +3966,16 @@
       this.zombieSpeedMult = preset.zombieSpeedMult;
       this.infectionWindow = preset.infectionWindow;
 
+      if (document.body) {
+        document.body.classList.remove('in-start-menu');
+        document.body.classList.add('is-multiplayer');
+      }
+      hideEl(this.startScreenOverlay);
+      hideEl(this.mpRoleModal);
+      hideEl(this.mpPauseModal);
+      hideEl(this.mpHostDisconnectedModal);
+      hideEl(this.gameOverOverlay);
+
       if (config.cols && config.rows) {
         this.setMapDimensions(config.cols, config.rows);
       } else if (this.isMpHost) {
@@ -3922,16 +3994,6 @@
       if (this.btnSpeed) this.btnSpeed.innerText = 'Speed: 1x';
       this.mpPauseActive = false;
       this.isPaused = false;
-
-      if (document.body) {
-        document.body.classList.remove('in-start-menu');
-        document.body.classList.add('is-multiplayer');
-      }
-      hideEl(this.startScreenOverlay);
-      hideEl(this.mpRoleModal);
-      hideEl(this.mpPauseModal);
-      hideEl(this.mpHostDisconnectedModal);
-      hideEl(this.gameOverOverlay);
 
       this.playerWallets = {};
       for (const p of this.mpPlayers) {
@@ -4132,15 +4194,13 @@
       if (this.isMobileTouch) {
         this.syncCanvasViewportSize();
         const myZones = Array.from(this.safeZones.values()).filter((sz) => sz.ownerId === this.localPlayerId);
+        const startZoom = this.getWidthFitZoom();
         if (myZones.length > 0) {
           const avgX = myZones.reduce((sum, sz) => sum + sz.x, 0) / myZones.length;
           const avgY = myZones.reduce((sum, sz) => sum + sz.y, 0) / myZones.length;
-          const startZoom = this.mapSizePreset === 'auto'
-            ? Math.max(1.0, this.getCoverZoom())
-            : Math.min(this.camera.maxZoom, Math.max(1.45, this.getCoverZoom()));
           this.centerCameraOnWorld(avgX, avgY, startZoom);
         } else {
-          this.focusCameraOnSafeZones(1.45);
+          this.focusCameraOnSafeZones(startZoom);
         }
       } else {
         this.setCameraZoom(1.0);
@@ -4236,7 +4296,7 @@
         }
         case 'train': {
           const st = this.structures.get(action.key);
-          if (st) this.trainFromSelectedBuilding(st, senderId);
+          if (st) this.trainFromSelectedBuilding(st, senderId, action.unitKind || null);
           break;
         }
         case 'release': {
@@ -4359,6 +4419,7 @@
           spawnedCivs: st.spawnedCivs || 0,
           occCount: st.occupants ? st.occupants.length : 0,
           qLen: st.trainQueue ? st.trainQueue.length : 0,
+          qKinds: st.type === 'barracks' && st.trainQueue ? st.trainQueue.map((o) => o.unitKind || 'commando') : undefined,
           activeT: st.activeTrainers ? st.activeTrainers.length : 0,
           ownerId: st.ownerId || null, ownerSlot: st.ownerSlot || 0, ownerColor: st.ownerColor || null, ownerName: st.ownerName || null
         });
@@ -4403,6 +4464,7 @@
         })),
         soldiers: this.soldiers.map((s) => ({
           id: s.id, level: s.level, isCommando: !!s.isCommando,
+          unitKind: s.unitKind || (s.isCommando ? 'commando' : 'soldier'),
           x: Math.round(s.x * 10) / 10, y: Math.round(s.y * 10) / 10,
           vx: Math.round((s.vx || 0) * 10) / 10, vy: Math.round((s.vy || 0) * 10) / 10,
           hp: s.hp, maxHp: s.maxHp,
@@ -4434,6 +4496,7 @@
           y1: p.y1 !== undefined ? Math.round(p.y1 * 10) / 10 : undefined,
           x2: p.x2 !== undefined ? Math.round(p.x2 * 10) / 10 : undefined,
           y2: p.y2 !== undefined ? Math.round(p.y2 * 10) / 10 : undefined,
+          points: Array.isArray(p.points) ? p.points.map((pt) => ({ x: Math.round(pt.x * 10) / 10, y: Math.round(pt.y * 10) / 10 })) : undefined,
           x: p.x !== undefined ? Math.round(p.x * 10) / 10 : undefined,
           y: p.y !== undefined ? Math.round(p.y * 10) / 10 : undefined,
           vx: p.vx !== undefined ? Math.round(p.vx * 10) / 10 : undefined,
@@ -4529,7 +4592,7 @@
           cooldown: 0,
           flash: 0,
           occupants: new Array(st.occCount || 0).fill(0).map(() => ({ isCommando: false, unitType: 'recruit', hp: 100, maxHp: 100 })),
-          trainQueue: new Array(st.qLen || 0).fill(0).map(() => ({ cost: 50, started: true })),
+          trainQueue: new Array(st.qLen || 0).fill(0).map((_, qIdx) => ({ cost: 50, started: true, unitKind: Array.isArray(st.qKinds) ? (st.qKinds[qIdx] || 'commando') : 'commando' })),
           activeTrainers: new Array(st.activeT || 0).fill(0).map(() => ({ timer: st.trainTimer || 0 }))
         });
       }
@@ -4676,6 +4739,7 @@
           s.maxHp = ss.maxHp;
           s.level = ss.level;
           s.isCommando = !!ss.isCommando;
+          s.unitKind = ss.unitKind || (ss.isCommando ? 'commando' : 'soldier');
           s.range = ss.range;
           s.dmg = ss.dmg;
           s.rate = ss.rate;
@@ -4805,15 +4869,19 @@
             this.mpSeenProjIds.delete(firstKey);
           }
         }
-        const minLife = sp.type === 'bullet' ? 0.09 : (sp.type === 'railBeam' ? 0.16 : 0.2);
+        const minLife = sp.type === 'bullet' ? 0.09 : (sp.type === 'railBeam' || sp.type === 'lightningArc' ? 0.16 : 0.2);
         this.projectiles.push({
           ...sp,
           life: Math.max(sp.life || minLife, minLife),
           maxLife: Math.max(sp.maxLife || minLife, minLife)
         });
-        if (sp.x2 !== undefined && sp.y2 !== undefined) {
-          const count = sp.type === 'railBeam' ? 8 : 3;
-          const speed = sp.type === 'railBeam' ? 65 : 35;
+        if (sp.type === 'lightningArc' && Array.isArray(sp.points)) {
+          for (let pi = 1; pi < sp.points.length; pi++) {
+            this.addParticles(sp.points[pi].x, sp.points[pi].y, '#5CEEFF', 4, 42);
+          }
+        } else if (sp.x2 !== undefined && sp.y2 !== undefined) {
+          const count = sp.type === 'railBeam' ? 8 : (sp.type === 'flameCone' ? 6 : 3);
+          const speed = sp.type === 'railBeam' ? 65 : (sp.type === 'flameCone' ? 44 : 35);
           this.addParticles(sp.x2, sp.y2, sp.color || '#FFD23F', count, speed);
         }
       }
@@ -5313,10 +5381,7 @@
       }
       if (this.isMobileTouch) {
         this.syncCanvasViewportSize();
-        const startZoom = this.mapSizePreset === 'auto'
-          ? Math.max(1.0, this.getCoverZoom())
-          : Math.min(this.camera.maxZoom, Math.max(1.45, this.getCoverZoom()));
-        this.focusCameraOnSafeZones(startZoom);
+        this.focusCameraOnSafeZones(this.getWidthFitZoom());
       } else {
         this.setCameraZoom(1.0);
       }
@@ -5329,9 +5394,13 @@
       this.zombieHpMult = preset.zombieHpMult;
       this.zombieSpeedMult = preset.zombieSpeedMult;
       this.infectionWindow = preset.infectionWindow;
-      this.initLevel('tutorial');
       hideEl(this.startScreenOverlay);
       if (document.body) document.body.classList.remove('in-start-menu');
+      this.initLevel('tutorial');
+      if (this.isMobileTouch) {
+        this.syncCanvasViewportSize();
+        this.focusCameraOnSafeZones(this.getWidthFitZoom());
+      }
       this.waveState = STATE.PREPARE;
       this.updateTutorial();
       this.updateHUD();
@@ -5533,7 +5602,7 @@
           body: hasHabitat
             ? 'Click <b>Recruit Civilian ($65)</b> inside your selected <b>Habitat</b>.'
             : 'Place <b>Habitat ($110, Key 6)</b> on the highlighted green tile.',
-          pulse: hasHabitat ? (habSelected ? 'btnTrainUnit' : null) : 'toolHabitat',
+          pulse: hasHabitat ? (habSelected ? 'buildingUnitFloatMenu' : null) : 'toolHabitat',
           arrowLabel: hasHabitat ? 'RECRUIT' : 'KEY 6',
           tiles: hasHabitat ? [[hab.col, hab.row]] : [[15, 10]],
           tileLabel: hasHabitat ? (habSelected ? 'HABITAT READY' : 'CLICK HABITAT') : 'PLACE HABITAT'
@@ -5546,7 +5615,7 @@
           body: hasEng
             ? 'Click <b>Train Engineer ($50)</b> for automatic $0 base welding.'
             : 'Place <b>Engineering ($90, Key 5)</b> on the highlighted green tile.',
-          pulse: hasEng ? (engSelected ? 'btnTrainUnit' : null) : 'toolEngineering',
+          pulse: hasEng ? (engSelected ? 'buildingUnitFloatMenu' : null) : 'toolEngineering',
           arrowLabel: hasEng ? 'TRAIN ENG' : 'KEY 5',
           tiles: hasEng ? [[engHub.col, engHub.row]] : [[15, 11]],
           tileLabel: hasEng ? (engSelected ? 'ENGINEERING' : 'CLICK HUB') : 'PLACE ENGINEERING'
@@ -5559,7 +5628,7 @@
           body: hasBar
             ? 'Click <b>Train Commando ($75)</b> \u2014 only Commandos destroy Breaches!'
             : 'Place <b>Barracks ($80, Key 4)</b> on the highlighted green tile.',
-          pulse: hasBar ? (barSelected ? 'btnTrainUnit' : null) : 'toolBarracks',
+          pulse: hasBar ? (barSelected ? 'buildingUnitFloatMenu' : null) : 'toolBarracks',
           arrowLabel: hasBar ? 'TRAIN CMD' : 'KEY 4',
           tiles: hasBar ? [[barHub.col, barHub.row]] : [[15, 12]],
           tileLabel: hasBar ? (barSelected ? 'BARRACKS' : 'CLICK BARRACKS') : 'PLACE BARRACKS'
@@ -6524,7 +6593,7 @@
           if (this.tabBuildings) {
             this.tabBuildings.classList.toggle('active', this.activeMobileCategory === 'buildings' || isBuildingActive);
           }
-          const isTowerActive = this.selectedBuildType === 'sentry' || this.selectedBuildType === 'cryo' || this.selectedBuildType === 'sniper';
+          const isTowerActive = this.selectedBuildType === 'sentry' || this.selectedBuildType === 'cryo' || this.selectedBuildType === 'sniper' || this.selectedBuildType === 'tesla';
           if (this.tabTowers) {
             this.tabTowers.classList.toggle('active', this.activeMobileCategory === 'towers' || isTowerActive);
           }
@@ -6561,6 +6630,10 @@
       if (this.tabSafeZone) {
         const szSpec = STRUCTURE_SPECS.safezone;
         this.tabSafeZone.classList.toggle('unaffordable', !!szSpec && this.scrap < szSpec.baseCost);
+      }
+      if (this.selectedStructure && (this.selectedStructure.type === 'barracks' || this.selectedStructure.type === 'engineering' || this.selectedStructure.type === 'habitat')) {
+        const isAllyReadOnly = !!(this.isMultiplayer && this.selectedStructure.ownerId && this.selectedStructure.ownerId !== this.localPlayerId);
+        this.renderBuildingUnitFloatMenu(this.selectedStructure, isAllyReadOnly);
       }
     }
 
@@ -7484,12 +7557,47 @@
       this.commandUnitMove(civ, targetCol, targetRow, 'Civilian', false);
     }
 
-    createCommando(x, y, baseSoldier = null, level = 1, homeHubId = null) {
+    createCommando(x, y, baseSoldier = null, level = 1, homeHubId = null, unitKind = 'commando') {
+      if (unitKind === 'flamethrower') {
+        return {
+          id: baseSoldier ? baseSoldier.id : Math.random().toString(36).slice(2, 11),
+          level: FLAMETHROWER_SPEC.level,
+          unitKind: 'flamethrower',
+          name: FLAMETHROWER_SPEC.name,
+          homeHubId,
+          isCommando: true,
+          x,
+          y,
+          radius: 8,
+          speed: FLAMETHROWER_SPEC.speed,
+          hp: FLAMETHROWER_SPEC.maxHp,
+          maxHp: FLAMETHROWER_SPEC.maxHp,
+          range: FLAMETHROWER_SPEC.range,
+          dmg: FLAMETHROWER_SPEC.dmg,
+          rate: FLAMETHROWER_SPEC.rate,
+          aoeRadius: FLAMETHROWER_SPEC.aoeRadius,
+          armorMult: FLAMETHROWER_SPEC.armorMult,
+          color: FLAMETHROWER_SPEC.color,
+          cooldown: 0,
+          kills: baseSoldier ? (baseSoldier.kills || 0) : 0,
+          angle: -Math.PI / 2,
+          path: [],
+          dest: null,
+          targetBunker: null,
+          targetBarracks: null,
+          targetEngineering: null,
+          manualOrder: false,
+          manualMoveOrder: false,
+          reenterCooldown: 1.8,
+          aiTimer: 0.2
+        };
+      }
       const idx = Math.max(0, Math.min(COMMANDO_SPECS.length - 1, (level || 1) - 1));
       const spec = COMMANDO_SPECS[idx];
       return {
         id: baseSoldier ? baseSoldier.id : Math.random().toString(36).slice(2, 11),
         level: spec.level,
+        unitKind: 'commando',
         name: spec.name,
         homeHubId,
         isCommando: true,
@@ -7516,6 +7624,13 @@
         reenterCooldown: 1.8,
         aiTimer: 0.2
       };
+    }
+
+    getHubCapacity(struct) {
+      if (!struct) return 4;
+      const spec = STRUCTURE_SPECS[struct.type];
+      const idx = Math.max(0, Math.min((spec?.levels?.length || 1) - 1, (struct.level || 1) - 1));
+      return (spec?.levels?.[idx]?.capacity) || struct.capacity || 4;
     }
 
     getHubRosterCount(hub) {
@@ -7555,7 +7670,7 @@
       if (hub.type === 'barracks') {
         const spec = COMMANDO_SPECS[lvl - 1];
         const apply = (u) => {
-          if (u && u.hp > 0 && u.isCommando && u.homeHubId === hub.id) {
+          if (u && u.hp > 0 && u.isCommando && u.unitKind !== 'flamethrower' && u.homeHubId === hub.id) {
             u.level = spec.level;
             u.name = spec.name;
             u.maxHp = spec.maxHp;
@@ -7610,7 +7725,7 @@
       if (!hub.occupants) hub.occupants = [];
       if (hub.trainQueue.length === 0) return;
 
-      const cap = hub.capacity || 4;
+      const cap = this.getHubCapacity(hub);
       const dur = STRUCTURE_SPECS[hub.type].trainDuration || 4.0;
 
       // Clear stale recruit assignments if recruit died or was reassigned
@@ -7639,7 +7754,7 @@
             dispatched.path = [];
           }
         }
-        hub.activeTrainers.push({ id: order.id, unit: recruit, timer: dur, duration: dur, cost: order.cost });
+        hub.activeTrainers.push({ id: order.id, unit: recruit, unitKind: order.unitKind || 'commando', timer: dur, duration: dur, cost: order.cost });
       }
       hub.trainTimer = hub.activeTrainers.length > 0 ? Math.min(...hub.activeTrainers.map((t) => t.timer)) : 0;
 
@@ -7732,10 +7847,10 @@
         this.sound.playHit();
         return;
       }
-      const cap = barracks.capacity || 4;
+      const cap = this.getHubCapacity(barracks);
       const activeT = barracks.activeTrainers ? barracks.activeTrainers.length : 0;
       if (barracks.occupants.length + activeT >= cap) {
-        this.showStatus('Barracks is at full capacity (4/4)!');
+        this.showStatus(`Barracks is at full capacity (${cap}/${cap})!`);
         this.addFloatingText('Barracks Full!', barracks.x, barracks.y - 12, '#FF9A1F');
         this.sound.playHit();
         return;
@@ -7792,7 +7907,7 @@
       }
 
       if (!barracks) return false;
-      const cap = barracks.capacity || 4;
+      const cap = this.getHubCapacity(barracks);
       if (!barracks.activeTrainers) barracks.activeTrainers = [];
       if (!barracks.trainQueue) barracks.trainQueue = [];
 
@@ -7821,7 +7936,8 @@
         soldier.x = barracks.x;
         soldier.y = barracks.y;
         const dur = STRUCTURE_SPECS.barracks.trainDuration || 4.0;
-        barracks.activeTrainers.push({ id: order.id, unit: soldier, timer: dur, duration: dur, cost: order.cost });
+        const unitKind = order.unitKind || 'commando';
+        barracks.activeTrainers.push({ id: order.id, unit: soldier, unitKind, timer: dur, duration: dur, cost: order.cost });
         barracks.trainTimer = Math.min(...barracks.activeTrainers.map((t) => t.timer));
 
         if (this.selectedSoldier === soldier) {
@@ -7831,7 +7947,7 @@
           this.renderUpgradePanel(barracks);
         }
         this.sound.playClick();
-        this.addFloatingText('Training Commando (4.0s)...', barracks.x, barracks.y - 12, '#00E5FF');
+        this.addFloatingText(`Training ${unitKind === 'flamethrower' ? 'Flamethrower' : 'Commando'} (4.0s)...`, barracks.x, barracks.y - 12, unitKind === 'flamethrower' ? '#FF6B1A' : '#00E5FF');
         this.updateHUD();
         return true;
       }
@@ -7877,10 +7993,10 @@
         this.sound.playHit();
         return;
       }
-      const cap = engBuilding.capacity || 4;
+      const cap = this.getHubCapacity(engBuilding);
       const activeT = engBuilding.activeTrainers ? engBuilding.activeTrainers.length : 0;
       if (engBuilding.occupants.length + activeT >= cap) {
-        this.showStatus('Engineering is at full capacity (4/4)!');
+        this.showStatus(`Engineering is at full capacity (${cap}/${cap})!`);
         this.addFloatingText('Engineering Full!', engBuilding.x, engBuilding.y - 12, '#FF9A1F');
         this.sound.playHit();
         return;
@@ -7932,7 +8048,7 @@
       }
 
       if (!engBld) return false;
-      const cap = engBld.capacity || 4;
+      const cap = this.getHubCapacity(engBld);
       if (!engBld.activeTrainers) engBld.activeTrainers = [];
       if (!engBld.trainQueue) engBld.trainQueue = [];
 
@@ -8009,9 +8125,9 @@
 
     commandEngineerToEngineering(eng, engBuilding) {
       if (!engBuilding || engBuilding.type !== 'engineering' || !eng) return;
-      const cap = engBuilding.capacity || 4;
+      const cap = this.getHubCapacity(engBuilding);
       if (engBuilding.occupants.length >= cap) {
-        this.showStatus('Engineering is at full capacity (4/4)!');
+        this.showStatus(`Engineering is at full capacity (${cap}/${cap})!`);
         this.sound.playHit();
         return;
       }
@@ -8056,7 +8172,7 @@
       }
 
       if (!engBld) return false;
-      const cap = engBld.capacity || 4;
+      const cap = this.getHubCapacity(engBld);
       if (engBld.occupants.length >= cap) {
         eng.targetEngineering = null;
         return false;
@@ -8124,7 +8240,7 @@
       return { x: struct.x, y: struct.y };
     }
 
-    trainFromSelectedBuilding(struct, actorId = null) {
+    trainFromSelectedBuilding(struct, actorId = null, unitKind = null) {
       if (!this.inPlay || !struct) return;
       const effActor = this.getEffectiveActorId(actorId);
       if (this.isMultiplayer && struct.ownerId && effActor && struct.ownerId !== effActor) {
@@ -8133,10 +8249,10 @@
         return;
       }
       if (this.isMultiplayer && !this.isMpHost) {
-        if (this.mp) this.mp.sendAction({ kind: 'train', key: `${struct.col},${struct.row}` });
+        if (this.mp) this.mp.sendAction({ kind: 'train', key: `${struct.col},${struct.row}`, unitKind: unitKind || undefined });
         return;
       }
-      if (struct.type === 'barracks') this.trainUnitFromBarracks(struct, effActor);
+      if (struct.type === 'barracks') this.trainUnitFromBarracks(struct, effActor, unitKind || 'commando');
       else if (struct.type === 'engineering') this.trainUnitFromEngineering(struct, effActor);
       else if (struct.type === 'habitat') this.trainUnitFromHabitat(struct, effActor);
     }
@@ -8145,28 +8261,36 @@
       return !!(struct && struct.occupants && struct.occupants.some((u) => !u.isCommando && u.unitType !== 'engineer'));
     }
 
-    trainUnitFromBarracks(barracks, actorId = null) {
+    trainUnitFromBarracks(barracks, actorId = null, unitKind = 'commando') {
       if (!this.inPlay || !barracks || barracks.type !== 'barracks') return;
       const effActor = this.getEffectiveActorId(actorId || barracks.ownerId);
+      const reqKind = unitKind === 'flamethrower' ? 'flamethrower' : 'commando';
+      if (reqKind === 'flamethrower' && (barracks.level || 1) < 3) {
+        this.showStatus('Flamethrower requires Barracks Lv3!');
+        this.addFloatingText('Requires Lv3!', barracks.x, barracks.y - 12, '#FF9A1F');
+        this.sound.playHit();
+        return;
+      }
       if (!barracks.trainQueue) barracks.trainQueue = [];
       if (!barracks.activeTrainers) barracks.activeTrainers = [];
-      const maxRoster = STRUCTURE_SPECS.barracks.maxRoster || 4;
+      const maxRoster = this.getHubCapacity(barracks);
       const committed = this.getHubRosterCount(barracks) + barracks.activeTrainers.length + barracks.trainQueue.length;
       if (committed >= maxRoster) {
-        this.showStatus(`Barracks roster cap reached (${maxRoster}/${maxRoster} living/training)! Build another Barracks.`);
-        this.addFloatingText('Roster Full (4/4)!', barracks.x, barracks.y - 12, '#FF9A1F');
+        this.showStatus(`Barracks roster cap reached (${maxRoster}/${maxRoster} living/training)! Upgrade or build another Barracks.`);
+        this.addFloatingText(`Roster Full (${maxRoster}/${maxRoster})!`, barracks.x, barracks.y - 12, '#FF9A1F');
         this.sound.playHit();
         return;
       }
-      if (this.getTotalQueuedTrainOrders() >= 10) {
-        this.showStatus('Global training queue is full (10 orders max)! Wait for dispatched Recruits to arrive.');
-        this.addFloatingText('Queue Full (10 max)!', barracks.x, barracks.y - 12, '#FF9A1F');
+      if (this.getTotalQueuedTrainOrders() >= 20) {
+        this.showStatus('Global training queue is full (20 orders max)! Wait for dispatched Recruits to arrive.');
+        this.addFloatingText('Queue Full (20 max)!', barracks.x, barracks.y - 12, '#FF9A1F');
         this.sound.playHit();
         return;
       }
-      const trainCost = STRUCTURE_SPECS.barracks.trainCost || 75;
+      const trainCost = reqKind === 'flamethrower' ? (FLAMETHROWER_SPEC.trainCost || 100) : (STRUCTURE_SPECS.barracks.trainCost || 75);
+      const unitLabel = reqKind === 'flamethrower' ? 'Flamethrower' : 'Commando';
       if (!this.spendPlayerScrap(effActor, trainCost)) {
-        this.showStatus(`Insufficient Scrap: training a Commando requires $${trainCost}.`);
+        this.showStatus(`Insufficient Scrap: training a ${unitLabel} requires $${trainCost}.`);
         this.addFloatingText('Insufficient Scrap', barracks.x, barracks.y - 12, '#FF3333');
         this.sound.playHit();
         return;
@@ -8174,6 +8298,7 @@
 
       barracks.trainQueue.push({
         id: Math.random().toString(36).slice(2, 11),
+        unitKind: reqKind,
         cost: trainCost,
         assignedRecruitId: null
       });
@@ -8181,13 +8306,14 @@
 
       const runningNow = barracks.activeTrainers.length;
       const waitingNow = barracks.trainQueue.length;
+      const cueColor = reqKind === 'flamethrower' ? '#FF6B1A' : '#00E5FF';
       this.sound.playClick();
-      this.addFloatingText(runningNow > 0 ? 'Training Commando (4.0s)...' : 'Queued Commando!', barracks.x, barracks.y - 14, '#00E5FF');
-      this.addParticles(barracks.x, barracks.y, '#00E5FF', 10, 42);
+      this.addFloatingText(runningNow > 0 ? `Training ${unitLabel} (4.0s)...` : `Queued ${unitLabel}!`, barracks.x, barracks.y - 14, cueColor);
+      this.addParticles(barracks.x, barracks.y, cueColor, 10, 42);
       this.showStatus(
         runningNow > 0
-          ? `Barracks training ${runningNow} Commando(s) (${waitingNow} queued / auto-dispatching Recruit).`
-          : `Commando order queued (${waitingNow} pending) — auto-dispatching closest Lv1 Recruit.`
+          ? `Barracks training ${runningNow} unit(s) (${waitingNow} queued / auto-dispatching Recruit).`
+          : `${unitLabel} order queued (${waitingNow} pending) — auto-dispatching closest Lv1 Recruit.`
       );
       this.updateHUD();
       if (this.selectedStructure === barracks) this.renderUpgradePanel(barracks);
@@ -8209,7 +8335,8 @@
 
       this.score += 200;
       const exitPos = this.findSafeExitPos(barracks, false, false, true);
-      const commando = this.createCommando(exitPos.x, exitPos.y, recruit, barracks.level || 1, barracks.id);
+      const unitKind = (trainer && trainer.unitKind) || 'commando';
+      const commando = this.createCommando(exitPos.x, exitPos.y, recruit, barracks.level || 1, barracks.id, unitKind);
       commando.ownerId = barracks.ownerId || recruit.ownerId || null;
       this.soldiers.push(commando);
       barracks.trainTimer = barracks.activeTrainers && barracks.activeTrainers.length > 0
@@ -8229,17 +8356,17 @@
       const effActor = this.getEffectiveActorId(actorId || engBld.ownerId);
       if (!engBld.trainQueue) engBld.trainQueue = [];
       if (!engBld.activeTrainers) engBld.activeTrainers = [];
-      const maxRoster = STRUCTURE_SPECS.engineering.maxRoster || 4;
+      const maxRoster = this.getHubCapacity(engBld);
       const committed = this.getHubRosterCount(engBld) + engBld.activeTrainers.length + engBld.trainQueue.length;
       if (committed >= maxRoster) {
-        this.showStatus(`Engineering roster cap reached (${maxRoster}/${maxRoster} living/training)! Build another Engineering hub.`);
-        this.addFloatingText('Roster Full (4/4)!', engBld.x, engBld.y - 12, '#FF9A1F');
+        this.showStatus(`Engineering roster cap reached (${maxRoster}/${maxRoster} living/training)! Upgrade or build another Engineering hub.`);
+        this.addFloatingText(`Roster Full (${maxRoster}/${maxRoster})!`, engBld.x, engBld.y - 12, '#FF9A1F');
         this.sound.playHit();
         return;
       }
-      if (this.getTotalQueuedTrainOrders() >= 10) {
-        this.showStatus('Global training queue is full (10 orders max)! Wait for dispatched Recruits to arrive.');
-        this.addFloatingText('Queue Full (10 max)!', engBld.x, engBld.y - 12, '#FF9A1F');
+      if (this.getTotalQueuedTrainOrders() >= 20) {
+        this.showStatus('Global training queue is full (20 orders max)! Wait for dispatched Recruits to arrive.');
+        this.addFloatingText('Queue Full (20 max)!', engBld.x, engBld.y - 12, '#FF9A1F');
         this.sound.playHit();
         return;
       }
@@ -8754,7 +8881,7 @@
         const spec = STRUCTURE_SPECS[struct.type];
         const cur = spec && spec.levels ? spec.levels[Math.min(struct.level - 1, spec.levels.length - 1)] : null;
         const label = (cur && cur.name) || (spec && spec.name) || struct.type;
-        const isTurret = struct.type === 'sentry' || struct.type === 'cryo' || struct.type === 'sniper';
+        const isTurret = struct.type === 'sentry' || struct.type === 'cryo' || struct.type === 'sniper' || struct.type === 'tesla';
         const killsTxt = (isTurret && struct.kills !== undefined) ? ` • Kills: ${struct.kills}` : '';
         this.showStatus(
           `Ally ${label} Lv${struct.level} (Owner: ${struct.ownerName || 'Ally'}) — HP ${Math.ceil(struct.hp)}/${struct.maxHp}${killsTxt} [View-Only]`
@@ -8810,20 +8937,20 @@
 
       if (struct.type === 'barracks') {
         const occ = struct.occupants ? struct.occupants.length : 0;
-        const cap = struct.capacity || 4;
-        const maxRoster = spec.maxRoster || 4;
-        const trainCost = spec.trainCost || 75;
+        const cap = this.getHubCapacity(struct);
+        const maxRoster = cap;
         const activeTrainers = struct.activeTrainers || [];
         const trainQueue = struct.trainQueue || [];
         const rosterCount = this.getHubRosterCount(struct);
-        const committed = rosterCount + activeTrainers.length + trainQueue.length;
         const minTimer = activeTrainers.length > 0 ? Math.min(...activeTrainers.map((t) => t.timer)) : 0;
         const cSpec = COMMANDO_SPECS[Math.max(0, Math.min(2, (struct.level || 1) - 1))];
         if (this.inspectStatRange) {
           this.inspectStatRange.innerText = `Roster: ${rosterCount}/${maxRoster} • Active: ${activeTrainers.length} • Q: ${trainQueue.length}`;
         }
         if (this.inspectStatDmg) {
-          this.inspectStatDmg.innerText = `${cSpec.name}: ${cSpec.dmg}dmg (${cSpec.range}px)`;
+          this.inspectStatDmg.innerText = (struct.level || 1) >= 3
+            ? `${cSpec.name} (${cSpec.dmg}dmg) | Flame Lv3 ($100)`
+            : `${cSpec.name}: ${cSpec.dmg}dmg (${cSpec.range}px)`;
         }
         if (this.inspectStatKills) {
           this.inspectStatKills.innerText = activeTrainers.length > 0
@@ -8832,34 +8959,22 @@
             ? `Dispatching Recruit (${trainQueue.length} Q)`
             : `Kills: ${struct.kills || 0} (Auto-Dispatch)`;
         }
-        if (this.unitTrainSelect) {
-          this.unitTrainSelect.innerHTML = `<option value="commando" selected>${cSpec.name} (Lv${struct.level} Linked)</option>`;
-          showEl(this.unitTrainSelect, 'inline-block');
-        }
-        if (this.btnTrainUnit) {
-          showEl(this.btnTrainUnit, 'flex');
-          this.btnTrainUnit.disabled = committed >= maxRoster || this.getTotalQueuedTrainOrders() >= 10 || this.scrap < trainCost;
-          const qTag = trainQueue.length > 0 ? ` (Q:${trainQueue.length})` : '';
-          if (trainBtnLabel) trainBtnLabel.innerText = committed >= maxRoster ? 'Roster Full' : ((this.isMobileTouch ? 'Train' : 'Train Commando') + qTag);
-        }
-        if (this.trainCostLabel) {
-          this.trainCostLabel.innerText = committed >= maxRoster ? `${rosterCount}/${maxRoster}` : `$${trainCost}`;
-        }
+        if (this.unitTrainSelect) hideEl(this.unitTrainSelect);
+        if (this.btnTrainUnit) hideEl(this.btnTrainUnit);
         if (this.btnCancelTrain) hideEl(this.btnCancelTrain);
         if (this.btnRelease) {
           showEl(this.btnRelease, 'flex');
           this.btnRelease.disabled = occ === 0;
         }
         if (this.releaseCountLabel) this.releaseCountLabel.innerText = `${occ}/${cap}`;
+        this.renderBuildingUnitFloatMenu(struct, isAllyReadOnly);
       } else if (struct.type === 'engineering') {
         const occ = struct.occupants ? struct.occupants.length : 0;
-        const cap = struct.capacity || 4;
-        const maxRoster = spec.maxRoster || 4;
-        const trainCost = spec.trainCost || 50;
+        const cap = this.getHubCapacity(struct);
+        const maxRoster = cap;
         const activeTrainers = struct.activeTrainers || [];
         const trainQueue = struct.trainQueue || [];
         const rosterCount = this.getHubRosterCount(struct);
-        const committed = rosterCount + activeTrainers.length + trainQueue.length;
         const minTimer = activeTrainers.length > 0 ? Math.min(...activeTrainers.map((t) => t.timer)) : 0;
         const eSpec = ENGINEER_SPECS[Math.max(0, Math.min(2, (struct.level || 1) - 1))];
         const nextESpec = struct.level < 3 ? ENGINEER_SPECS[struct.level] : null;
@@ -8878,32 +8993,20 @@
             ? `Dispatching Recruit (${trainQueue.length} Q)`
             : `Standby: ${occ}/${cap} (+6 HP/s)`;
         }
-        if (this.unitTrainSelect) {
-          this.unitTrainSelect.innerHTML = `<option value="engineer" selected>${eSpec.name} (Lv${struct.level} Linked)</option>`;
-          showEl(this.unitTrainSelect, 'inline-block');
-        }
-        if (this.btnTrainUnit) {
-          showEl(this.btnTrainUnit, 'flex');
-          this.btnTrainUnit.disabled = committed >= maxRoster || this.getTotalQueuedTrainOrders() >= 10 || this.scrap < trainCost;
-          const qTag = trainQueue.length > 0 ? ` (Q:${trainQueue.length})` : '';
-          if (trainBtnLabel) trainBtnLabel.innerText = committed >= maxRoster ? 'Roster Full' : ((this.isMobileTouch ? 'Train' : 'Train Engineer') + qTag);
-        }
-        if (this.trainCostLabel) {
-          this.trainCostLabel.innerText = committed >= maxRoster ? `${rosterCount}/${maxRoster}` : `$${trainCost}`;
-        }
+        if (this.unitTrainSelect) hideEl(this.unitTrainSelect);
+        if (this.btnTrainUnit) hideEl(this.btnTrainUnit);
         if (this.btnCancelTrain) hideEl(this.btnCancelTrain);
         if (this.btnRelease) {
           showEl(this.btnRelease, 'flex');
           this.btnRelease.disabled = occ === 0;
         }
         if (this.releaseCountLabel) this.releaseCountLabel.innerText = `${occ}/${cap}`;
+        this.renderBuildingUnitFloatMenu(struct, isAllyReadOnly);
       } else if (struct.type === 'habitat') {
-        const trainCost = spec.trainCost || 65;
         const maxQ = spec.maxQueue || 20;
         const trainQueue = struct.trainQueue || [];
         const qLen = trainQueue.length;
         const isTraining = (struct.trainTimer || 0) > 0;
-        const hasUnstarted = trainQueue.some((o) => !o.started);
         if (this.inspectStatRange) this.inspectStatRange.innerText = `Queue: ${qLen} / ${maxQ}`;
         if (this.inspectStatDmg) this.inspectStatDmg.innerText = `Speed: ${(cur.trainDuration || 3.5).toFixed(1)}s`;
         if (this.inspectStatKills) {
@@ -8911,22 +9014,13 @@
             ? `Recruiting: ${struct.trainTimer.toFixed(1)}s (${qLen}/${maxQ})`
             : `Civilians Created: ${struct.spawnedCivs || 0}`;
         }
-        if (this.unitTrainSelect) {
-          this.unitTrainSelect.innerHTML = '<option value="civilian" selected>Civilian (Queue up to 20)</option>';
-          showEl(this.unitTrainSelect, 'inline-block');
-        }
-        if (this.btnTrainUnit) {
-          showEl(this.btnTrainUnit, 'flex');
-          this.btnTrainUnit.disabled = qLen >= maxQ || this.scrap < trainCost;
-          const qTag = qLen > 0 ? ` (Q:${qLen})` : '';
-          if (trainBtnLabel) trainBtnLabel.innerText = qLen >= maxQ ? 'Queue Full' : ((this.isMobileTouch ? 'Recruit' : 'Recruit Civilian') + qTag);
-        }
-        if (this.trainCostLabel) {
-          this.trainCostLabel.innerText = qLen >= maxQ ? `${qLen}/${maxQ}` : `$${trainCost}`;
-        }
+        if (this.unitTrainSelect) hideEl(this.unitTrainSelect);
+        if (this.btnTrainUnit) hideEl(this.btnTrainUnit);
         if (this.btnCancelTrain) hideEl(this.btnCancelTrain);
         hideEl(this.btnRelease);
+        this.renderBuildingUnitFloatMenu(struct, isAllyReadOnly);
       } else if (struct.type === 'gate') {
+        hideEl(this.buildingUnitFloatMenu);
         hideEl(this.unitTrainSelect);
         hideEl(this.btnTrainUnit);
         hideEl(this.btnRelease);
@@ -8934,6 +9028,7 @@
         if (this.inspectStatDmg) this.inspectStatDmg.innerText = 'Friendly Pass / Zombie Blocked';
         if (this.inspectStatKills) this.inspectStatKills.innerText = 'Anchors Adjacent Builds';
       } else if (struct.type === 'safezone') {
+        hideEl(this.buildingUnitFloatMenu);
         hideEl(this.unitTrainSelect);
         hideEl(this.btnTrainUnit);
         hideEl(this.btnRelease);
@@ -8942,16 +9037,21 @@
         if (this.inspectStatDmg) this.inspectStatDmg.innerText = `Damage Aura: +${auraPct}% DMG`;
         if (this.inspectStatKills) this.inspectStatKills.innerText = 'Rescues +$50 / Heals +3 HP/s';
       } else {
+        hideEl(this.buildingUnitFloatMenu);
         hideEl(this.unitTrainSelect);
         hideEl(this.btnTrainUnit);
         hideEl(this.btnRelease);
         if (this.inspectStatRange) {
-          this.inspectStatRange.innerText = cur.range ? `Range: ${cur.range}px` : 'Role: Barricade';
+          this.inspectStatRange.innerText = struct.type === 'tesla' && cur.chainCount
+            ? `Range: ${cur.range}px • Chain: ${cur.chainCount}`
+            : cur.range ? `Range: ${cur.range}px` : 'Role: Barricade';
         }
         if (this.inspectStatDmg) {
           const mult = this.getSafeZoneDmgMult();
           const devMult = this.devTowerStrengthMult || 1.0;
-          this.inspectStatDmg.innerText = cur.dmg
+          this.inspectStatDmg.innerText = struct.type === 'tesla' && cur.dmg
+            ? `Lightning: ${Math.round(cur.dmg * mult * devMult)} (35% Heavy)`
+            : cur.dmg
             ? `Damage: ${Math.round(cur.dmg * mult * devMult)}${devMult !== 1.0 ? ` (${devMult}x dev)` : ` (${cur.dmg} base)`}`
             : struct.type === 'cryo'
             ? `Slow: ${Math.round(cur.slow * 100)}%${devMult !== 1.0 ? ` (Pulse: ${Math.round(8 * mult * devMult)}dmg)` : ''}`
@@ -9045,8 +9145,75 @@
       this.updateMobileFloatingDetails(struct);
     }
 
+    renderBuildingUnitFloatMenu(struct, isAllyReadOnly = false) {
+      if (!this.buildingUnitFloatMenu) return;
+      if (!struct || isAllyReadOnly || (struct.type !== 'barracks' && struct.type !== 'engineering' && struct.type !== 'habitat')) {
+        hideEl(this.buildingUnitFloatMenu);
+        return;
+      }
+
+      const buttons = [];
+      if (struct.type === 'barracks') {
+        const cap = this.getHubCapacity(struct);
+        const q = struct.trainQueue || [];
+        const activeLen = struct.activeTrainers ? struct.activeTrainers.length : 0;
+        const committed = this.getHubRosterCount(struct) + activeLen + q.length;
+        const globalFull = this.getTotalQueuedTrainOrders() >= 20;
+        const capFull = committed >= cap || globalFull;
+        const commandoCost = STRUCTURE_SPECS.barracks.trainCost || 75;
+        const flameCost = FLAMETHROWER_SPEC.trainCost || 100;
+        const commandoQ = q.filter((o) => (o.unitKind || 'commando') === 'commando').length;
+        const flameQ = q.filter((o) => o.unitKind === 'flamethrower').length;
+        const flameUnlocked = (struct.level || 1) >= 3;
+
+        buttons.push(
+          `<button type="button" class="float-unit-btn" data-unit-kind="commando" ${capFull || this.scrap < commandoCost ? 'disabled' : ''}>` +
+            `<span class="float-unit-name">&#9874; Commando</span>` +
+            `<span class="float-unit-meta"><span class="float-unit-q">Q:${commandoQ}</span><span class="float-unit-cost">$${commandoCost}</span></span>` +
+          `</button>`
+        );
+        buttons.push(
+          `<button type="button" class="float-unit-btn${flameUnlocked ? '' : ' locked'}" data-unit-kind="flamethrower" ${!flameUnlocked || capFull || this.scrap < flameCost ? 'disabled' : ''}>` +
+            `<span class="float-unit-name">&#128293; Flamethrower</span>` +
+            `<span class="float-unit-meta">` +
+              (flameUnlocked ? `<span class="float-unit-q">Q:${flameQ}</span>` : `<span class="float-unit-lock">Requires Lv3</span>`) +
+              `<span class="float-unit-cost">$${flameCost}</span>` +
+            `</span>` +
+          `</button>`
+        );
+      } else if (struct.type === 'engineering') {
+        const cap = this.getHubCapacity(struct);
+        const q = struct.trainQueue || [];
+        const activeLen = struct.activeTrainers ? struct.activeTrainers.length : 0;
+        const committed = this.getHubRosterCount(struct) + activeLen + q.length;
+        const engCost = STRUCTURE_SPECS.engineering.trainCost || 50;
+        const disabled = committed >= cap || this.getTotalQueuedTrainOrders() >= 20 || this.scrap < engCost;
+        buttons.push(
+          `<button type="button" class="float-unit-btn" data-unit-kind="engineer" ${disabled ? 'disabled' : ''}>` +
+            `<span class="float-unit-name">&#9881; Engineer</span>` +
+            `<span class="float-unit-meta"><span class="float-unit-q">Q:${q.length}</span><span class="float-unit-cost">$${engCost}</span></span>` +
+          `</button>`
+        );
+      } else if (struct.type === 'habitat') {
+        const maxQ = STRUCTURE_SPECS.habitat.maxQueue || 20;
+        const qLen = struct.trainQueue ? struct.trainQueue.length : 0;
+        const civCost = STRUCTURE_SPECS.habitat.trainCost || 65;
+        const disabled = qLen >= maxQ || this.scrap < civCost;
+        buttons.push(
+          `<button type="button" class="float-unit-btn" data-unit-kind="civilian" ${disabled ? 'disabled' : ''}>` +
+            `<span class="float-unit-name">&#8962; Civilian</span>` +
+            `<span class="float-unit-meta"><span class="float-unit-q">Q:${qLen}</span><span class="float-unit-cost">$${civCost}</span></span>` +
+          `</button>`
+        );
+      }
+
+      this.buildingUnitFloatMenu.innerHTML = `<div class="float-unit-title">TRAIN UNIT</div>` + buttons.join('');
+      showEl(this.buildingUnitFloatMenu, 'flex');
+    }
+
     renderSoldierInspector(soldier) {
       if (!this.upgradePanel || !soldier) return;
+      hideEl(this.buildingUnitFloatMenu);
       this.upgradePanel.classList.remove('details-expanded', 'is-ally-readonly');
       this.salvageConfirmId = null;
       this.salvageConfirmUntil = 0;
@@ -9072,10 +9239,11 @@
       if (this.btnSalvage) this.btnSalvage.classList.remove('confirming');
       if (this.inspectIcon) this.inspectIcon.innerHTML = STRUCT_ICONS.soldier;
       if (soldier.isCommando) {
-        if (this.inspectName) this.inspectName.innerText = `${soldier.name || 'Commando'} (Territory Guard)`;
-        if (this.inspectTier) this.inspectTier.innerText = `Lv${soldier.level}/3 \u2022 Linked to Barracks`;
-        if (this.inspectStatRange) this.inspectStatRange.innerText = `Range: ${soldier.range}px (Kite)`;
-        if (this.inspectStatDmg) this.inspectStatDmg.innerText = `Damage: ${soldier.dmg}`;
+        const isFlame = soldier.unitKind === 'flamethrower';
+        if (this.inspectName) this.inspectName.innerText = isFlame ? 'Flamethrower (AoE Perimeter)' : `${soldier.name || 'Commando'} (Territory Guard)`;
+        if (this.inspectTier) this.inspectTier.innerText = isFlame ? 'Lv3/3 • Barracks AoE (35% Heavy)' : `Lv${soldier.level}/3 \u2022 Linked to Barracks`;
+        if (this.inspectStatRange) this.inspectStatRange.innerText = isFlame ? `Range: ${soldier.range}px (AoE ${soldier.aoeRadius || 46}px)` : `Range: ${soldier.range}px (Kite)`;
+        if (this.inspectStatDmg) this.inspectStatDmg.innerText = isFlame ? `Flame Dmg: ${soldier.dmg} (35% Armor)` : `Damage: ${soldier.dmg}`;
         if (this.inspectStatKills) this.inspectStatKills.innerText = `Kills: ${soldier.kills || 0}`;
         if (this.upgradeCostLabel) this.upgradeCostLabel.innerText = 'HUB';
         if (this.btnUpgrade) this.btnUpgrade.disabled = true;
@@ -9101,6 +9269,7 @@
 
     renderEngineerInspector(engineer) {
       if (!this.upgradePanel || !engineer) return;
+      hideEl(this.buildingUnitFloatMenu);
       this.upgradePanel.classList.remove('details-expanded', 'is-ally-readonly');
       this.salvageConfirmId = null;
       this.salvageConfirmUntil = 0;
@@ -9200,6 +9369,7 @@
       s.maxHp = next.hp;
       s.hp = next.hp;
       s.invested += next.cost;
+      if (next.capacity) s.capacity = next.capacity;
       if (s.type === 'safezone') this.recalcBaseIntegrity();
       if (s.type === 'barracks' || s.type === 'engineering') {
         this.syncLinkedHubUnits(s);
@@ -9345,6 +9515,7 @@
       if (this.btnSalvage) this.btnSalvage.classList.remove('confirming');
       if (this.btnMoveStructure) this.btnMoveStructure.classList.remove('moving-active', 'on-cooldown');
       if (this.upgradePanel) this.upgradePanel.classList.remove('details-expanded');
+      hideEl(this.buildingUnitFloatMenu);
       hideEl(this.upgradePanel);
       if (this.mobileFloatingDetails) this.mobileFloatingDetails.classList.add('hidden');
     }
@@ -9352,7 +9523,7 @@
     isMovableStructure(struct) {
       if (!struct) return false;
       return struct.type === 'barracks' || struct.type === 'engineering' || struct.type === 'habitat'
-        || struct.type === 'sentry' || struct.type === 'cryo' || struct.type === 'sniper';
+        || struct.type === 'sentry' || struct.type === 'cryo' || struct.type === 'sniper' || struct.type === 'tesla';
     }
 
     toggleMoveSelectedStructure() {
@@ -9525,7 +9696,7 @@
         let totalEng = this.engineers.length;
         let totalTowers = 0;
         for (const st of this.structures.values()) {
-          if (st.type === 'sentry' || st.type === 'cryo' || st.type === 'sniper') totalTowers++;
+          if (st.type === 'sentry' || st.type === 'cryo' || st.type === 'sniper' || st.type === 'tesla') totalTowers++;
           if (st.occupants) {
             for (const u of st.occupants) {
               if (u.unitType === 'engineer') totalEng++;
@@ -9537,7 +9708,7 @@
         parts.push(`Engineers: ${totalEng}`);
         parts.push(`Civilians: ${this.civilians.length}`);
         parts.push(`Towers: ${totalTowers}`);
-      } else if (entity.type === 'sentry' || entity.type === 'cryo' || entity.type === 'sniper') {
+      } else if (entity.type === 'sentry' || entity.type === 'cryo' || entity.type === 'sniper' || entity.type === 'tesla') {
         if (entity.hp !== undefined && entity.maxHp !== undefined) {
           parts.push(`HP: ${Math.ceil(entity.hp)}/${entity.maxHp}`);
         }
@@ -9547,6 +9718,9 @@
           if (cur.range) {
             const tiles = Math.round(cur.range / 40);
             parts.push(`Rng: ${tiles} ${tiles === 1 ? 'tile' : 'tiles'}`);
+          }
+          if (entity.type === 'tesla' && cur.chainCount) {
+            parts.push(`Chain: ${cur.chainCount}`);
           }
           if (cur.dmg) {
             const mult = this.getSafeZoneDmgMult();
@@ -10254,7 +10428,7 @@
                 let bestBarD = Infinity;
                 for (const st of this.structures.values()) {
                   const activeT = st.activeTrainers ? st.activeTrainers.length : 0;
-                  if (st.type === 'barracks' && st.occupants && st.occupants.length + activeT < (st.capacity || 4)) {
+                  if (st.type === 'barracks' && st.occupants && st.occupants.length + activeT < this.getHubCapacity(st)) {
                     if (this.isMultiplayer && sol.ownerId && st.ownerId && st.ownerId !== sol.ownerId) continue;
                     const d = Math.hypot(st.x - sol.x, st.y - sol.y);
                     if (d < bestBarD) {
@@ -10309,25 +10483,57 @@
           if (fireTarget) {
             sol.cooldown = effectiveRate;
             sol.angle = Math.atan2(fireTarget.y - sol.y, fireTarget.x - sol.x);
-            this.sound.playLaser(720, 340, 0.05);
-            this.projectiles.push({
-              id: this.nextProjId++,
-              type: 'bullet',
-              x1: sol.x,
-              y1: sol.y,
-              x2: fireTarget.x,
-              y2: fireTarget.y,
-              color: '#38E8FF',
-              life: 0.1,
-              maxLife: 0.1
-            });
-            fireTarget.lastAttackerOwnerId = sol.ownerId || fireTarget.lastAttackerOwnerId || null;
-            fireTarget.hp -= hitDmg;
-            if (fireTarget.hp <= 0) {
-              sol.kills = (sol.kills || 0) + 1;
-              if (sol.isCommando) this.totalCommandoKills = (this.totalCommandoKills || 0) + 1;
+            if (sol.unitKind === 'flamethrower') {
+              const aoeR = sol.aoeRadius || 46;
+              const armorMult = sol.armorMult || 0.35;
+              this.sound.playFlameBurst();
+              this.projectiles.push({
+                id: this.nextProjId++,
+                type: 'flameCone',
+                x1: sol.x,
+                y1: sol.y,
+                x2: fireTarget.x,
+                y2: fireTarget.y,
+                radius: aoeR,
+                color: '#FF6B1A',
+                life: 0.22,
+                maxLife: 0.22
+              });
+              for (const z of this.zombies) {
+                if (z.hp <= 0) continue;
+                if (Math.hypot(z.x - fireTarget.x, z.y - fireTarget.y) > aoeR) continue;
+                const isHeavy = z.type === 'tank' || z.type === 'demolisher' || z.type === 'wrecker';
+                const dmg = isHeavy ? Math.max(1, Math.round(hitDmg * armorMult)) : hitDmg;
+                z.lastAttackerOwnerId = sol.ownerId || z.lastAttackerOwnerId || null;
+                z.hp -= dmg;
+                if (z.hp <= 0) {
+                  sol.kills = (sol.kills || 0) + 1;
+                  this.totalCommandoKills = (this.totalCommandoKills || 0) + 1;
+                }
+              }
+              this.addParticles(fireTarget.x, fireTarget.y, '#FF6B1A', 6, 44);
+              this.addParticles(fireTarget.x, fireTarget.y, '#FFD23F', 4, 34);
+            } else {
+              this.sound.playLaser(720, 340, 0.05);
+              this.projectiles.push({
+                id: this.nextProjId++,
+                type: 'bullet',
+                x1: sol.x,
+                y1: sol.y,
+                x2: fireTarget.x,
+                y2: fireTarget.y,
+                color: '#38E8FF',
+                life: 0.1,
+                maxLife: 0.1
+              });
+              fireTarget.lastAttackerOwnerId = sol.ownerId || fireTarget.lastAttackerOwnerId || null;
+              fireTarget.hp -= hitDmg;
+              if (fireTarget.hp <= 0) {
+                sol.kills = (sol.kills || 0) + 1;
+                if (sol.isCommando) this.totalCommandoKills = (this.totalCommandoKills || 0) + 1;
+              }
+              this.addParticles(fireTarget.x, fireTarget.y, '#38E8FF', 3, 28);
             }
-            this.addParticles(fireTarget.x, fireTarget.y, '#38E8FF', 3, 28);
           } else if (sol.isCommando) {
             const breach = this.findSpawnBreachInRange(sol.x, sol.y, sol.range);
             if (breach) {
@@ -10583,7 +10789,7 @@
               let bestBayD = Infinity;
               for (const st of this.structures.values()) {
                 const activeT = st.activeTrainers ? st.activeTrainers.length : 0;
-                if (st.type === 'engineering' && st.occupants && st.occupants.length + activeT < (st.capacity || 4)) {
+                if (st.type === 'engineering' && st.occupants && st.occupants.length + activeT < this.getHubCapacity(st)) {
                   const d = Math.hypot(st.x - eng.x, st.y - eng.y);
                   if (d < bestBayD) {
                     bestBayD = d;
@@ -11160,26 +11366,58 @@
                 zombieInFireRange = true;
                 sol.cooldown = sRate;
                 struct.angle = Math.atan2(fireTarget.y - struct.y, fireTarget.x - struct.x);
-                this.sound.playLaser(720, 340, 0.05);
-                this.projectiles.push({
-                  id: this.nextProjId++,
-                  type: 'bullet',
-                  x1: struct.x,
-                  y1: struct.y,
-                  x2: fireTarget.x,
-                  y2: fireTarget.y,
-                  color: sol.isCommando ? '#00E5FF' : '#38E8FF',
-                  life: 0.1,
-                  maxLife: 0.1
-                });
-                fireTarget.lastAttackerOwnerId = sol.ownerId || struct.ownerId || fireTarget.lastAttackerOwnerId || null;
-                fireTarget.hp -= sDmg;
-                if (fireTarget.hp <= 0) {
-                  sol.kills = (sol.kills || 0) + 1;
-                  struct.kills = (struct.kills || 0) + 1;
-                  if (sol.isCommando) this.totalCommandoKills = (this.totalCommandoKills || 0) + 1;
+                if (sol.unitKind === 'flamethrower') {
+                  const aoeR = sol.aoeRadius || 46;
+                  const armorMult = sol.armorMult || 0.35;
+                  this.sound.playFlameBurst();
+                  this.projectiles.push({
+                    id: this.nextProjId++,
+                    type: 'flameCone',
+                    x1: struct.x,
+                    y1: struct.y,
+                    x2: fireTarget.x,
+                    y2: fireTarget.y,
+                    radius: aoeR,
+                    color: '#FF6B1A',
+                    life: 0.22,
+                    maxLife: 0.22
+                  });
+                  for (const z of this.zombies) {
+                    if (z.hp <= 0) continue;
+                    if (Math.hypot(z.x - fireTarget.x, z.y - fireTarget.y) > aoeR) continue;
+                    const isHeavy = z.type === 'tank' || z.type === 'demolisher' || z.type === 'wrecker';
+                    const dmg = isHeavy ? Math.max(1, Math.round(sDmg * armorMult)) : sDmg;
+                    z.lastAttackerOwnerId = sol.ownerId || struct.ownerId || z.lastAttackerOwnerId || null;
+                    z.hp -= dmg;
+                    if (z.hp <= 0) {
+                      sol.kills = (sol.kills || 0) + 1;
+                      struct.kills = (struct.kills || 0) + 1;
+                      this.totalCommandoKills = (this.totalCommandoKills || 0) + 1;
+                    }
+                  }
+                  this.addParticles(fireTarget.x, fireTarget.y, '#FF6B1A', 5, 40);
+                } else {
+                  this.sound.playLaser(720, 340, 0.05);
+                  this.projectiles.push({
+                    id: this.nextProjId++,
+                    type: 'bullet',
+                    x1: struct.x,
+                    y1: struct.y,
+                    x2: fireTarget.x,
+                    y2: fireTarget.y,
+                    color: sol.isCommando ? '#00E5FF' : '#38E8FF',
+                    life: 0.1,
+                    maxLife: 0.1
+                  });
+                  fireTarget.lastAttackerOwnerId = sol.ownerId || struct.ownerId || fireTarget.lastAttackerOwnerId || null;
+                  fireTarget.hp -= sDmg;
+                  if (fireTarget.hp <= 0) {
+                    sol.kills = (sol.kills || 0) + 1;
+                    struct.kills = (struct.kills || 0) + 1;
+                    if (sol.isCommando) this.totalCommandoKills = (this.totalCommandoKills || 0) + 1;
+                  }
+                  this.addParticles(fireTarget.x, fireTarget.y, sol.isCommando ? '#00E5FF' : '#38E8FF', 3, 28);
                 }
-                this.addParticles(fireTarget.x, fireTarget.y, sol.isCommando ? '#00E5FF' : '#38E8FF', 3, 28);
               }
             }
 
@@ -11369,6 +11607,21 @@
             struct.cooldown = lv.rate;
             this.fireSniper(struct, target, lv);
           }
+        } else if (struct.type === 'tesla') {
+          let best = null;
+          let bestD = lv.range;
+          for (const z of this.zombies) {
+            if (z.hp <= 0) continue;
+            const d = Math.hypot(z.x - struct.x, z.y - struct.y);
+            if (d <= bestD) {
+              bestD = d;
+              best = z;
+            }
+          }
+          if (best) {
+            struct.cooldown = lv.rate;
+            this.fireTesla(struct, best, lv);
+          }
         }
       }
     }
@@ -11446,6 +11699,55 @@
         if (target.hp <= 0) t.kills = (t.kills || 0) + 1;
         this.addParticles(target.x, target.y, '#FF00FF', 10, 70);
       }
+    }
+
+    fireTesla(t, target, lv) {
+      this.sound.playTeslaZap();
+      const hitZombies = [target];
+      const visited = new Set([target]);
+      const maxTargets = lv.chainCount || 3;
+      const chainRange = lv.chainRange || 85;
+      let cur = target;
+
+      while (hitZombies.length < maxTargets) {
+        let nextZ = null;
+        let nextD = chainRange;
+        for (const z of this.zombies) {
+          if (z.hp <= 0 || visited.has(z)) continue;
+          const d = Math.hypot(z.x - cur.x, z.y - cur.y);
+          if (d <= nextD) {
+            nextD = d;
+            nextZ = z;
+          }
+        }
+        if (!nextZ) break;
+        visited.add(nextZ);
+        hitZombies.push(nextZ);
+        cur = nextZ;
+      }
+
+      const baseDmg = Math.round(lv.dmg * this.getSafeZoneDmgMult() * (this.devTowerStrengthMult || 1.0));
+      const armorMult = (STRUCTURE_SPECS.tesla && STRUCTURE_SPECS.tesla.armorMult) || 0.35;
+      const points = [{ x: t.x, y: t.y }];
+
+      for (const z of hitZombies) {
+        points.push({ x: z.x, y: z.y });
+        const isHeavy = z.type === 'tank' || z.type === 'demolisher' || z.type === 'wrecker';
+        const dmg = isHeavy ? Math.max(1, Math.round(baseDmg * armorMult)) : baseDmg;
+        z.lastAttackerOwnerId = t.ownerId || z.lastAttackerOwnerId || null;
+        z.hp -= dmg;
+        if (z.hp <= 0) t.kills = (t.kills || 0) + 1;
+        this.addParticles(z.x, z.y, '#5CEEFF', 4, 42);
+      }
+
+      this.projectiles.push({
+        id: this.nextProjId++,
+        type: 'lightningArc',
+        points,
+        color: '#5CEEFF',
+        life: 0.18,
+        maxLife: 0.18
+      });
     }
 
     updateProjectiles(dt) {
@@ -12063,6 +12365,36 @@
         ctx.textAlign = 'center';
         ctx.fillText(qLen > 0 ? `Q:${qLen}` : 'HAB', x + TILE_SIZE / 2, y + 10);
         ctx.textAlign = 'left';
+      } else if (s.type === 'tesla') {
+        // Tesla Coil Tower: dark-blue insulated base pad, concentric electric-cyan coil rings, pulsing plasma orb
+        ctx.fillStyle = '#0f1c36';
+        ctx.fillRect(x + 4, y + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+        ctx.strokeStyle = lv.border || '#38E8FF';
+        ctx.lineWidth = 1.6;
+        ctx.strokeRect(x + 4, y + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+
+        ctx.strokeStyle = flash ? '#FFFFFF' : '#5CEEFF';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, 12.5, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = lv.color || '#2B5BB8';
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, 8.5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.lineWidth = 1;
+
+        const orbPulse = 0.75 + 0.25 * Math.sin(t * 9);
+        ctx.fillStyle = flash ? '#FFFFFF' : `rgba(92, 238, 255, ${orbPulse})`;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, 5.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, 2.2, 0, Math.PI * 2);
+        ctx.fill();
       } else {
         // Turret base pad
         ctx.fillStyle = '#141c28';
@@ -12188,7 +12520,7 @@
         const ownerColor = s.ownerColor || this.getPlayerColor(s.ownerId);
         if (ownerColor) {
           ctx.save();
-          if (s.type === 'sentry' || s.type === 'cryo' || s.type === 'sniper' || s.type === 'barracks' || s.type === 'engineering' || s.type === 'habitat') {
+          if (s.type === 'sentry' || s.type === 'cryo' || s.type === 'sniper' || s.type === 'tesla' || s.type === 'barracks' || s.type === 'engineering' || s.type === 'habitat') {
             ctx.strokeStyle = ownerColor;
             ctx.globalAlpha = 0.55;
             ctx.lineWidth = 1.6;
@@ -12326,8 +12658,15 @@
         ctx.save();
         ctx.translate(sol.x, sol.y);
         ctx.rotate(sol.angle || 0);
-        ctx.fillStyle = '#D6E2F3';
-        ctx.fillRect(2, -1.5, 9, 3);
+        if (sol.unitKind === 'flamethrower') {
+          ctx.fillStyle = '#B83D00';
+          ctx.fillRect(-9, -4, 4, 8);
+          ctx.fillStyle = '#FF9A1F';
+          ctx.fillRect(2, -2, 10, 4);
+        } else {
+          ctx.fillStyle = '#D6E2F3';
+          ctx.fillRect(2, -1.5, 9, 3);
+        }
         ctx.restore();
 
         ctx.fillStyle = sol.isCommando
@@ -12503,6 +12842,51 @@
           ctx.stroke();
           ctx.lineWidth = 1;
           ctx.globalAlpha = 1;
+        } else if (p.type === 'flameCone') {
+          ctx.save();
+          const ang = Math.atan2((p.y2 || 0) - (p.y1 || 0), (p.x2 || 0) - (p.x1 || 0));
+          const perp = ang + Math.PI * 0.5;
+          const spread = 14;
+          ctx.globalAlpha = a * 0.65;
+          ctx.fillStyle = '#FF6B1A';
+          ctx.beginPath();
+          ctx.moveTo(p.x1, p.y1);
+          ctx.lineTo(p.x2 + Math.cos(perp) * spread, p.y2 + Math.sin(perp) * spread);
+          ctx.lineTo(p.x2 - Math.cos(perp) * spread, p.y2 - Math.sin(perp) * spread);
+          ctx.closePath();
+          ctx.fill();
+          ctx.globalAlpha = a * 0.25;
+          ctx.beginPath();
+          ctx.arc(p.x2, p.y2, (p.radius || 46) * 0.75, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = a * 0.85;
+          ctx.strokeStyle = '#FFD23F';
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.moveTo(p.x1, p.y1);
+          ctx.lineTo(p.x2, p.y2);
+          ctx.stroke();
+          ctx.restore();
+        } else if (p.type === 'lightningArc' && Array.isArray(p.points) && p.points.length >= 2) {
+          ctx.save();
+          ctx.globalAlpha = a;
+          ctx.strokeStyle = p.color || '#5CEEFF';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(p.points[0].x, p.points[0].y);
+          for (let i = 1; i < p.points.length; i++) {
+            const p0 = p.points[i - 1];
+            const p1 = p.points[i];
+            const mx = (p0.x + p1.x) * 0.5 + (Math.random() - 0.5) * 14;
+            const my = (p0.y + p1.y) * 0.5 + (Math.random() - 0.5) * 14;
+            ctx.lineTo(mx, my);
+            ctx.lineTo(p1.x, p1.y);
+          }
+          ctx.stroke();
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+          ctx.restore();
         }
       }
     }
