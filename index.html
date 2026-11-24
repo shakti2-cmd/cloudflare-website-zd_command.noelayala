@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Zombie Defense Command - Tactical Grid Survival (v0.39.0)</title>
+  <title>Zombie Defense Command - Tactical Grid Survival (v0.40.0)</title>
 
   <!-- PWA & Mobile Web App Meta -->
   <meta name="theme-color" content="#07090d">
@@ -30,7 +30,7 @@
     <header id="topHud">
       <div class="hud-brand">
         <span class="hud-logo">&#9763;</span>
-        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.39.0</small></span>
+        <span class="hud-title">ZOMBIE DEFENSE<small>COMMAND v0.40.0</small></span>
       </div>
 
       <div class="hud-stats">
@@ -111,7 +111,7 @@
         <button id="btnCamFocusBase" class="cam-btn cam-base-btn" type="button" title="Center Camera on Safe Zone Base">&#8982; Base</button>
       </div>
 
-      <!-- Tactical Active Abilities Bar (v0.39.0: Overcharge & Napalm) -->
+      <!-- Tactical Active Abilities Bar (v0.40.0: Overcharge & Napalm) -->
       <div id="abilityBar" class="ability-bar hidden" role="toolbar" aria-label="Tactical Abilities">
         <button id="btnAbilityOvercharge" class="ability-btn" type="button" title="Overcharge ($200, 25s CD): +50% turret fire rate for 10s">
           <span class="ability-icon">&#9889;</span>
@@ -147,7 +147,7 @@
         <div class="modal-card start-card">
           <div class="start-icon">&#9763;</div>
           <h1 class="start-title">ZOMBIE DEFENSE COMMAND</h1>
-          <div class="start-version-badge">v0.39.0</div>
+          <div class="start-version-badge">v0.40.0</div>
           <p class="start-subtitle">Expand green Safe Zones within 3 tiles of Red Spawn Breaches and deploy Commandos to destroy them (towers defend against zombies only).</p>
 
           <div id="startMainSection">
@@ -242,11 +242,11 @@
             <option value="tutorial">Tutorial: Basic Training</option>
           </select>
 
-          <div class="start-hint">v0.39.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; Settings</div>
+          <div class="start-hint">v0.40.0 &bull; Hotkeys: Q select/unselect &bull; 1-9,0 build &bull; W upgrade &bull; S salvage &bull; E release &bull; Space pause &bull; Settings</div>
         </div>
       </div>
 
-      <!-- Settings Modal (v0.39.0) -->
+      <!-- Settings Modal (v0.40.0) -->
       <div id="settingsModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
         <div class="modal-card settings-card">
           <button id="btnCloseSettings" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
@@ -316,13 +316,17 @@
         </div>
       </div>
 
-      <!-- Developer Tuning Modal (v0.39.0: Live Multiplier Overrides) -->
+      <!-- Developer Tuning Modal (v0.40.0: Live Multiplier Overrides) -->
       <div id="developerModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="devTitle">
         <div class="modal-card dev-card">
           <button id="btnCloseDeveloper" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
           <h2 id="devTitle" class="help-title">&#9874; DEVELOPER TUNING (LIVE)</h2>
           <p class="dev-subtitle">Live parameter overrides. Changes take effect immediately during gameplay.</p>
-          <div class="dev-content">
+          <div class="dev-tabs" role="tablist" aria-label="Developer Tuning Tabs">
+            <button type="button" id="tabDevGeneral" class="dev-tab-btn active" data-dev-tab="general" role="tab" aria-selected="true">General</button>
+            <button type="button" id="tabDevZombies" class="dev-tab-btn" data-dev-tab="zombies" role="tab" aria-selected="false">Zombies <span id="devZombiesDot" class="dev-override-dot hidden" title="Custom per-zombie overrides active"></span></button>
+          </div>
+          <div id="devTabGeneral" class="dev-tab-panel dev-content">
             <div class="dev-group">
               <div class="dev-label-row">
                 <label class="dev-label" for="sliderDevTowerStrength">Tower Strength</label>
@@ -344,7 +348,7 @@
                   <span>10.0x</span>
                 </div>
               </div>
-              <div class="dev-hint">Multiplies Sentry, Cryo, Sniper, and Tesla tower damage.</div>
+              <div class="dev-hint">Multiplies Sentry, Cryo, Sniper, Tesla, Mortar, and Laser tower damage.</div>
             </div>
 
             <div class="dev-group">
@@ -392,7 +396,7 @@
                   <span>10.0x</span>
                 </div>
               </div>
-              <div class="dev-hint">Multiplies scrap reward received when zombies are eliminated.</div>
+              <div class="dev-hint">Multiplies scrap reward received when zombies are eliminated ($1 minimum enforced).</div>
             </div>
 
             <div class="dev-group">
@@ -443,8 +447,87 @@
               <div class="dev-hint">Multiplies the fixed per-breach zombie count spawned each wave in Survival Mode.</div>
             </div>
           </div>
+
+          <div id="devTabZombies" class="dev-tab-panel dev-content hidden">
+            <div id="devZombiePicker" class="dev-zombie-picker" role="group" aria-label="Select Zombie Type">
+              <button type="button" class="dev-zpick-btn active" data-dev-ztype="walker">Walker</button>
+              <button type="button" class="dev-zpick-btn" data-dev-ztype="runner">Runner</button>
+              <button type="button" class="dev-zpick-btn" data-dev-ztype="tank">Tank</button>
+              <button type="button" class="dev-zpick-btn" data-dev-ztype="demolisher">Demolisher</button>
+              <button type="button" class="dev-zpick-btn" data-dev-ztype="wrecker">Wrecker</button>
+              <button type="button" class="dev-zpick-btn" data-dev-ztype="miniboss">Brood Warden</button>
+              <button type="button" class="dev-zpick-btn" data-dev-ztype="behemoth">Hive Behemoth</button>
+            </div>
+
+            <div class="dev-group">
+              <div class="dev-label-row">
+                <label class="dev-label" for="sliderDevZTypeHp">HP Multiplier</label>
+                <span id="valDevZTypeHp" class="dev-val-badge">1.0x</span>
+              </div>
+              <div class="dev-slider-wrap">
+                <input type="range" id="sliderDevZTypeHp" class="dev-slider" min="0" max="10" step="1" value="5" />
+                <div class="dev-ticks">
+                  <span>0.1x</span><span>0.2x</span><span>0.35x</span><span>0.5x</span><span>0.75x</span><span class="tick-mid">1.0x</span><span>1.5x</span><span>2.0x</span><span>3.5x</span><span>6.0x</span><span>10.0x</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="dev-group">
+              <div class="dev-label-row">
+                <label class="dev-label" for="sliderDevZTypeSpeed">Speed Multiplier</label>
+                <span id="valDevZTypeSpeed" class="dev-val-badge">1.0x</span>
+              </div>
+              <div class="dev-slider-wrap">
+                <input type="range" id="sliderDevZTypeSpeed" class="dev-slider" min="0" max="10" step="1" value="5" />
+                <div class="dev-ticks">
+                  <span>0.1x</span><span>0.2x</span><span>0.35x</span><span>0.5x</span><span>0.75x</span><span class="tick-mid">1.0x</span><span>1.5x</span><span>2.0x</span><span>3.5x</span><span>6.0x</span><span>10.0x</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="dev-group">
+              <div class="dev-label-row">
+                <label class="dev-label" for="sliderDevZTypeDmg">Damage Multiplier</label>
+                <span id="valDevZTypeDmg" class="dev-val-badge">1.0x</span>
+              </div>
+              <div class="dev-slider-wrap">
+                <input type="range" id="sliderDevZTypeDmg" class="dev-slider" min="0" max="10" step="1" value="5" />
+                <div class="dev-ticks">
+                  <span>0.1x</span><span>0.2x</span><span>0.35x</span><span>0.5x</span><span>0.75x</span><span class="tick-mid">1.0x</span><span>1.5x</span><span>2.0x</span><span>3.5x</span><span>6.0x</span><span>10.0x</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="dev-group">
+              <div class="dev-label-row">
+                <label class="dev-label" for="sliderDevZTypeBounty">Base Bounty ($1&ndash;$100)</label>
+                <span id="valDevZTypeBounty" class="dev-val-badge">$1</span>
+              </div>
+              <div class="dev-slider-wrap">
+                <input type="range" id="sliderDevZTypeBounty" class="dev-slider" min="1" max="100" step="1" value="1" />
+                <div class="dev-ticks">
+                  <span>$1</span><span>$25</span><span class="tick-mid">$50</span><span>$75</span><span>$100</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="dev-group">
+              <div class="dev-label-row">
+                <label class="dev-label" for="sliderDevZTypeCount">Wave Count Multiplier</label>
+                <span id="valDevZTypeCount" class="dev-val-badge">1.0x</span>
+              </div>
+              <div class="dev-slider-wrap">
+                <input type="range" id="sliderDevZTypeCount" class="dev-slider" min="0" max="9" step="1" value="4" />
+                <div class="dev-ticks">
+                  <span>0x</span><span>0.25x</span><span>0.5x</span><span>0.75x</span><span class="tick-mid">1.0x</span><span>1.5x</span><span>2.0x</span><span>3.0x</span><span>4.0x</span><span>5.0x</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="modal-actions dev-actions">
-            <button id="btnResetDeveloper" type="button" class="modal-btn secondary-btn dev-reset-btn">&#8635; Reset Defaults</button>
+            <button id="btnResetDevTab" type="button" class="modal-btn secondary-btn dev-reset-btn">&#8635; Reset Tab</button>
+            <button id="btnResetDevAll" type="button" class="modal-btn secondary-btn dev-reset-btn">Reset All</button>
             <button id="btnDoneDeveloper" type="button" class="modal-btn primary-btn">Done</button>
           </div>
         </div>
@@ -454,7 +537,7 @@
       <div id="howToPlayModal" class="modal-overlay hidden">
         <div class="modal-card help-card">
           <button id="btnCloseHowToPlay" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.39.0)</h2>
+          <h2 class="help-title">TACTICAL OPERATIONS MANUAL (v0.40.0)</h2>
           <div class="help-grid">
             <section>
               <h3>Single 3&times;3 Start &amp; Line-Drag Barricades</h3>
@@ -491,21 +574,21 @@
       <div id="zombieGuideModal" class="modal-overlay hidden">
         <div class="modal-card help-card zombie-guide-card">
           <button id="btnCloseZombieGuide" class="hud-btn close-btn" title="Close (Esc)">&times;</button>
-          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.39.0)</h2>
+          <h2 class="help-title">&#9760; ZOMBIE BESTIARY &amp; THREAT INTEL (v0.40.0)</h2>
           <div id="bestiaryHardIndicator" class="bestiary-hard-indicator hidden">&#9888; HARD MODE ACTIVE: 3.0&times; ZOMBIE HP APPLIED</div>
           <p class="bestiary-note"><b class="c-orange">25% Random Brute-Breach Trait:</b> Any spawned Walker, Runner, Tank, or Wrecker has a 25% chance (100% on Demolisher) to smash straight toward Safe Zones, dealing a <b>fixed unscaled 12 damage</b> (<b>16 damage</b> for Demolishers) per strike against structures &amp; Safe Zones.</p>
           <div class="zombie-intel-list">
             <div class="zombie-intel-row">
               <canvas id="zPortraitWalker" class="z-portrait" width="52" height="52"></canvas>
               <div class="z-info">
-                <div class="z-head"><span class="z-name c-red">1. WALKER (walker)</span><span class="z-stats">HP: 40 &bull; Speed: 45 px/s &bull; Dmg: 10 / 0.5s &bull; Bounty: +$2 &bull; Wave 1+</span></div>
+                <div class="z-head"><span class="z-name c-red">1. WALKER (walker)</span><span class="z-stats">HP: 40 &bull; Speed: 45 px/s &bull; Dmg: 10 / 0.5s &bull; Bounty: +$1 &bull; Wave 1+</span></div>
                 <p>Standard infected shambler. Pursues nearest uninfected civilian, then Rescued Soldiers/Engineers within 300px, then green Safe Zone blocks. Routes around structures when an open lane exists.</p>
               </div>
             </div>
             <div class="zombie-intel-row">
               <canvas id="zPortraitRunner" class="z-portrait" width="52" height="52"></canvas>
               <div class="z-info">
-                <div class="z-head"><span class="z-name c-orange">2. RUNNER (runner)</span><span class="z-stats">HP: 25 &bull; Speed: 85 px/s &bull; Dmg: 8 / 0.5s &bull; Bounty: +$4 &bull; Wave 2+</span></div>
+                <div class="z-head"><span class="z-name c-orange">2. RUNNER (runner)</span><span class="z-stats">HP: 25 &bull; Speed: 85 px/s &bull; Dmg: 8 / 0.5s &bull; Bounty: +$1 &bull; Wave 2+</span></div>
                 <p>High-velocity sprinter appearing from Wave 2+. Closes distance rapidly to bite exposed civilians; also spawns immediately whenever an infected white-dot civilian completes incubation.</p>
               </div>
             </div>
@@ -571,7 +654,7 @@
         </div>
       </div>
 
-      <!-- 4-Player Co-Op Multiplayer Modals (v0.39.0) -->
+      <!-- 4-Player Co-Op Multiplayer Modals (v0.40.0) -->
       <div id="mpRoleModal" class="modal-overlay hidden">
         <div class="modal-card mp-card">
           <h2 class="help-title mp-modal-title">&#127760; 4-PLAYER CO-OP MULTIPLAYER</h2>
@@ -703,7 +786,7 @@
         </div>
       </div>
 
-      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.39.0) -->
+      <!-- Multiplayer Tactical Pause, Host Migration & Reconnect Approval Modal (v0.40.0) -->
       <div id="mpPauseModal" class="modal-overlay hidden">
         <div class="modal-card mp-card mp-pause-card">
           <h2 id="mpPauseTitle" class="help-title mp-modal-title">&#9208; MATCH PAUSED</h2>
@@ -897,7 +980,7 @@
         </div>
 
         <div id="deckHint">
-          <span class="hint-text">v0.39.0 &bull; Mortar ($240) / Laser ($260) / Radar ($175) &bull; Gunner / Medic / Sapper &bull; Barracks Hold Stance &bull; Overcharge &amp; Napalm</span>
+          <span class="hint-text">v0.40.0 &bull; Mortar ($240) / Laser ($260) / Radar ($175) &bull; Gunner / Medic / Sapper &bull; Barracks Hold Stance &bull; Overcharge &amp; Napalm</span>
         </div>
       </div>
     </footer>

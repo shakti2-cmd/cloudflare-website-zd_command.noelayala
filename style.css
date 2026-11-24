@@ -1,4 +1,4 @@
-/* Zombie Defense Command v0.39.0 - tactical command-center theme (offline, zero layout shift) */
+/* Zombie Defense Command v0.40.0 - tactical command-center theme (offline, zero layout shift) */
 :root {
   --bg: #07090d;
   --panel: #0e131b;
@@ -2025,7 +2025,93 @@ body.is-multiplayer #btnMobileReset {
 .dev-subtitle {
   color: var(--dim);
   font-size: 11.5px;
-  margin: 4px 0 12px;
+  margin: 4px 0 10px;
+}
+.dev-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.dev-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: border-color 0.14s, background 0.14s, color 0.14s;
+}
+.dev-tab-btn:hover {
+  border-color: var(--color-yellow);
+  color: var(--text);
+}
+.dev-tab-btn.active {
+  background: rgba(255, 210, 63, 0.14);
+  border-color: var(--color-yellow);
+  color: var(--color-yellow);
+}
+.dev-override-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #FF9A1F;
+  box-shadow: 0 0 6px #FF9A1F;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.dev-override-dot.hidden,
+.dev-tab-panel.hidden {
+  display: none !important;
+}
+.dev-zombie-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.dev-zpick-btn {
+  position: relative;
+  flex: 1 1 auto;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  touch-action: manipulation;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+}
+.dev-zpick-btn:hover {
+  border-color: var(--color-yellow);
+  color: var(--text);
+}
+.dev-zpick-btn.active {
+  background: rgba(255, 210, 63, 0.16);
+  border-color: var(--color-yellow);
+  color: var(--color-yellow);
+}
+.dev-zpick-btn.modified::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 5px;
+  border-radius: 50%;
+  background: #FF9A1F;
+  vertical-align: middle;
 }
 .dev-content {
   display: flex;
@@ -2098,8 +2184,12 @@ body.is-multiplayer #btnMobileReset {
 .dev-actions {
   margin-top: 16px;
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 8px;
+}
+.dev-actions .hidden {
+  display: none !important;
 }
 .dev-reset-btn {
   border-color: rgba(255, 210, 63, 0.4);

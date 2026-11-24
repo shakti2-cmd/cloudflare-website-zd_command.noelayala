@@ -2,7 +2,7 @@
  * Zombie Defense Command - HTML5 Engine (00_zombie)
  * Canvas 2D Top-Down Grid Defense Game
  * Pure Vanilla JavaScript - 100% Offline Playable (file:// safe)
- * Version: v0.39.0 (Gate Pathing Fix, Medic Beam & Escort, Sapper Outside 5-Mine Click-to-Detonate, Sniper -50% ROF & Boss Headshot Immunity, Wave 6+ Mini-Boss)
+ * Version: v0.40.0 (Sapper Barrier-Adjacent Mining & Return, Medic Target Filter, Soldier Gate Unstick, $1 Bounties & Tabbed Per-Zombie Developer Tuning)
  */
 
 (function () {
@@ -415,6 +415,16 @@
     speed: 76,
     trainCost: 90,
     color: '#FFAE00'
+  };
+
+  const ZOMBIE_BASE_STATS = {
+    walker: { label: 'Walker', hp: 40, speed: 45, dmg: 10, radius: 7, color: '#FF3333', reward: 1 },
+    runner: { label: 'Runner', hp: 25, speed: 85, dmg: 8, radius: 6, color: '#FF7700', reward: 1 },
+    tank: { label: 'Tank', hp: 220, speed: 25, dmg: 32, radius: 11, color: '#990000', reward: 10 },
+    demolisher: { label: 'Demolisher', hp: 180, speed: 38, dmg: 20, radius: 12, color: '#3B0910', reward: 9 },
+    wrecker: { label: 'Wrecker', hp: 110, speed: 62, dmg: 14, radius: 9, color: '#B833FF', reward: 7 },
+    miniboss: { label: 'Brood Warden', hp: 450, speed: 30, dmg: 24, radius: 14, color: '#8B1E3F', reward: 45 },
+    behemoth: { label: 'Hive Behemoth', hp: 900, speed: 24, dmg: 35, radius: 17, color: '#6E0D25', reward: 40 }
   };
 
   // --- AUTO-REPAIR ENGINEER SPECS (Trained in Engineering from Lv1 Recruits over 4.0s; upgrades linked to Engineering Lv1-Lv3) ---
@@ -1228,6 +1238,10 @@
       this.devZombieSpeedMult = 1.0;
       this.devBreachCountMult = 0.75;
       this.devSliderStops = [0.1, 0.2, 0.35, 0.5, 0.75, 1.0, 1.5, 2.0, 3.5, 6.0, 10.0];
+      this.devCountStops = [0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0];
+      this.devActiveTab = 'general';
+      this.devSelectedZombieType = 'walker';
+      this.devZombieOverrides = this.createDefaultZombieOverrides();
 
       this.scrap = 100;
       this.score = 0;
@@ -1593,11 +1607,18 @@
       this.btnSettingsBestiary = $('btnSettingsBestiary');
       this.btnSettingsDeveloper = $('btnSettingsDeveloper');
 
-      // Developer Tuning UI Elements (v0.31.0)
+      // Developer Tuning UI Elements (v0.40.0)
       this.developerModal = $('developerModal');
       this.btnCloseDeveloper = $('btnCloseDeveloper');
       this.btnDoneDeveloper = $('btnDoneDeveloper');
-      this.btnResetDeveloper = $('btnResetDeveloper');
+      this.btnResetDevTab = $('btnResetDevTab');
+      this.btnResetDevAll = $('btnResetDevAll');
+      this.tabDevGeneral = $('tabDevGeneral');
+      this.tabDevZombies = $('tabDevZombies');
+      this.devZombiesDot = $('devZombiesDot');
+      this.devTabGeneral = $('devTabGeneral');
+      this.devTabZombies = $('devTabZombies');
+      this.devZombiePicker = $('devZombiePicker');
       this.sliderDevTowerStrength = $('sliderDevTowerStrength');
       this.sliderDevZombieHp = $('sliderDevZombieHp');
       this.sliderDevZombieScrap = $('sliderDevZombieScrap');
@@ -1608,6 +1629,16 @@
       this.valDevZombieScrap = $('valDevZombieScrap');
       this.valDevZombieSpeed = $('valDevZombieSpeed');
       this.valDevBreachCount = $('valDevBreachCount');
+      this.sliderDevZTypeHp = $('sliderDevZTypeHp');
+      this.sliderDevZTypeSpeed = $('sliderDevZTypeSpeed');
+      this.sliderDevZTypeDmg = $('sliderDevZTypeDmg');
+      this.sliderDevZTypeBounty = $('sliderDevZTypeBounty');
+      this.sliderDevZTypeCount = $('sliderDevZTypeCount');
+      this.valDevZTypeHp = $('valDevZTypeHp');
+      this.valDevZTypeSpeed = $('valDevZTypeSpeed');
+      this.valDevZTypeDmg = $('valDevZTypeDmg');
+      this.valDevZTypeBounty = $('valDevZTypeBounty');
+      this.valDevZTypeCount = $('valDevZTypeCount');
 
       // Multiplayer UI Elements (v0.23.0)
       this.btnStartMultiplayer = $('btnStartMultiplayer');
@@ -1787,11 +1818,23 @@
       on(this.btnSettingsHowToPlay, 'click', () => this.openHowToPlay());
       on(this.btnSettingsBestiary, 'click', () => this.openZombieGuide());
 
-      // Developer Tuning Modal bindings (v0.31.0)
+      // Developer Tuning Modal bindings (v0.40.0)
       on(this.btnSettingsDeveloper, 'click', () => this.openDeveloperModal());
       on(this.btnCloseDeveloper, 'click', () => this.closeDeveloperModal());
       on(this.btnDoneDeveloper, 'click', () => this.closeDeveloperModal());
-      on(this.btnResetDeveloper, 'click', () => this.resetDeveloperDefaults());
+      on(this.btnResetDevTab, 'click', () => this.resetDeveloperTab());
+      on(this.btnResetDevAll, 'click', () => this.resetAllDeveloperDefaults());
+      on(this.tabDevGeneral, 'click', () => { this.setDeveloperTab('general'); this.sound.playClick(); });
+      on(this.tabDevZombies, 'click', () => { this.setDeveloperTab('zombies'); this.sound.playClick(); });
+      if (this.devZombiePicker) {
+        this.devZombiePicker.querySelectorAll('[data-dev-ztype]').forEach((btn) => {
+          on(btn, 'click', () => {
+            this.devSelectedZombieType = btn.dataset.devZtype || 'walker';
+            this.syncDeveloperUI();
+            this.sound.playClick();
+          });
+        });
+      }
 
       const updateDevSlider = (slider, key, readout) => {
         if (!slider) return;
@@ -1817,6 +1860,27 @@
       on(this.sliderDevZombieScrap, 'input', () => updateDevSlider(this.sliderDevZombieScrap, 'scrap', this.valDevZombieScrap));
       on(this.sliderDevZombieSpeed, 'input', () => updateDevSlider(this.sliderDevZombieSpeed, 'speed', this.valDevZombieSpeed));
       on(this.sliderDevBreachCount, 'input', () => updateDevSlider(this.sliderDevBreachCount, 'breach', this.valDevBreachCount));
+
+      on(this.sliderDevZTypeHp, 'input', () => {
+        const idx = Math.max(0, Math.min(this.devSliderStops.length - 1, parseInt(this.sliderDevZTypeHp.value, 10) || 0));
+        this.setDevZombieTypeStat(this.devSelectedZombieType, 'hpMult', this.devSliderStops[idx]);
+      });
+      on(this.sliderDevZTypeSpeed, 'input', () => {
+        const idx = Math.max(0, Math.min(this.devSliderStops.length - 1, parseInt(this.sliderDevZTypeSpeed.value, 10) || 0));
+        this.setDevZombieTypeStat(this.devSelectedZombieType, 'speedMult', this.devSliderStops[idx]);
+      });
+      on(this.sliderDevZTypeDmg, 'input', () => {
+        const idx = Math.max(0, Math.min(this.devSliderStops.length - 1, parseInt(this.sliderDevZTypeDmg.value, 10) || 0));
+        this.setDevZombieTypeStat(this.devSelectedZombieType, 'dmgMult', this.devSliderStops[idx]);
+      });
+      on(this.sliderDevZTypeBounty, 'input', () => {
+        const val = Math.max(1, Math.min(100, parseInt(this.sliderDevZTypeBounty.value, 10) || 1));
+        this.setDevZombieTypeStat(this.devSelectedZombieType, 'bounty', val);
+      });
+      on(this.sliderDevZTypeCount, 'input', () => {
+        const idx = Math.max(0, Math.min(this.devCountStops.length - 1, parseInt(this.sliderDevZTypeCount.value, 10) || 0));
+        this.setDevZombieTypeStat(this.devSelectedZombieType, 'countMult', this.devCountStops[idx]);
+      });
 
       const saveSettingsCallsign = () => {
         if (!this.settingsPlayerCallsign) return;
@@ -3073,12 +3137,83 @@
       this.sound.playClick();
     }
 
+    createDefaultZombieOverrides() {
+      const out = {};
+      for (const [k, st] of Object.entries(ZOMBIE_BASE_STATS)) {
+        out[k] = { hpMult: 1.0, speedMult: 1.0, dmgMult: 1.0, bounty: st.reward, countMult: 1.0 };
+      }
+      return out;
+    }
+
+    isZombieTypeModified(zType) {
+      const base = ZOMBIE_BASE_STATS[zType];
+      const ovr = this.devZombieOverrides && this.devZombieOverrides[zType];
+      if (!base || !ovr) return false;
+      return Math.abs((ovr.hpMult ?? 1.0) - 1.0) > 0.001
+        || Math.abs((ovr.speedMult ?? 1.0) - 1.0) > 0.001
+        || Math.abs((ovr.dmgMult ?? 1.0) - 1.0) > 0.001
+        || Math.abs((ovr.countMult ?? 1.0) - 1.0) > 0.001
+        || (ovr.bounty ?? base.reward) !== base.reward;
+    }
+
+    hasAnyZombieOverrides() {
+      for (const k of Object.keys(ZOMBIE_BASE_STATS)) {
+        if (this.isZombieTypeModified(k)) return true;
+      }
+      return false;
+    }
+
+    setDeveloperTab(tab) {
+      this.devActiveTab = tab === 'zombies' ? 'zombies' : 'general';
+      const isZom = this.devActiveTab === 'zombies';
+      if (this.tabDevGeneral) {
+        this.tabDevGeneral.classList.toggle('active', !isZom);
+        this.tabDevGeneral.setAttribute('aria-selected', !isZom ? 'true' : 'false');
+      }
+      if (this.tabDevZombies) {
+        this.tabDevZombies.classList.toggle('active', isZom);
+        this.tabDevZombies.setAttribute('aria-selected', isZom ? 'true' : 'false');
+      }
+      if (this.devTabGeneral) this.devTabGeneral.classList.toggle('hidden', isZom);
+      if (this.devTabZombies) this.devTabZombies.classList.toggle('hidden', !isZom);
+      if (this.btnResetDevAll) this.btnResetDevAll.classList.toggle('hidden', isZom);
+      this.syncDeveloperUI();
+    }
+
+    setDevZombieTypeStat(zType, stat, newVal) {
+      if (!this.devZombieOverrides || !this.devZombieOverrides[zType]) return;
+      const ovr = this.devZombieOverrides[zType];
+      const prev = ovr[stat];
+      ovr[stat] = newVal;
+      if (Array.isArray(this.zombies)) {
+        for (let i = 0; i < this.zombies.length; i++) {
+          const z = this.zombies[i];
+          if (!z || z.dead || z.type !== zType) continue;
+          if (stat === 'hpMult' && prev > 0) {
+            const ratio = newVal / prev;
+            z.maxHp = Math.max(1, Math.round(z.maxHp * ratio));
+            z.hp = Math.max(1, Math.min(z.maxHp, Math.round(z.hp * ratio)));
+          } else if (stat === 'speedMult' && prev > 0) {
+            const ratio = newVal / prev;
+            z.baseSpeed = Math.max(5, Math.round((z.baseSpeed || 45) * ratio));
+            z.speed = Math.max(5, Math.round((z.speed || z.baseSpeed) * ratio));
+          } else if (stat === 'dmgMult' && prev > 0) {
+            const ratio = newVal / prev;
+            z.dmg = Math.max(1, Math.round((z.dmg || 10) * ratio));
+          } else if (stat === 'bounty') {
+            z.reward = Math.max(1, Math.round(newVal));
+          }
+        }
+      }
+      this.syncDeveloperUI();
+    }
+
     syncDeveloperUI() {
-      const getStopIndex = (val) => {
-        let bestIdx = 5;
+      const getStopIndex = (stops, val, defIdx) => {
+        let bestIdx = defIdx;
         let minDiff = Infinity;
-        for (let i = 0; i < this.devSliderStops.length; i++) {
-          const diff = Math.abs(this.devSliderStops[i] - val);
+        for (let i = 0; i < stops.length; i++) {
+          const diff = Math.abs(stops[i] - val);
           if (diff < minDiff) {
             minDiff = diff;
             bestIdx = i;
@@ -3093,61 +3228,95 @@
       const speedMult = typeof this.devZombieSpeedMult === 'number' ? this.devZombieSpeedMult : 1.0;
       const breachMult = typeof this.devBreachCountMult === 'number' ? this.devBreachCountMult : 0.75;
 
-      if (this.sliderDevTowerStrength) {
-        this.sliderDevTowerStrength.value = getStopIndex(towerMult);
-      }
-      if (this.valDevTowerStrength) {
-        this.valDevTowerStrength.textContent = towerMult + 'x';
-      }
+      if (this.sliderDevTowerStrength) this.sliderDevTowerStrength.value = getStopIndex(this.devSliderStops, towerMult, 5);
+      if (this.valDevTowerStrength) this.valDevTowerStrength.textContent = towerMult + 'x';
+      if (this.sliderDevZombieHp) this.sliderDevZombieHp.value = getStopIndex(this.devSliderStops, hpMult, 3);
+      if (this.valDevZombieHp) this.valDevZombieHp.textContent = hpMult + 'x';
+      if (this.sliderDevZombieScrap) this.sliderDevZombieScrap.value = getStopIndex(this.devSliderStops, scrapMult, 6);
+      if (this.valDevZombieScrap) this.valDevZombieScrap.textContent = scrapMult + 'x';
+      if (this.sliderDevZombieSpeed) this.sliderDevZombieSpeed.value = getStopIndex(this.devSliderStops, speedMult, 5);
+      if (this.valDevZombieSpeed) this.valDevZombieSpeed.textContent = speedMult + 'x';
+      if (this.sliderDevBreachCount) this.sliderDevBreachCount.value = getStopIndex(this.devSliderStops, breachMult, 4);
+      if (this.valDevBreachCount) this.valDevBreachCount.textContent = breachMult + 'x';
 
-      if (this.sliderDevZombieHp) {
-        this.sliderDevZombieHp.value = getStopIndex(hpMult);
+      if (this.devZombiesDot) {
+        this.devZombiesDot.classList.toggle('hidden', !this.hasAnyZombieOverrides());
       }
-      if (this.valDevZombieHp) {
-        this.valDevZombieHp.textContent = hpMult + 'x';
+      if (this.devZombiePicker) {
+        this.devZombiePicker.querySelectorAll('[data-dev-ztype]').forEach((btn) => {
+          const zt = btn.dataset.devZtype;
+          btn.classList.toggle('active', zt === this.devSelectedZombieType);
+          btn.classList.toggle('modified', this.isZombieTypeModified(zt));
+        });
       }
+      const selType = this.devSelectedZombieType || 'walker';
+      const base = ZOMBIE_BASE_STATS[selType] || ZOMBIE_BASE_STATS.walker;
+      const ovr = (this.devZombieOverrides && this.devZombieOverrides[selType]) || { hpMult: 1.0, speedMult: 1.0, dmgMult: 1.0, bounty: base.reward, countMult: 1.0 };
 
-      if (this.sliderDevZombieScrap) {
-        this.sliderDevZombieScrap.value = getStopIndex(scrapMult);
-      }
-      if (this.valDevZombieScrap) {
-        this.valDevZombieScrap.textContent = scrapMult + 'x';
-      }
-
-      if (this.sliderDevZombieSpeed) {
-        this.sliderDevZombieSpeed.value = getStopIndex(speedMult);
-      }
-      if (this.valDevZombieSpeed) {
-        this.valDevZombieSpeed.textContent = speedMult + 'x';
-      }
-
-      if (this.sliderDevBreachCount) {
-        this.sliderDevBreachCount.value = getStopIndex(breachMult);
-      }
-      if (this.valDevBreachCount) {
-        this.valDevBreachCount.textContent = breachMult + 'x';
-      }
+      if (this.sliderDevZTypeHp) this.sliderDevZTypeHp.value = getStopIndex(this.devSliderStops, ovr.hpMult, 5);
+      if (this.valDevZTypeHp) this.valDevZTypeHp.textContent = ovr.hpMult + 'x';
+      if (this.sliderDevZTypeSpeed) this.sliderDevZTypeSpeed.value = getStopIndex(this.devSliderStops, ovr.speedMult, 5);
+      if (this.valDevZTypeSpeed) this.valDevZTypeSpeed.textContent = ovr.speedMult + 'x';
+      if (this.sliderDevZTypeDmg) this.sliderDevZTypeDmg.value = getStopIndex(this.devSliderStops, ovr.dmgMult, 5);
+      if (this.valDevZTypeDmg) this.valDevZTypeDmg.textContent = ovr.dmgMult + 'x';
+      if (this.sliderDevZTypeBounty) this.sliderDevZTypeBounty.value = Math.max(1, Math.min(100, ovr.bounty ?? base.reward));
+      if (this.valDevZTypeBounty) this.valDevZTypeBounty.textContent = '$' + Math.max(1, ovr.bounty ?? base.reward);
+      if (this.sliderDevZTypeCount) this.sliderDevZTypeCount.value = getStopIndex(this.devCountStops, ovr.countMult, 4);
+      if (this.valDevZTypeCount) this.valDevZTypeCount.textContent = ovr.countMult + 'x';
     }
 
-    resetDeveloperDefaults() {
-      // Defaults in [0.1, 0.2, 0.35, 0.5, 0.75, 1.0, 1.5, 2.0, 3.5, 6.0, 10.0]:
-      // Tower = 1.0x (5), HP = 0.5x (3), Scrap = 1.5x (6), Speed = 1.0x (5), Breach Count = 0.75x (4)
-      if (this.sliderDevTowerStrength) this.sliderDevTowerStrength.value = 5;
-      if (this.sliderDevZombieHp) this.sliderDevZombieHp.value = 3;
-      if (this.sliderDevZombieScrap) this.sliderDevZombieScrap.value = 6;
-      if (this.sliderDevZombieSpeed) this.sliderDevZombieSpeed.value = 5;
-      if (this.sliderDevBreachCount) this.sliderDevBreachCount.value = 4;
-      if (this.valDevTowerStrength) this.valDevTowerStrength.textContent = '1.0x';
-      if (this.valDevZombieHp) this.valDevZombieHp.textContent = '0.5x';
-      if (this.valDevZombieScrap) this.valDevZombieScrap.textContent = '1.5x';
-      if (this.valDevZombieSpeed) this.valDevZombieSpeed.textContent = '1.0x';
-      if (this.valDevBreachCount) this.valDevBreachCount.textContent = '0.75x';
+    resetGeneralDeveloperDefaults() {
       this.devTowerStrengthMult = 1.0;
       this.devZombieScrapMult = 1.5;
       this.devBreachCountMult = 0.75;
       this.setDevZombieHpMult(0.5);
       this.setDevZombieSpeedMult(1.0);
       if (this.selectedStructure) this.updateUpgradePanel();
+    }
+
+    resetZombieDeveloperDefaults() {
+      const defaults = this.createDefaultZombieOverrides();
+      for (const zType of Object.keys(ZOMBIE_BASE_STATS)) {
+        const def = defaults[zType];
+        const prev = this.devZombieOverrides && this.devZombieOverrides[zType];
+        if (prev && Array.isArray(this.zombies)) {
+          for (const z of this.zombies) {
+            if (!z || z.dead || z.type !== zType) continue;
+            if ((prev.hpMult || 1.0) !== 1.0) {
+              const r = 1.0 / (prev.hpMult || 1.0);
+              z.maxHp = Math.max(1, Math.round(z.maxHp * r));
+              z.hp = Math.max(1, Math.min(z.maxHp, Math.round(z.hp * r)));
+            }
+            if ((prev.speedMult || 1.0) !== 1.0) {
+              const r = 1.0 / (prev.speedMult || 1.0);
+              z.baseSpeed = Math.max(5, Math.round((z.baseSpeed || 45) * r));
+              z.speed = Math.max(5, Math.round((z.speed || z.baseSpeed) * r));
+            }
+            if ((prev.dmgMult || 1.0) !== 1.0) {
+              const r = 1.0 / (prev.dmgMult || 1.0);
+              z.dmg = Math.max(1, Math.round((z.dmg || 10) * r));
+            }
+            z.reward = def.bounty;
+          }
+        }
+      }
+      this.devZombieOverrides = defaults;
+    }
+
+    resetDeveloperTab() {
+      if (this.devActiveTab === 'zombies') {
+        this.resetZombieDeveloperDefaults();
+      } else {
+        this.resetGeneralDeveloperDefaults();
+      }
+      this.syncDeveloperUI();
+      this.sound.playClick();
+    }
+
+    resetAllDeveloperDefaults() {
+      this.resetGeneralDeveloperDefaults();
+      this.resetZombieDeveloperDefaults();
+      this.syncDeveloperUI();
       this.sound.playClick();
     }
 
@@ -6639,25 +6808,40 @@
         this.reshuffleSurvivalSpawns();
       }
 
+      const getZCountMult = (zt) => {
+        const o = this.devZombieOverrides && this.devZombieOverrides[zt];
+        return o && typeof o.countMult === 'number' ? o.countMult : 1.0;
+      };
       let cfg = { walkers: 0, runners: 0, tanks: 0, demolishers: 0, wreckers: 0 };
       if (this.isSurvivalMode && !(this.isTutorialMode && w === 1)) {
-        const perBreach = Math.max(1, Math.round(6 * (this.devBreachCountMult || 0.75)));
+        const perBreachBase = Math.max(1, Math.round(6 * (this.devBreachCountMult || 0.75)));
         const activeOwners = (this.isMultiplayer && this.isMpHost)
           ? Array.from(new Set(Array.from(this.safeZones.values()).map((sz) => sz.ownerId).filter(Boolean)))
           : [];
-        const pickSurvivalZombieType = () => {
-          const r = Math.random();
-          if (w < 2) return 'walker';
-          if (w < 3) return r < 0.65 ? 'walker' : 'runner';
-          if (w < 6) {
-            if (r < 0.48) return 'walker';
-            if (r < 0.82) return 'runner';
-            return 'tank';
+        const baseWeights = w < 2
+          ? [['walker', 1.0]]
+          : w < 3
+          ? [['walker', 0.65], ['runner', 0.35]]
+          : w < 6
+          ? [['walker', 0.48], ['runner', 0.34], ['tank', 0.18]]
+          : [['walker', 0.40], ['runner', 0.30], ['tank', 0.16], ['demolisher', 0.07], ['wrecker', 0.07]];
+        const weightedPool = [];
+        let totalW = 0;
+        for (const [zt, bw] of baseWeights) {
+          const scaledW = bw * getZCountMult(zt);
+          if (scaledW > 0) {
+            totalW += scaledW;
+            weightedPool.push([zt, totalW]);
           }
-          if (r < 0.40) return 'walker';
-          if (r < 0.70) return 'runner';
-          if (r < 0.86) return 'tank';
-          return r < 0.93 ? 'demolisher' : 'wrecker';
+        }
+        const avgCountMult = baseWeights.reduce((acc, [zt, bw]) => acc + bw * getZCountMult(zt), 0);
+        const perBreach = weightedPool.length === 0 ? 0 : Math.max(1, Math.round(perBreachBase * avgCountMult));
+        const pickSurvivalZombieType = () => {
+          const r = Math.random() * totalW;
+          for (let pi = 0; pi < weightedPool.length; pi++) {
+            if (r <= weightedPool[pi][1]) return weightedPool[pi][0];
+          }
+          return weightedPool[weightedPool.length - 1][0];
         };
         const survivalBatch = [];
         let bIdx = 0;
@@ -6688,16 +6872,21 @@
         const mpMult = this.isMultiplayer
           ? (mpScaleArr[Math.min(4, Math.max(1, (this.mpPlayers || []).length))] || 1.0)
           : 1.0;
-        const scaleCnt = (n) => (n > 0 ? Math.max(1, Math.round(n * mpMult)) : 0);
+        const scaleCnt = (n, zType = 'walker') => {
+          if (n <= 0) return 0;
+          const cMult = getZCountMult(zType);
+          if (cMult <= 0) return 0;
+          return Math.max(1, Math.round(n * mpMult * cMult));
+        };
 
         cfg = (this.isTutorialMode && w === 1)
           ? { walkers: 4, runners: 0, tanks: 0, demolishers: 0, wreckers: 0 }
           : {
-              walkers: scaleCnt(8 + L * 2 + w * 3),
-              runners: scaleCnt(w >= 2 ? 3 + L + w * 2 : 0),
-              tanks: scaleCnt(w >= 3 ? 2 + Math.floor((w - 2) * 1.3) : 0),
-              demolishers: scaleCnt(allowSiege ? Math.min(2, 1 + Math.floor((w - 6) / 3)) : 0),
-              wreckers: scaleCnt(allowSiege ? Math.min(2, 1 + Math.floor((w - 6) / 2)) : 0)
+              walkers: scaleCnt(8 + L * 2 + w * 3, 'walker'),
+              runners: scaleCnt(w >= 2 ? 3 + L + w * 2 : 0, 'runner'),
+              tanks: scaleCnt(w >= 3 ? 2 + Math.floor((w - 2) * 1.3) : 0, 'tank'),
+              demolishers: scaleCnt(allowSiege ? Math.min(2, 1 + Math.floor((w - 6) / 3)) : 0, 'demolisher'),
+              wreckers: scaleCnt(allowSiege ? Math.min(2, 1 + Math.floor((w - 6) / 2)) : 0, 'wrecker')
             };
 
         const batch = [];
@@ -6728,18 +6917,24 @@
         }
       }
       let miniBossSpawned = false;
-      if (w >= 6 && !this.isTutorialMode && this.spawns.size > 0) {
+      const mbCount = (w >= 6 && !this.isTutorialMode && this.spawns.size > 0) ? Math.round(1 * getZCountMult('miniboss')) : 0;
+      if (mbCount > 0) {
         const spawnKeys = Array.from(this.spawns.keys());
-        const mbKey = spawnKeys[Math.floor(Math.random() * spawnKeys.length)];
-        this.waveSpawnQueue.push({ type: 'miniboss', breachKey: mbKey });
+        for (let mbi = 0; mbi < mbCount; mbi++) {
+          const mbKey = spawnKeys[Math.floor(Math.random() * spawnKeys.length)];
+          this.waveSpawnQueue.push({ type: 'miniboss', breachKey: mbKey });
+        }
         miniBossSpawned = true;
-        this.addFloatingText('MINI-BOSS INCOMING!', WIDTH / 2, 165, '#FFD23F');
+        this.addFloatingText(mbCount > 1 ? `${mbCount}x MINI-BOSS INCOMING!` : 'MINI-BOSS INCOMING!', WIDTH / 2, 165, '#FFD23F');
         this.sound.playWaveWarning();
       }
-      if (this.isSurvivalMode && w >= 10 && w % 10 === 0 && this.spawns.size > 0) {
+      const behCount = (this.isSurvivalMode && w >= 10 && w % 10 === 0 && this.spawns.size > 0) ? Math.round(1 * getZCountMult('behemoth')) : 0;
+      if (behCount > 0) {
         const firstKey = this.spawns.keys().next().value;
-        this.waveSpawnQueue.push({ type: 'behemoth', breachKey: firstKey });
-        this.addFloatingText('WARNING: HIVE BEHEMOTH BOSS!', WIDTH / 2, 192, '#FF3366');
+        for (let bhi = 0; bhi < behCount; bhi++) {
+          this.waveSpawnQueue.push({ type: 'behemoth', breachKey: firstKey });
+        }
+        this.addFloatingText(behCount > 1 ? `WARNING: ${behCount}x HIVE BEHEMOTH!` : 'WARNING: HIVE BEHEMOTH BOSS!', WIDTH / 2, 192, '#FF3366');
         this.sound.playWaveWarning();
       }
       if (this.spawnTimer <= 0) this.spawnTimer = 0.35;
@@ -6775,23 +6970,16 @@
     }
 
     makeZombie(type, x, y) {
-      // v1.9.0 Rebalance: Demolisher base dmg = 20 (-70% from 65), Wrecker base dmg = 14 (-70% from 45)
-      const T = {
-        walker: { hp: 40, speed: 45, dmg: 10, radius: 7, color: '#FF3333', reward: 5 },
-        runner: { hp: 25, speed: 85, dmg: 8, radius: 6, color: '#FF7700', reward: 8 },
-        tank: { hp: 220, speed: 25, dmg: 32, radius: 11, color: '#990000', reward: 20 },
-        demolisher: { hp: 180, speed: 38, dmg: 20, radius: 12, color: '#3B0910', reward: 18 },
-        wrecker: { hp: 110, speed: 62, dmg: 14, radius: 9, color: '#B833FF', reward: 14 },
-        miniboss: { hp: 450, speed: 30, dmg: 24, radius: 14, color: '#8B1E3F', reward: 90 },
-        behemoth: { hp: 900, speed: 24, dmg: 35, radius: 17, color: '#6E0D25', reward: 80 }
-      }[type] || { hp: 40, speed: 45, dmg: 10, radius: 7, color: '#FF3333', reward: 5 };
-
+      const T = ZOMBIE_BASE_STATS[type] || ZOMBIE_BASE_STATS.walker;
+      const ovr = (this.devZombieOverrides && this.devZombieOverrides[type]) || {};
       const esc = this.computeThreatMultipliers();
-      const devHp = this.devZombieHpMult || 1.0;
-      const devSpd = this.devZombieSpeedMult || 1.0;
+      const devHp = (this.devZombieHpMult || 1.0) * (ovr.hpMult ?? 1.0);
+      const devSpd = (this.devZombieSpeedMult || 1.0) * (ovr.speedMult ?? 1.0);
+      const devDmg = ovr.dmgMult ?? 1.0;
       const hp = Math.max(1, Math.round(T.hp * this.zombieHpMult * esc.hp * devHp));
       const speed = Math.max(5, Math.round(T.speed * this.zombieSpeedMult * esc.speed * devSpd));
-      const dmg = Math.round(T.dmg * esc.dmg);
+      const dmg = Math.max(1, Math.round(T.dmg * esc.dmg * devDmg));
+      const reward = Math.max(1, Math.round(ovr.bounty !== undefined ? ovr.bounty : T.reward));
 
       return {
         id: Math.random().toString(36).slice(2, 11),
@@ -6805,7 +6993,7 @@
         dmg,
         radius: T.radius,
         color: T.color,
-        reward: Math.max(1, Math.floor(T.reward * 0.5)),
+        reward,
         angle: 0,
         bruteBreach: type === 'demolisher' ? true : Math.random() < 0.25,
         slowTimer: 0,
@@ -8913,8 +9101,10 @@
     }
 
     tryEnterEngineeringEngineer(eng, engIndex) {
-      if (eng.unitKind === 'medic' || eng.unitKind === 'sapper') {
+      if (eng.unitKind === 'medic') {
         if (!eng.manualOrder || !eng.targetEngineering) return false;
+      } else if (eng.unitKind === 'sapper') {
+        if (!eng.targetEngineering && !eng.manualOrder) return false;
       }
       if ((eng.reenterCooldown || 0) > 0) return false;
       const col = Math.floor(eng.x / TILE_SIZE);
@@ -8934,7 +9124,7 @@
         this.structures.get(`${eng.targetEngineering.col},${eng.targetEngineering.row}`) === eng.targetEngineering
       ) {
         const d = Math.hypot(eng.x - eng.targetEngineering.x, eng.y - eng.targetEngineering.y);
-        if (d <= TILE_SIZE * 0.95) engBld = eng.targetEngineering;
+        if (d <= TILE_SIZE * 1.45) engBld = eng.targetEngineering;
       }
 
       if (!engBld) return false;
@@ -11279,6 +11469,31 @@
         if (this.tryEnterBarracksSoldier(sol, i)) continue;
         if (this.tryEnterEngineeringSoldier(sol, i)) continue;
 
+        if (sol.path.length === 0) {
+          const gCol = Math.floor(sol.x / TILE_SIZE);
+          const gRow = Math.floor(sol.y / TILE_SIZE);
+          if (this.structures.get(`${gCol},${gRow}`)?.type === 'gate') {
+            let bestOff = null;
+            let bestOffScore = -Infinity;
+            for (let k = 0; k < DIRS_8.length; k++) {
+              const nc = gCol + DIRS_8[k][0];
+              const nr = gRow + DIRS_8[k][1];
+              const blocked = sol.isCommando ? this.commandoBlocked(nc, nr) : this.unitBlocked(nc, nr);
+              if (blocked) continue;
+              if (this.structures.get(`${nc},${nr}`)?.type === 'gate') continue;
+              const score = (this.grid[nr][nc] === 2 ? 10 : 0) - Math.hypot(DIRS_8[k][0], DIRS_8[k][1]);
+              if (score > bestOffScore) {
+                bestOffScore = score;
+                bestOff = [nc, nr];
+              }
+            }
+            if (bestOff) {
+              sol.path = [tileCenter(bestOff[0], bestOff[1])];
+              sol.isIntercepting = false;
+            }
+          }
+        }
+
         // Active 3-Tile Safe-Zone Perimeter Commando AI (v2.6.0):
         // 1) Immediately interrupt & kite backward when any zombie is < 120px
         // 2) Hold & shoot when any zombie is within 120..sol.range
@@ -11327,7 +11542,7 @@
             }
           }
 
-          if (sol.path.length === 0 && !onGateNow) {
+          if (sol.path.length === 0) {
             sol.aiTimer = (sol.aiTimer || 0) - dt;
             const scNow = Math.floor(sol.x / TILE_SIZE);
             const srNow = Math.floor(sol.y / TILE_SIZE);
@@ -11772,26 +11987,16 @@
 
         if (this.tryEnterEngineeringEngineer(eng, i)) continue;
 
-        // Specialist Engineer Branch: Medic (heals wounded teammates + cures infected civilians + squad escort) & Sapper (plants 5 mines outside Safe Zones)
+        // Specialist Engineer Branch: Medic (squad-only heal beam & escort; excludes civilians & outside-Safe-Zone Sappers) & Sapper (5 barrier mines + Engineering return)
         if (eng.unitKind === 'medic') {
           const hRange = eng.healRange || 110;
           const hRate = eng.healRate || 18;
-          if ((eng.cureBeamTimer || 0) > 0) eng.cureBeamTimer = Math.max(0, eng.cureBeamTimer - dt);
-          let curedAny = false;
-          for (const civ of this.civilians) {
-            if (civ.isIncubating && Math.hypot(civ.x - eng.x, civ.y - eng.y) <= hRange) {
-              civ.isIncubating = false;
-              civ.incubationTimer = 0;
-              eng.curedCount = (eng.curedCount || 0) + 1;
-              this.sound.playRescue();
-              this.addFloatingText('CURED!', civ.x, civ.y - 14, '#00FF9D');
-              this.addParticles(civ.x, civ.y, '#00FF9D', 10, 40);
-              eng.healBeamTarget = { x: civ.x, y: civ.y };
-              eng.cureBeamTimer = 0.45;
-              curedAny = true;
-              break;
-            }
-          }
+          const isSapperOutsideSafeZone = (u) => {
+            if (!u || u.unitKind !== 'sapper') return false;
+            const uc = Math.floor(u.x / TILE_SIZE);
+            const ur = Math.floor(u.y / TILE_SIZE);
+            return !inBounds(uc, ur) || !this.safeZones.has(`${uc},${ur}`);
+          };
           let bestMate = null;
           let lowestRatio = 0.999;
           for (const sol of this.soldiers) {
@@ -11801,6 +12006,7 @@
             }
           }
           for (const e2 of this.engineers) {
+            if (isSapperOutsideSafeZone(e2)) continue;
             if (e2.hp > 0 && e2.hp < e2.maxHp && Math.hypot(e2.x - eng.x, e2.y - eng.y) <= hRange) {
               const r = e2.hp / e2.maxHp;
               if (r < lowestRatio) { lowestRatio = r; bestMate = e2; }
@@ -11811,12 +12017,11 @@
             bestMate.hp = Math.min(bestMate.maxHp, bestMate.hp + hRate * dt);
             eng.repairedTotal = (eng.repairedTotal || 0) + (bestMate.hp - before);
             eng.healBeamTarget = { x: bestMate.x, y: bestMate.y };
-            eng.cureBeamTimer = 0;
             eng.angle = Math.atan2(bestMate.y - eng.y, bestMate.x - eng.x);
             if (Math.random() < 0.18) {
               this.addParticles(bestMate.x, bestMate.y, '#00FF9D', 1, 20);
             }
-          } else if (!curedAny && !(eng.cureBeamTimer > 0)) {
+          } else {
             eng.healBeamTarget = null;
           }
 
@@ -11826,29 +12031,22 @@
               eng.scanTimer = 0.65;
               let needTarget = null;
               let minNeedD = Infinity;
-              for (const civ of this.civilians) {
-                if (civ.isIncubating) {
-                  const d = Math.hypot(civ.x - eng.x, civ.y - eng.y);
-                  if (d < minNeedD) { minNeedD = d; needTarget = civ; }
-                }
-              }
-              if (!needTarget) {
-                for (const sol of this.soldiers) {
-                  if (sol.hp > 0 && sol.hp < sol.maxHp) {
-                    const d = Math.hypot(sol.x - eng.x, sol.y - eng.y);
-                    if (d < minNeedD) { minNeedD = d; needTarget = sol; }
-                  }
+              for (const sol of this.soldiers) {
+                if (sol.hp > 0 && sol.hp < sol.maxHp) {
+                  const d = Math.hypot(sol.x - eng.x, sol.y - eng.y);
+                  if (d < minNeedD) { minNeedD = d; needTarget = sol; }
                 }
               }
               if (!needTarget) {
                 for (const e2 of this.engineers) {
-                  if (e2 !== eng && e2.hp > 0 && e2.hp < e2.maxHp) {
+                  if (e2 === eng || isSapperOutsideSafeZone(e2)) continue;
+                  if (e2.hp > 0 && e2.hp < e2.maxHp) {
                     const d = Math.hypot(e2.x - eng.x, e2.y - eng.y);
                     if (d < minNeedD) { minNeedD = d; needTarget = e2; }
                   }
                 }
               }
-              // Escort active frontline squads when everyone is healthy
+              // Escort active frontline combat squads when everyone is healthy
               if (!needTarget && this.soldiers.length > 0) {
                 let escortLeader = null;
                 let bestSolD = Infinity;
@@ -11882,6 +12080,13 @@
           const mineCd = eng.mineCooldown || SAPPER_SPEC.mineCooldown || 3.0;
           const ownMines = this.mines ? this.mines.filter((m) => m.ownerUnitId === eng.id).length : 0;
           const eKey = `${ec},${er}`;
+          const isAdjBarrier = (c, r) => {
+            for (const [dc, dr] of DIRS_8) {
+              const adj = this.structures.get(`${c + dc},${r + dr}`);
+              if (adj && (adj.type === 'wall' || adj.type === 'gate')) return true;
+            }
+            return false;
+          };
           let safeDistFromBreaches = true;
           for (const sp of this.spawns.values()) {
             if (Math.max(Math.abs(ec - sp.col), Math.abs(er - sp.row)) < 3) {
@@ -11893,7 +12098,8 @@
             && !this.structures.has(eKey) && !this.safeZones.has(eKey) && !this.spawns.has(eKey)
             && safeDistFromBreaches
             && !this.mines.some((m) => Math.hypot(m.x - eng.x, m.y - eng.y) < 24);
-          if (eng.mineTimer <= 0 && ownMines < maxMines && canPlantHere) {
+          const standingBarrierAdj = isAdjBarrier(ec, er);
+          if (eng.mineTimer <= 0 && ownMines < maxMines && canPlantHere && (standingBarrierAdj || eng._sapperFallbackPlant)) {
             const mp = tileCenter(ec, er);
             this.mines.push({
               id: Math.random().toString(36).slice(2, 11),
@@ -11907,14 +12113,39 @@
               ownerId: eng.ownerId || null,
               ownerUnitId: eng.id
             });
+            eng._sapperFallbackPlant = false;
             eng.minesPlanted = (eng.minesPlanted || 0) + 1;
             eng.mineTimer = mineCd;
             this.sound.playClick();
             this.addFloatingText('MINE SET', mp.x, mp.y - 10, '#FFAE00');
-          } else if (!eng.manualOrder && !eng.manualMoveOrder && eng.path.length === 0 && eng.mineTimer <= 1.0 && ownMines < maxMines) {
+          } else if (ownMines >= maxMines && !eng.manualOrder && !eng.manualMoveOrder && eng.path.length === 0 && !eng.targetEngineering) {
+            // Return to nearest Engineering hub once all 5 mines are active
             eng.scanTimer = (eng.scanTimer || 0) - dt;
             if (eng.scanTimer <= 0) {
-              eng.scanTimer = 0.75;
+              eng.scanTimer = 0.7;
+              let bestBay = null;
+              let bestBayD = Infinity;
+              for (const st of this.structures.values()) {
+                if (st.type !== 'engineering') continue;
+                const activeT = st.activeTrainers ? st.activeTrainers.length : 0;
+                if (st.occupants && st.occupants.length + activeT < this.getHubCapacity(st)) {
+                  const d = Math.hypot(st.x - eng.x, st.y - eng.y);
+                  if (d < bestBayD) { bestBayD = d; bestBay = st; }
+                }
+              }
+              if (bestBay) {
+                const p = this.findPathToAdjacentTile(ec, er, bestBay.col, bestBay.row, (c, r) => this.unitBlocked(c, r));
+                if (p && p.length > 0) {
+                  eng.path = p.map(([c, r]) => tileCenter(c, r));
+                  eng.targetEngineering = bestBay;
+                  eng.reenterCooldown = 0;
+                }
+              }
+            }
+          } else if (!eng.manualOrder && !eng.manualMoveOrder && eng.path.length === 0 && ownMines < maxMines) {
+            eng.scanTimer = (eng.scanTimer || 0) - dt;
+            if (eng.scanTimer <= 0) {
+              eng.scanTimer = 0.7;
               const openTiles = [];
               for (let r = 1; r < ROWS - 1; r++) {
                 for (let c = 1; c < COLS - 1; c++) {
@@ -11930,12 +12161,15 @@
                   if (tooCloseToBreach) continue;
                   const tp = tileCenter(c, r);
                   if (this.mines.some((m) => Math.hypot(m.x - tp.x, m.y - tp.y) < 24)) continue;
-                  openTiles.push({ c, r, d: Math.hypot(tp.x - eng.x, tp.y - eng.y) });
+                  openTiles.push({ c, r, adjBarrier: isAdjBarrier(c, r), d: Math.hypot(tp.x - eng.x, tp.y - eng.y) });
                 }
               }
               if (openTiles.length > 0) {
-                openTiles.sort((a, b) => a.d - b.d);
-                const pick = openTiles[Math.floor(Math.random() * Math.min(5, openTiles.length))];
+                openTiles.sort((a, b) => (b.adjBarrier - a.adjBarrier) || (a.d - b.d));
+                const hasBarrierSpot = openTiles[0].adjBarrier;
+                eng._sapperFallbackPlant = !hasBarrierSpot;
+                const poolSize = hasBarrierSpot ? Math.min(2, openTiles.length) : Math.min(5, openTiles.length);
+                const pick = openTiles[Math.floor(Math.random() * poolSize)];
                 const p = findPath(ec, er, pick.c, pick.r, (c, r) => this.unitBlocked(c, r));
                 if (p && p.length > 0) {
                   eng.path = p.map(([c, r]) => tileCenter(c, r));
@@ -12064,10 +12298,13 @@
 
     // --- ZOMBIES (Per-Block Safe Zone Attacks, Fixed Brute-Breach Damage, Demolisher & Anti-Tower Wrecker) ---
     getZombieStructDmg(z) {
+      const ovr = (z && this.devZombieOverrides && this.devZombieOverrides[z.type]) || null;
+      const dmgMult = ovr && typeof ovr.dmgMult === 'number' ? ovr.dmgMult : 1.0;
       if (z && z.bruteBreach) {
-        return z.type === 'demolisher' ? 16 : 12;
+        const baseBrute = z.type === 'demolisher' ? 16 : 12;
+        return Math.max(1, Math.round(baseBrute * dmgMult));
       }
-      return z ? z.dmg : 10;
+      return z ? Math.max(1, Math.round(z.dmg)) : 10;
     }
 
     zombieRockOnly(c, r) {
@@ -12876,6 +13113,27 @@
                   this.engineers.push(eng);
                   this.commandEngineerToTarget(eng, damagedTarget);
                 }
+              } else {
+                const sIdx = struct.occupants.findIndex((u) => u.unitType === 'engineer' && u.unitKind === 'sapper');
+                if (sIdx !== -1) {
+                  const sap = struct.occupants[sIdx];
+                  const maxM = sap.maxMines || SAPPER_SPEC.maxMines || 5;
+                  const ownM = this.mines ? this.mines.filter((m) => m.ownerUnitId === sap.id).length : 0;
+                  if (ownM < maxM) {
+                    struct.occupants.splice(sIdx, 1);
+                    const exitPos = this.findSafeExitPos(struct, false, true);
+                    sap.x = exitPos.x;
+                    sap.y = exitPos.y;
+                    sap.path = [];
+                    sap.dest = null;
+                    sap.targetEngineering = null;
+                    sap.manualOrder = false;
+                    sap.manualMoveOrder = false;
+                    sap.reenterCooldown = 2.0;
+                    sap.mineTimer = Math.min(sap.mineTimer || 0, 0.6);
+                    this.engineers.push(sap);
+                  }
+                }
               }
             }
           }
@@ -13442,16 +13700,13 @@
 
     renderMines(ctx, t) {
       if (!this.mines || this.mines.length === 0) return;
-      const blink = Math.sin(t * 7) > 0;
       for (const m of this.mines) {
         if (this.isMineDetonatable(m)) {
-          ctx.strokeStyle = blink ? 'rgba(255, 174, 0, 0.7)' : 'rgba(255, 90, 31, 0.35)';
+          ctx.strokeStyle = 'rgba(255, 174, 0, 0.45)';
           ctx.lineWidth = 1.2;
-          ctx.setLineDash([3, 3]);
           ctx.beginPath();
-          ctx.arc(m.x, m.y, 11, 0, Math.PI * 2);
+          ctx.arc(m.x, m.y, 10, 0, Math.PI * 2);
           ctx.stroke();
-          ctx.setLineDash([]);
         }
         ctx.fillStyle = '#332610';
         ctx.beginPath();
@@ -13460,7 +13715,7 @@
         ctx.strokeStyle = '#FFAE00';
         ctx.lineWidth = 1.4;
         ctx.stroke();
-        ctx.fillStyle = blink ? '#FF3B3B' : '#FFAE00';
+        ctx.fillStyle = '#FF5522';
         ctx.beginPath();
         ctx.arc(m.x, m.y, 2, 0, Math.PI * 2);
         ctx.fill();
